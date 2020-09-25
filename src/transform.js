@@ -20,7 +20,7 @@ export function initTransform(framebufferSize) {
     m[8] = 1;
   }
 
-  function set(a, b, c, d, e, f) {
+  function setTransform(a, b, c, d, e, f) {
     // TODO: Resize canvas to displayed size?
     reset();
     multiply(m, m, [a, b, 0, c, d, 0, e, f, 1]);
@@ -30,12 +30,14 @@ export function initTransform(framebufferSize) {
     multiply(m, m, [a, b, 0, c, d, 0, e, f, 1]);
   }
 
-  return {
-    matrix: m,
-    set,
+  // Mimic Canvas2D API
+  const methods = {
     transform,
     translate: (tx, ty) => transform(1, 0, 0, 1, tx, ty),
     scale: (sx, sy) => transform(sx, 0, 0, sy, 0, 0),
-    get: () => m.slice(),
+    setTransform,
+    getTransform: () => m.slice(),
   };
+
+  return { matrix: m, methods };
 }
