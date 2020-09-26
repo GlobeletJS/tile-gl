@@ -504,11 +504,11 @@ function initUniforms(transform) {
   };
 
   return { values: uniforms, setters };
-}
 
-function convertColor(cssString) {
-  let c = rgb(cssString);
-  return [c.r / 255, c.g / 255, c.b / 255, c.opacity];
+  function convertColor(cssString) {
+    let c = rgb(cssString);
+    return [c.r / 255, c.g / 255, c.b / 255, c.opacity];
+  }
 }
 
 function createUniformSetters(gl, program) {

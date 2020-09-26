@@ -2,7 +2,7 @@
   "name": "tile-gl",
   "version": "0.0.1",
   "description": "2D context emulator in WebGL for vector tiles",
-  "main": "dist/tile-gl.bundle.js",
+  "module": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "rollup -c build/rollup.config.js",
@@ -26,12 +26,15 @@
   },
   "homepage": "https://github.com/GlobeletJS/tile-gl#readme",
   "devDependencies": {
+    "d3-color": "^2.0.0",
     "rollup": "^2.28.2",
+    "rollup-plugin-commonjs": "^10.1.0",
     "rollup-plugin-node-resolve": "^5.2.0"
   },
   "dependencies": {
-    "d3-color": "^2.0.0",
+    "earcut": "^2.2.2",
     "gl-matrix": "^3.3.0",
     "yawgl": "^0.2.0"
-  }
+  },
+  "sideEffects": false
 }

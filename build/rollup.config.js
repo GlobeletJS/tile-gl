@@ -1,17 +1,31 @@
 import resolve from 'rollup-plugin-node-resolve';
+import commonjs from 'rollup-plugin-commonjs'; // Needed for earcut
 import { glsl } from "./glsl-plugin.js";
-import pkg from "../package.json";
+//import pkg from "../package.json";
 
-export default {
-  input: 'src/index.js',
+// Bundling is only needed for some sub-modules
+export default [{
+  input: 'src/context.js',
   plugins: [
     glsl(),
     resolve(),
+    commonjs(),
   ],
   output: {
-    file: pkg.main,
+    file: 'dist/context.bundle.js',
     //sourcemap: 'inline',
     format: 'esm',
-    name: pkg.name
+    name: 'initGLpaint',
   }
-};
+}, {
+  input: 'src/serializers/fill.js',
+  plugins: [
+    resolve(),
+    commonjs(),
+  ],
+  output: {
+    file: 'dist/fill.bundle.js',
+    format: 'esm',
+    name: 'triangulate',
+  }
+}];
