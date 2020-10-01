@@ -4,6 +4,7 @@ uniform mat3 projection;
 attribute vec2 position;
 attribute vec3 pointA, pointB, pointC, pointD;
 
+varying float yCoord;
 varying vec2 miterCoord1, miterCoord2;
 
 mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v) {
@@ -48,7 +49,9 @@ void main() {
 
   // Find the position of the current instance vertex, in 3 coordinate systems
   vec2 extend = miterLimit * xBasis * lineWidth * (position.x - 0.5);
-  vec2 point = pointB.xy + xAxis * position.x + yBasis * lineWidth * position.y + extend;
+  // Add one pixel on either side of the line for the anti-alias taper
+  yCoord = (lineWidth + 2.0) * position.y;
+  vec2 point = pointB.xy + xAxis * position.x + yBasis * yCoord + extend;
   miterCoord1 = (m1 * vec3(point - pointB.xy, 1)).xy;
   miterCoord2 = (m2 * vec3(point - pointC.xy, 1)).xy; 
 
