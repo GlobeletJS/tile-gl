@@ -5,11 +5,14 @@ import fillVertSrc from "./shaders/fill-vertex.glsl";
 import fillFragSrc from "./shaders/fill-fragment.glsl";
 import strokeVertSrc from "./shaders/stroke-vertex.glsl";
 import strokeFragSrc from "./shaders/stroke-fragment.glsl";
+import circleVertSrc from "./shaders/circle-vertex.glsl";
+import circleFragSrc from "./shaders/circle-fragment.glsl";
 
 export function initPrograms(gl, uniforms) {
   const textProgram = yawgl.initProgram(gl, textVertSrc, textFragSrc);
   const fillProgram = yawgl.initProgram(gl, fillVertSrc, fillFragSrc);
   const strokeProgram = yawgl.initProgram(gl, strokeVertSrc, strokeFragSrc);
+  const circleProgram = yawgl.initProgram(gl, circleVertSrc, circleFragSrc);
 
   function fillText(buffers) {
     let { textVao, numInstances } = buffers;
@@ -32,13 +35,22 @@ export function initPrograms(gl, uniforms) {
     gl.bindVertexArray(null);
   }
 
+  function fillCircle(buffers) {
+    let { circleVao, numInstances } = buffers;
+    circleProgram.setupDraw({ uniforms, vao: circleVao });
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
+    gl.bindVertexArray(null);
+  }
+
   return {
     fillText,
     fill,
     stroke,
+    fillCircle,
 
     constructTextVao: textProgram.constructVao,
     constructFillVao: fillProgram.constructVao,
     constructStrokeVao: strokeProgram.constructVao,
+    constructCircleVao: circleProgram.constructVao,
   };
 }

@@ -472,6 +472,7 @@ function initUniforms(transform) {
     fontScale: 1.0,
     sdf: null,
     sdfDim: [256, 256],
+    circleRadius: 5.0,
   };
 
   // Mimic Canvas2D API
@@ -497,6 +498,9 @@ function initUniforms(transform) {
     },
     set fontSize(val) {
       uniforms.fontScale = val / 24.0; // TODO: get divisor from sdf-manager?
+    },
+    set circleRadius(val) {
+      uniforms.circleRadius = val;
     },
     // TODO: implement dashed lines, patterns
     setLineDash: () => null,
@@ -845,10 +849,48 @@ void main() {
 }
 `;
 
+var circleVertSrc = `precision highp float;
+
+attribute vec2 quadPos; // Vertices of the quad instance
+attribute vec2 circlePos;
+
+uniform mat3 projection;
+uniform float circleRadius;
+
+varying vec2 delta;
+
+void main() {
+  float extend = 2.0; // Extra space in the quad for tapering
+  delta = (circleRadius + extend) * quadPos;
+  vec2 vPos = circlePos + delta;
+
+  vec2 projected = (projection * vec3(vPos, 1)).xy;
+  gl_Position = vec4(projected, 0, 1);
+}
+`;
+
+var circleFragSrc = `precision mediump float;
+
+uniform highp float circleRadius;
+uniform vec4 fillStyle;
+uniform float globalAlpha;
+
+varying vec2 delta;
+
+void main() {
+  float radius = length(delta);
+  float dr = fwidth(radius);
+
+  float taper = 1.0 - smoothstep(circleRadius - dr, circleRadius + dr, radius);
+  gl_FragColor = fillStyle * globalAlpha * taper;
+}
+`;
+
 function initPrograms(gl, uniforms) {
   const textProgram = initProgram(gl, textVertSrc, textFragSrc);
   const fillProgram = initProgram(gl, fillVertSrc, fillFragSrc);
   const strokeProgram = initProgram(gl, strokeVertSrc, strokeFragSrc);
+  const circleProgram = initProgram(gl, circleVertSrc, circleFragSrc);
 
   function fillText(buffers) {
     let { textVao, numInstances } = buffers;
@@ -871,14 +913,23 @@ function initPrograms(gl, uniforms) {
     gl.bindVertexArray(null);
   }
 
+  function fillCircle(buffers) {
+    let { circleVao, numInstances } = buffers;
+    circleProgram.setupDraw({ uniforms, vao: circleVao });
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
+    gl.bindVertexArray(null);
+  }
+
   return {
     fillText,
     fill,
     stroke,
+    fillCircle,
 
     constructTextVao: textProgram.constructVao,
     constructFillVao: fillProgram.constructVao,
     constructStrokeVao: strokeProgram.constructVao,
+    constructCircleVao: circleProgram.constructVao,
   };
 }
 
