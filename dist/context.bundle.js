@@ -855,13 +855,13 @@ attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
 
 uniform mat3 projection;
-uniform float circleRadius;
+uniform float lineWidth;
 
 varying vec2 delta;
 
 void main() {
   float extend = 2.0; // Extra space in the quad for tapering
-  delta = (circleRadius + extend) * quadPos;
+  delta = (lineWidth + extend) * quadPos;
   vec2 vPos = circlePos + delta;
 
   vec2 projected = (projection * vec3(vPos, 1)).xy;
@@ -871,51 +871,53 @@ void main() {
 
 var circleFragSrc = `precision mediump float;
 
-uniform highp float circleRadius;
-uniform vec4 fillStyle;
+uniform highp float lineWidth;
+uniform vec4 strokeStyle;
 uniform float globalAlpha;
 
 varying vec2 delta;
 
 void main() {
-  float radius = length(delta);
-  float dr = fwidth(radius);
+  float r = length(delta);
+  float dr = fwidth(r);
+  float radius = lineWidth / 2.0;
 
-  float taper = 1.0 - smoothstep(circleRadius - dr, circleRadius + dr, radius);
-  gl_FragColor = fillStyle * globalAlpha * taper;
+  float taper = 1.0 - smoothstep(radius - dr, radius + dr, r);
+  gl_FragColor = strokeStyle * globalAlpha * taper;
 }
 `;
 
 function initPrograms(gl, uniforms) {
-  const textProgram = initProgram(gl, textVertSrc, textFragSrc);
-  const fillProgram = initProgram(gl, fillVertSrc, fillFragSrc);
-  const strokeProgram = initProgram(gl, strokeVertSrc, strokeFragSrc);
-  const circleProgram = initProgram(gl, circleVertSrc, circleFragSrc);
+  const programs = {
+    text: initProgram(gl, textVertSrc, textFragSrc),
+    fill: initProgram(gl, fillVertSrc, fillFragSrc),
+    stroke: initProgram(gl, strokeVertSrc, strokeFragSrc),
+    circle: initProgram(gl, circleVertSrc, circleFragSrc),
+  };
 
   function fillText(buffers) {
     let { textVao, numInstances } = buffers;
-    textProgram.setupDraw({ uniforms, vao: textVao });
+    programs.text.setupDraw({ uniforms, vao: textVao });
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
     gl.bindVertexArray(null);
   }
 
   function fill(buffers) {
     let { fillVao, indices: { vertexCount, type, offset } } = buffers;
-    fillProgram.setupDraw({ uniforms, vao: fillVao });
+    programs.fill.setupDraw({ uniforms, vao: fillVao });
     gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
     gl.bindVertexArray(null);
   }
 
   function stroke(buffers) {
-    let { strokeVao, numInstances } = buffers;
-    strokeProgram.setupDraw({ uniforms, vao: strokeVao });
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
-    gl.bindVertexArray(null);
-  }
-
-  function fillCircle(buffers) {
-    let { circleVao, numInstances } = buffers;
-    circleProgram.setupDraw({ uniforms, vao: circleVao });
+    let { strokeVao, circleVao, numInstances } = buffers;
+    if (strokeVao) {
+      programs.stroke.setupDraw({ uniforms, vao: strokeVao });
+    } else if (circleVao) {
+      programs.circle.setupDraw({ uniforms, vao: circleVao });
+    } else {
+      return;
+    }
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
     gl.bindVertexArray(null);
   }
@@ -924,12 +926,11 @@ function initPrograms(gl, uniforms) {
     fillText,
     fill,
     stroke,
-    fillCircle,
 
-    constructTextVao: textProgram.constructVao,
-    constructFillVao: fillProgram.constructVao,
-    constructStrokeVao: strokeProgram.constructVao,
-    constructCircleVao: circleProgram.constructVao,
+    constructTextVao: programs.text.constructVao,
+    constructFillVao: programs.fill.constructVao,
+    constructStrokeVao: programs.stroke.constructVao,
+    constructCircleVao: programs.circle.constructVao,
   };
 }
 

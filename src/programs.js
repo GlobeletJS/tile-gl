@@ -9,35 +9,36 @@ import circleVertSrc from "./shaders/circle-vertex.glsl";
 import circleFragSrc from "./shaders/circle-fragment.glsl";
 
 export function initPrograms(gl, uniforms) {
-  const textProgram = yawgl.initProgram(gl, textVertSrc, textFragSrc);
-  const fillProgram = yawgl.initProgram(gl, fillVertSrc, fillFragSrc);
-  const strokeProgram = yawgl.initProgram(gl, strokeVertSrc, strokeFragSrc);
-  const circleProgram = yawgl.initProgram(gl, circleVertSrc, circleFragSrc);
+  const programs = {
+    text: yawgl.initProgram(gl, textVertSrc, textFragSrc),
+    fill: yawgl.initProgram(gl, fillVertSrc, fillFragSrc),
+    stroke: yawgl.initProgram(gl, strokeVertSrc, strokeFragSrc),
+    circle: yawgl.initProgram(gl, circleVertSrc, circleFragSrc),
+  };
 
   function fillText(buffers) {
     let { textVao, numInstances } = buffers;
-    textProgram.setupDraw({ uniforms, vao: textVao });
+    programs.text.setupDraw({ uniforms, vao: textVao });
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
     gl.bindVertexArray(null);
   }
 
   function fill(buffers) {
     let { fillVao, indices: { vertexCount, type, offset } } = buffers;
-    fillProgram.setupDraw({ uniforms, vao: fillVao });
+    programs.fill.setupDraw({ uniforms, vao: fillVao });
     gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
     gl.bindVertexArray(null);
   }
 
   function stroke(buffers) {
-    let { strokeVao, numInstances } = buffers;
-    strokeProgram.setupDraw({ uniforms, vao: strokeVao });
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
-    gl.bindVertexArray(null);
-  }
-
-  function fillCircle(buffers) {
-    let { circleVao, numInstances } = buffers;
-    circleProgram.setupDraw({ uniforms, vao: circleVao });
+    let { strokeVao, circleVao, numInstances } = buffers;
+    if (strokeVao) {
+      programs.stroke.setupDraw({ uniforms, vao: strokeVao });
+    } else if (circleVao) {
+      programs.circle.setupDraw({ uniforms, vao: circleVao });
+    } else {
+      return;
+    }
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
     gl.bindVertexArray(null);
   }
@@ -46,11 +47,10 @@ export function initPrograms(gl, uniforms) {
     fillText,
     fill,
     stroke,
-    fillCircle,
 
-    constructTextVao: textProgram.constructVao,
-    constructFillVao: fillProgram.constructVao,
-    constructStrokeVao: strokeProgram.constructVao,
-    constructCircleVao: circleProgram.constructVao,
+    constructTextVao: programs.text.constructVao,
+    constructFillVao: programs.fill.constructVao,
+    constructStrokeVao: programs.stroke.constructVao,
+    constructCircleVao: programs.circle.constructVao,
   };
 }

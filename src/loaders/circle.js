@@ -3,8 +3,8 @@ export function initCircleBufferLoader(context) {
 
   // Create a buffer with the position of the vertices within one instance
   const instanceGeom = new Float32Array([
-    -1.0, -1.0,   1.0, -1.0,   1.0,  1.0,
-    -1.0, -1.0,   1.0,  1.0,  -1.0,  1.0,
+    -0.5, -0.5,   0.5, -0.5,   0.5,  0.5,
+    -0.5, -0.5,   0.5,  0.5,  -0.5,  0.5,
   ]);
 
   const quadPos = {
