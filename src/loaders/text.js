@@ -1,6 +1,4 @@
-export function initTextBufferLoader(context) {
-  const { gl, constructTextVao } = context;
-
+export function initTextBufferLoader(gl, constructVao) {
   // Create a buffer with the position of the vertices within one instance
   const instanceGeom = new Float32Array([
     0.0,  0.0,   1.0,  0.0,   1.0,  1.0,
@@ -60,7 +58,7 @@ export function initTextBufferLoader(context) {
     gl.bufferData(gl.ARRAY_BUFFER, rects, gl.STATIC_DRAW);
 
     const attributes = { quadPos, labelPos, charPos, sdfRect };
-    const textVao = constructTextVao({ attributes });
+    const textVao = constructVao({ attributes });
 
     return { textVao, numInstances };
   };

@@ -1,6 +1,4 @@
-export function initLineBufferLoader(context) {
-  const { gl, constructStrokeVao } = context;
-
+export function initLineBufferLoader(gl, constructVao) {
   // Create a buffer with the position of the vertices within one instance
   const instanceGeom = new Float32Array([
     0, -0.5,   1, -0.5,   1,  0.5,
@@ -20,13 +18,14 @@ export function initLineBufferLoader(context) {
   gl.bufferData(gl.ARRAY_BUFFER, instanceGeom, gl.STATIC_DRAW);
 
   return function(buffers) {
+    const { lines } = buffers;
     const numComponents = 3;
-    const numInstances = buffers.points.length / numComponents - 3;
+    const numInstances = lines.length / numComponents - 3;
 
     // Create buffer containing the vertex positions
-    const pointsBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, pointsBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, buffers.points, gl.STATIC_DRAW);
+    const linesBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, linesBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, lines, gl.STATIC_DRAW);
 
     // Create interleaved attributes pointing to different offsets in buffer
     const attributes = {
@@ -39,7 +38,7 @@ export function initLineBufferLoader(context) {
 
     function setupPoint(offset) {
       return {
-        buffer: pointsBuffer,
+        buffer: linesBuffer,
         numComponents: numComponents,
         type: gl.FLOAT,
         normalize: false,
@@ -49,7 +48,7 @@ export function initLineBufferLoader(context) {
       };
     }
 
-    const strokeVao = constructStrokeVao({ attributes });
+    const strokeVao = constructVao({ attributes });
 
     return { strokeVao, numInstances };
   };

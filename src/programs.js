@@ -7,12 +7,14 @@ import strokeVertSrc from "./shaders/stroke-vertex.glsl";
 import strokeFragSrc from "./shaders/stroke-fragment.glsl";
 import circleVertSrc from "./shaders/circle-vertex.glsl";
 import circleFragSrc from "./shaders/circle-fragment.glsl";
+import { initBufferLoader } from "./loaders/loader.js";
+import { initAtlasLoader } from "./loaders/atlas.js";
 
 export function initPrograms(gl, uniforms) {
   const programs = {
     text: yawgl.initProgram(gl, textVertSrc, textFragSrc),
     fill: yawgl.initProgram(gl, fillVertSrc, fillFragSrc),
-    stroke: yawgl.initProgram(gl, strokeVertSrc, strokeFragSrc),
+    line: yawgl.initProgram(gl, strokeVertSrc, strokeFragSrc),
     circle: yawgl.initProgram(gl, circleVertSrc, circleFragSrc),
   };
 
@@ -33,7 +35,7 @@ export function initPrograms(gl, uniforms) {
   function stroke(buffers) {
     let { strokeVao, circleVao, numInstances } = buffers;
     if (strokeVao) {
-      programs.stroke.setupDraw({ uniforms, vao: strokeVao });
+      programs.line.setupDraw({ uniforms, vao: strokeVao });
     } else if (circleVao) {
       programs.circle.setupDraw({ uniforms, vao: circleVao });
     } else {
@@ -48,9 +50,7 @@ export function initPrograms(gl, uniforms) {
     fill,
     stroke,
 
-    constructTextVao: programs.text.constructVao,
-    constructFillVao: programs.fill.constructVao,
-    constructStrokeVao: programs.stroke.constructVao,
-    constructCircleVao: programs.circle.constructVao,
+    loadBuffers: initBufferLoader(gl, programs),
+    loadAtlas: initAtlasLoader(gl),
   };
 }

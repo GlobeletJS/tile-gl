@@ -1,7 +1,7 @@
-export function initFillBufferLoader(context, lineLoader) {
-  const { gl, constructFillVao } = context;
-
+export function initFillBufferLoader(gl, constructVao, lineLoader) {
   return function(buffers) {
+    // buffers: { vertices, indices, lines }
+
     const vertexPositions = {
       buffer: gl.createBuffer(),
       numComponents: 2,
@@ -23,7 +23,7 @@ export function initFillBufferLoader(context, lineLoader) {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, buffers.indices, gl.STATIC_DRAW);
 
     const attributes = { a_position: vertexPositions };
-    const fillVao = constructFillVao({ attributes, indices });
+    const fillVao = constructVao({ attributes, indices });
     const path = { fillVao, indices };
 
     const strokePath = lineLoader(buffers);

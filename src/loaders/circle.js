@@ -1,6 +1,4 @@
-export function initCircleBufferLoader(context) {
-  const { gl, constructCircleVao } = context;
-
+export function initCircleBufferLoader(gl, constructVao) {
   // Create a buffer with the position of the vertices within one instance
   const instanceGeom = new Float32Array([
     -0.5, -0.5,   0.5, -0.5,   0.5,  0.5,
@@ -20,8 +18,8 @@ export function initCircleBufferLoader(context) {
   gl.bufferData(gl.ARRAY_BUFFER, instanceGeom, gl.STATIC_DRAW);
 
   return function(buffers) {
-    const { origins } = buffers;
-    const numInstances = origins.length / 2;
+    const { points } = buffers;
+    const numInstances = points.length / 2;
 
     const circlePos = {
       buffer: gl.createBuffer(),
@@ -33,10 +31,10 @@ export function initCircleBufferLoader(context) {
       divisor: 1,
     };
     gl.bindBuffer(gl.ARRAY_BUFFER, circlePos.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, origins, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
 
     const attributes = { quadPos, circlePos };
-    const circleVao = constructCircleVao({ attributes });
+    const circleVao = constructVao({ attributes });
 
     return { circleVao, numInstances };
   };

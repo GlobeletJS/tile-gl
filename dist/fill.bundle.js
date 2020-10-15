@@ -677,7 +677,7 @@ earcut.flatten = function (data) {
 };
 earcut_1.default = default_1;
 
-function flattenLine(geometry) {
+function flattenLines(geometry) {
   let { type, coordinates } = geometry;
 
   switch (type) {
@@ -716,7 +716,7 @@ function flattenLinearRing(ring) {
   ];
 }
 
-function triangulate(feature) {
+function parseFill(feature) {
   const { geometry, properties } = feature;
 
   // Normalize coordinate structure
@@ -743,10 +743,10 @@ function triangulate(feature) {
   const buffers = {
     vertices: combined.vertices,
     indices: combined.indices,
-    points: flattenLine(geometry), // For rendering the outline
+    lines: flattenLines(geometry), // For rendering the outline
   };
 
   return { properties, buffers };
 }
 
-export { triangulate };
+export { parseFill };

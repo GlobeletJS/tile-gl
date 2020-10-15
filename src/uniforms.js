@@ -11,7 +11,6 @@ export function initUniforms(transform) {
     fontScale: 1.0,
     sdf: null,
     sdfDim: [256, 256],
-    circleRadius: 5.0,
   };
 
   // Mimic Canvas2D API
@@ -37,9 +36,6 @@ export function initUniforms(transform) {
     },
     set fontSize(val) {
       uniforms.fontScale = val / 24.0; // TODO: get divisor from sdf-manager?
-    },
-    set circleRadius(val) {
-      uniforms.circleRadius = val;
     },
     // TODO: implement dashed lines, patterns
     setLineDash: () => null,

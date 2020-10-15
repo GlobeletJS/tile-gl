@@ -1,7 +1,7 @@
 import earcut from 'earcut';
-import { flattenLine } from "./line.js";
+import { flattenLines } from "./line.js";
 
-export function triangulate(feature) {
+export function parseFill(feature) {
   const { geometry, properties } = feature;
 
   // Normalize coordinate structure
@@ -28,7 +28,7 @@ export function triangulate(feature) {
   const buffers = {
     vertices: combined.vertices,
     indices: combined.indices,
-    points: flattenLine(geometry), // For rendering the outline
+    lines: flattenLines(geometry), // For rendering the outline
   };
 
   return { properties, buffers };

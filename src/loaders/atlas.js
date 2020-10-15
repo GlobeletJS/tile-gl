@@ -1,6 +1,4 @@
-export function initAtlasLoader(context) {
-  const { gl } = context;
-
+export function initAtlasLoader(gl) {
   return function(atlas) {
     const { width, height, data } = atlas;
 

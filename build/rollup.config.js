@@ -26,6 +26,6 @@ export default [{
   output: {
     file: 'dist/fill.bundle.js',
     format: 'esm',
-    name: 'triangulate',
+    name: 'parseFill',
   }
 }];

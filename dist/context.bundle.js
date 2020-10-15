@@ -472,7 +472,6 @@ function initUniforms(transform) {
     fontScale: 1.0,
     sdf: null,
     sdfDim: [256, 256],
-    circleRadius: 5.0,
   };
 
   // Mimic Canvas2D API
@@ -498,9 +497,6 @@ function initUniforms(transform) {
     },
     set fontSize(val) {
       uniforms.fontScale = val / 24.0; // TODO: get divisor from sdf-manager?
-    },
-    set circleRadius(val) {
-      uniforms.circleRadius = val;
     },
     // TODO: implement dashed lines, patterns
     setLineDash: () => null,
@@ -887,11 +883,260 @@ void main() {
 }
 `;
 
+function initTextBufferLoader(gl, constructVao) {
+  // Create a buffer with the position of the vertices within one instance
+  const instanceGeom = new Float32Array([
+    0.0,  0.0,   1.0,  0.0,   1.0,  1.0,
+    0.0,  0.0,   1.0,  1.0,   0.0,  1.0
+  ]);
+
+  const quadPos = {
+    buffer: gl.createBuffer(),
+    numComponents: 2,
+    type: gl.FLOAT,
+    normalize: false,
+    stride: 0,
+    offset: 0,
+    divisor: 0,
+  };
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadPos.buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, instanceGeom, gl.STATIC_DRAW);
+
+  return function(buffers) {
+    const { origins, deltas, rects } = buffers;
+    const numInstances = origins.length / 2;
+
+    const labelPos = {
+      buffer: gl.createBuffer(),
+      numComponents: 2,
+      type: gl.FLOAT,
+      normalize: false,
+      stride: 0,
+      offset: 0,
+      divisor: 1,
+    };
+    gl.bindBuffer(gl.ARRAY_BUFFER, labelPos.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, origins, gl.STATIC_DRAW);
+
+    const charPos = {
+      buffer: gl.createBuffer(),
+      numComponents: 2,
+      type: gl.FLOAT,
+      normalize: false,
+      stride: 0,
+      offset: 0,
+      divisor: 1,
+    };
+    gl.bindBuffer(gl.ARRAY_BUFFER, charPos.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, deltas, gl.STATIC_DRAW);
+
+    const sdfRect = {
+      buffer: gl.createBuffer(),
+      numComponents: 4,
+      type: gl.FLOAT,
+      normalize: false,
+      stride: 0,
+      offset: 0,
+      divisor: 1,
+    };
+    gl.bindBuffer(gl.ARRAY_BUFFER, sdfRect.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, rects, gl.STATIC_DRAW);
+
+    const attributes = { quadPos, labelPos, charPos, sdfRect };
+    const textVao = constructVao({ attributes });
+
+    return { textVao, numInstances };
+  };
+}
+
+function initFillBufferLoader(gl, constructVao, lineLoader) {
+  return function(buffers) {
+    // buffers: { vertices, indices, lines }
+
+    const vertexPositions = {
+      buffer: gl.createBuffer(),
+      numComponents: 2,
+      type: gl.FLOAT,
+      normalize: false,
+      stride: 0,
+      offset: 0
+    };
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositions.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, buffers.vertices, gl.STATIC_DRAW);
+
+    const indices = {
+      buffer: gl.createBuffer(),
+      vertexCount: buffers.indices.length,
+      type: gl.UNSIGNED_SHORT,
+      offset: 0
+    };
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices.buffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, buffers.indices, gl.STATIC_DRAW);
+
+    const attributes = { a_position: vertexPositions };
+    const fillVao = constructVao({ attributes, indices });
+    const path = { fillVao, indices };
+
+    const strokePath = lineLoader(buffers);
+
+    return Object.assign(path, strokePath);
+  }
+}
+
+function initLineBufferLoader(gl, constructVao) {
+  // Create a buffer with the position of the vertices within one instance
+  const instanceGeom = new Float32Array([
+    0, -0.5,   1, -0.5,   1,  0.5,
+    0, -0.5,   1,  0.5,   0,  0.5
+  ]);
+
+  const position = {
+    buffer: gl.createBuffer(),
+    numComponents: 2,
+    type: gl.FLOAT,
+    normalize: false,
+    stride: 0,
+    offset: 0,
+    divisor: 0,
+  };
+  gl.bindBuffer(gl.ARRAY_BUFFER, position.buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, instanceGeom, gl.STATIC_DRAW);
+
+  return function(buffers) {
+    const { lines } = buffers;
+    const numComponents = 3;
+    const numInstances = lines.length / numComponents - 3;
+
+    // Create buffer containing the vertex positions
+    const linesBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, linesBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, lines, gl.STATIC_DRAW);
+
+    // Create interleaved attributes pointing to different offsets in buffer
+    const attributes = {
+      position,
+      pointA: setupPoint(0),
+      pointB: setupPoint(1),
+      pointC: setupPoint(2),
+      pointD: setupPoint(3),
+    };
+
+    function setupPoint(offset) {
+      return {
+        buffer: linesBuffer,
+        numComponents: numComponents,
+        type: gl.FLOAT,
+        normalize: false,
+        stride: Float32Array.BYTES_PER_ELEMENT * numComponents,
+        offset: Float32Array.BYTES_PER_ELEMENT * numComponents * offset,
+        divisor: 1
+      };
+    }
+
+    const strokeVao = constructVao({ attributes });
+
+    return { strokeVao, numInstances };
+  };
+}
+
+function initCircleBufferLoader(gl, constructVao) {
+  // Create a buffer with the position of the vertices within one instance
+  const instanceGeom = new Float32Array([
+    -0.5, -0.5,   0.5, -0.5,   0.5,  0.5,
+    -0.5, -0.5,   0.5,  0.5,  -0.5,  0.5,
+  ]);
+
+  const quadPos = {
+    buffer: gl.createBuffer(),
+    numComponents: 2,
+    type: gl.FLOAT,
+    normalize: false,
+    stride: 0,
+    offset: 0,
+    divisor: 0,
+  };
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadPos.buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, instanceGeom, gl.STATIC_DRAW);
+
+  return function(buffers) {
+    const { points } = buffers;
+    const numInstances = points.length / 2;
+
+    const circlePos = {
+      buffer: gl.createBuffer(),
+      numComponents: 2,
+      type: gl.FLOAT,
+      normalize: false,
+      stride: 0,
+      offset: 0,
+      divisor: 1,
+    };
+    gl.bindBuffer(gl.ARRAY_BUFFER, circlePos.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
+
+    const attributes = { quadPos, circlePos };
+    const circleVao = constructVao({ attributes });
+
+    return { circleVao, numInstances };
+  };
+}
+
+function initBufferLoader(gl, programs) {
+  // TODO: clean this up. Can we import differently?
+  const lineLoader = initLineBufferLoader(gl, programs.line.constructVao);
+  const loaders = {
+    line: lineLoader,
+    fill: initFillBufferLoader(gl, programs.fill.constructVao, lineLoader),
+    circle: initCircleBufferLoader(gl, programs.circle.constructVao),
+    text: initTextBufferLoader(gl, programs.text.constructVao),
+  };
+
+  return function(buffers) {
+    if (buffers.vertices) {
+      return loaders.fill(buffers);
+    } else if (buffers.lines) {
+      return loaders.line(buffers);
+    } else if (buffers.points) {
+      return loaders.circle(buffers);
+    } else if (buffers.origins) {
+      return loaders.text(buffers);
+    } else {
+      throw("loadBuffers: unknown buffers structure!");
+    }
+  };
+}
+
+function initAtlasLoader(gl) {
+  return function(atlas) {
+    const { width, height, data } = atlas;
+
+    const target = gl.TEXTURE_2D;
+    const texture = gl.createTexture();
+    gl.bindTexture(target, texture);
+
+    const level = 0;
+    const format = gl.ALPHA;
+    const border = 0;
+    const type = gl.UNSIGNED_BYTE;
+
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
+    gl.texImage2D(target, level, format, 
+      width, height, border, format, type, data);
+
+    gl.texParameteri(target, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(target, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+    return { width, height, sampler: texture };
+  };
+}
+
 function initPrograms(gl, uniforms) {
   const programs = {
     text: initProgram(gl, textVertSrc, textFragSrc),
     fill: initProgram(gl, fillVertSrc, fillFragSrc),
-    stroke: initProgram(gl, strokeVertSrc, strokeFragSrc),
+    line: initProgram(gl, strokeVertSrc, strokeFragSrc),
     circle: initProgram(gl, circleVertSrc, circleFragSrc),
   };
 
@@ -912,7 +1157,7 @@ function initPrograms(gl, uniforms) {
   function stroke(buffers) {
     let { strokeVao, circleVao, numInstances } = buffers;
     if (strokeVao) {
-      programs.stroke.setupDraw({ uniforms, vao: strokeVao });
+      programs.line.setupDraw({ uniforms, vao: strokeVao });
     } else if (circleVao) {
       programs.circle.setupDraw({ uniforms, vao: circleVao });
     } else {
@@ -927,10 +1172,8 @@ function initPrograms(gl, uniforms) {
     fill,
     stroke,
 
-    constructTextVao: programs.text.constructVao,
-    constructFillVao: programs.fill.constructVao,
-    constructStrokeVao: programs.stroke.constructVao,
-    constructCircleVao: programs.circle.constructVao,
+    loadBuffers: initBufferLoader(gl, programs),
+    loadAtlas: initAtlasLoader(gl),
   };
 }
 
