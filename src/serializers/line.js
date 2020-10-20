@@ -1,8 +1,6 @@
 export function parseLine(feature) {
-  const { geometry, properties } = feature;
-  const buffers = { lines: flattenLines(geometry) };
-
-  return { properties, buffers };
+  const lines = flattenLines(feature.geometry);
+  if (lines) return { lines };
 }
 
 export function flattenLines(geometry) {

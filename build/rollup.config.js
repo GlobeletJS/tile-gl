@@ -13,19 +13,18 @@ export default [{
   ],
   output: {
     file: 'dist/context.bundle.js',
-    //sourcemap: 'inline',
     format: 'esm',
     name: 'initGLpaint',
   }
 }, {
-  input: 'src/serializers/fill.js',
+  input: 'src/serializer.js',
   plugins: [
     resolve(),
     commonjs(),
   ],
   output: {
-    file: 'dist/fill.bundle.js',
+    file: 'dist/serializer.bundle.js',
     format: 'esm',
-    name: 'parseFill',
+    name: 'serializers',
   }
 }];

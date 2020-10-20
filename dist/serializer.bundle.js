@@ -1,3 +1,65 @@
+function parseCircle(feature) {
+  const points = flattenPoints(feature.geometry);
+  if (points) return { points };
+}
+
+function flattenPoints(geometry) {
+  const { type, coordinates } = geometry;
+
+  switch (type) {
+    case "Point":
+      return coordinates;
+    case "MultiPoint":
+      return coordinates.flat();
+    default:
+      return;
+  }
+}
+
+function parseLine(feature) {
+  const lines = flattenLines(feature.geometry);
+  if (lines) return { lines };
+}
+
+function flattenLines(geometry) {
+  let { type, coordinates } = geometry;
+
+  switch (type) {
+    case "LineString":
+      return flattenLineString(coordinates);
+    case "MultiLineString":
+      return coordinates.flatMap(flattenLineString);
+    case "Polygon":
+      return flattenPolygon(coordinates);
+    case "MultiPolygon":
+      return coordinates.flatMap(flattenPolygon);
+    default:
+      return;
+  }
+}
+
+function flattenLineString(line) {
+  return [
+    ...[...line[0], -2.0],
+    ...line.flatMap(([x, y]) => [x, y, 0.0]),
+    ...[...line[line.length - 1], -2.0]
+  ];
+}
+
+function flattenPolygon(rings) {
+  return rings.flatMap(flattenLinearRing);
+}
+
+function flattenLinearRing(ring) {
+  // Definition of linear ring:
+  // ring.length > 3 && ring[ring.length - 1] == ring[0]
+  return [
+    ...[...ring[ring.length - 2], -2.0],
+    ...ring.flatMap(([x, y]) => [x, y, 0.0]),
+    ...[...ring[1], -2.0]
+  ];
+}
+
 var earcut_1 = earcut;
 var default_1 = earcut;
 
@@ -677,76 +739,44 @@ earcut.flatten = function (data) {
 };
 earcut_1.default = default_1;
 
-function flattenLines(geometry) {
-  let { type, coordinates } = geometry;
+function parseFill(feature) {
+  const triangles = triangulate(feature.geometry);
+
+  if (triangles) return {
+    vertices: triangles.vertices,
+    indices: triangles.indices,
+    lines: flattenLines(feature.geometry), // For rendering the outline
+  };
+}
+
+function triangulate(geometry) {
+  const { type, coordinates } = geometry;
 
   switch (type) {
-    case "LineString":
-      return flattenLineString(coordinates);
-    case "MultiLineString":
-      return coordinates.flatMap(flattenLineString);
     case "Polygon":
-      return flattenPolygon(coordinates);
+      return indexPolygon(coordinates);
     case "MultiPolygon":
-      return coordinates.flatMap(flattenPolygon);
+      return coordinates.map(indexPolygon).reduce((acc, cur) => {
+        let indexShift = acc.vertices.length / 2;
+        acc.vertices.push(...cur.vertices);
+        acc.indices.push(...cur.indices.map(h => h + indexShift));
+        return acc;
+      });
     default:
       return;
   }
 }
 
-function flattenLineString(line) {
-  return [
-    ...[...line[0], -2.0],
-    ...line.flatMap(([x, y]) => [x, y, 0.0]),
-    ...[...line[line.length - 1], -2.0]
-  ];
+function indexPolygon(coords) {
+  let { vertices, holes, dimensions } = earcut_1.flatten(coords);
+  let indices = earcut_1(vertices, holes, dimensions);
+  return { vertices, indices };
 }
 
-function flattenPolygon(rings) {
-  return rings.flatMap(flattenLinearRing);
-}
+const serializers = {
+  circle: parseCircle,
+  line: parseLine,
+  fill: parseFill,
+};
 
-function flattenLinearRing(ring) {
-  // Definition of linear ring:
-  // ring.length > 3 && ring[ring.length - 1] == ring[0]
-  return [
-    ...[...ring[ring.length - 2], -2.0],
-    ...ring.flatMap(([x, y]) => [x, y, 0.0]),
-    ...[...ring[1], -2.0]
-  ];
-}
-
-function parseFill(feature) {
-  const { geometry, properties } = feature;
-
-  // Normalize coordinate structure
-  var { type, coordinates } = geometry;
-  if (type === "Polygon") {
-    coordinates = [coordinates];
-  } else if (type !== "MultiPolygon") {
-    return feature; // Triangulation only makes sense for Polygons/MultiPolygons
-  }
-
-  const combined = coordinates
-    .map(coord => {
-      let { vertices, holes, dimensions } = earcut_1.flatten(coord);
-      let indices = earcut_1(vertices, holes, dimensions);
-      return { vertices, indices };
-    })
-    .reduce((accumulator, current) => {
-      let indexShift = accumulator.vertices.length / 2;
-      accumulator.vertices.push(...current.vertices);
-      accumulator.indices.push(...current.indices.map(h => h + indexShift));
-      return accumulator;
-    });
-
-  const buffers = {
-    vertices: combined.vertices,
-    indices: combined.indices,
-    lines: flattenLines(geometry), // For rendering the outline
-  };
-
-  return { properties, buffers };
-}
-
-export { parseFill };
+export { serializers };

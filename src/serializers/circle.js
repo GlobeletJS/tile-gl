@@ -1,8 +1,6 @@
 export function parseCircle(feature) {
-  const { geometry, properties } = feature;
-  const buffers = { points: flattenPoints(geometry) };
-
-  return { properties, buffers };
+  const points = flattenPoints(feature.geometry);
+  if (points) return { points };
 }
 
 function flattenPoints(geometry) {

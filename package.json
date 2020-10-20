@@ -2,7 +2,7 @@
   "name": "tile-gl",
   "version": "0.0.5",
   "description": "2D context emulator in WebGL for vector tiles",
-  "module": "src/index.js",
+  "module": "dist/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "rollup -c build/rollup.config.js",
