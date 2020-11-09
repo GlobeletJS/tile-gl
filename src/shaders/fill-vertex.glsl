@@ -1,9 +1,9 @@
 precision highp float;
 attribute vec2 a_position;
 
-uniform mat3 projection;
+uniform vec2 scalar, skew, translation;
 
 void main() {
-  vec2 position = (projection * vec3(a_position, 1)).xy;
-  gl_Position = vec4(position, 0, 1);
+  vec2 projected = scalar * a_position + skew * a_position.yx + translation;
+  gl_Position = vec4(projected, 0, 1);
 }

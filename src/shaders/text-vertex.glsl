@@ -4,7 +4,7 @@ attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 labelPos, charPos;
 attribute vec4 sdfRect; // x, y, w, h
 
-uniform mat3 projection;
+uniform vec2 scalar, skew, translation;
 uniform float fontScale;
 
 varying vec2 texCoord;
@@ -14,6 +14,6 @@ void main() {
   texCoord = sdfRect.xy + dPos;
   vec2 vPos = labelPos + (charPos + dPos) * fontScale;
 
-  vec2 projected = (projection * vec3(vPos, 1)).xy;
+  vec2 projected = scalar * vPos + skew * vPos.yx + translation;
   gl_Position = vec4(projected, 0, 1);
 }

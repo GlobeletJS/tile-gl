@@ -1,43 +1,60 @@
-import { multiply } from 'gl-matrix/mat3';
-
 export function initTransform(framebufferSize) {
-  const m = new Float64Array(9);
-  reset();
+  const scalar      = new Float64Array(2); // a, d
+  const skew        = new Float64Array(2); // c, b
+  const translation = new Float64Array(2); // e, f
+
+  function getTransform() {
+    let [a, d] = scalar;
+    let [c, b] = skew;
+    let [e, f] = translation;
+    return [a, b, c, d, e, f];
+  }
 
   function reset() {
     let { width, height } = framebufferSize;
 
-    // Default transform maps [0, 0] => [-1, 1] and [width, height] => [1, -1]
-    // NOTE WebGL column-ordering!
-    m[0] = 2 / width;
-    m[1] = 0;
-    m[2] = 0;
-    m[3] = 0;
-    m[4] = -2 / height;
-    m[5] = 0;
-    m[6] = -1;
-    m[7] = 1;
-    m[8] = 1;
+    scalar[0] = 2 / width;
+    scalar[1] = -2 / height;
+    skew[0] = 0;
+    skew[1] = 0;
+    translation[0] = -1;
+    translation[1] = 1;
   }
 
   function setTransform(a, b, c, d, e, f) {
-    // TODO: Resize canvas to displayed size?
     reset();
-    multiply(m, m, [a, b, 0, c, d, 0, e, f, 1]);
+    transform(a, b, c, d, e, f);
   }
 
   function transform(a, b, c, d, e, f) {
-    multiply(m, m, [a, b, 0, c, d, 0, e, f, 1]);
+    translate(e, f);
+    let [a0, d0] = scalar;
+    scalar[0] = a0 * a + skew[0] * b;
+    scalar[1] = d0 * d + skew[1] * c;
+    skew[0] = a0 * c + skew[0] * d;
+    skew[1] = d0 * b + skew[1] * a;
+  }
+
+  function translate(e, f) {
+    translation[0] += scalar[0] * e + skew[0] * f;
+    translation[1] += scalar[1] * f + skew[1] * e;
+  }
+
+  function scale(a, d) {
+    scalar[0] *= a;
+    scalar[1] *= d;
+    skew[0] *= d;
+    skew[1] *= a;
   }
 
   // Mimic Canvas2D API
   const methods = {
     transform,
-    translate: (tx, ty) => transform(1, 0, 0, 1, tx, ty),
-    scale: (sx, sy) => transform(sx, 0, 0, sy, 0, 0),
+    translate,
+    scale,
     setTransform,
-    getTransform: () => m.slice(),
+    getTransform,
   };
 
-  return { matrix: m, methods };
+  return { scalar, skew, translation, methods };
 }

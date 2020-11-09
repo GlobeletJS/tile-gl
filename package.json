@@ -3,6 +3,9 @@
   "version": "0.0.6",
   "description": "2D context emulator in WebGL for vector tiles",
   "module": "dist/index.js",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "rollup -c build/rollup.config.js",

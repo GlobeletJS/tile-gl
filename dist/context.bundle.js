@@ -1,83 +1,62 @@
-/**
- * Multiplies two mat3's
- *
- * @param {mat3} out the receiving matrix
- * @param {ReadonlyMat3} a the first operand
- * @param {ReadonlyMat3} b the second operand
- * @returns {mat3} out
- */
-
-function multiply(out, a, b) {
-  var a00 = a[0],
-      a01 = a[1],
-      a02 = a[2];
-  var a10 = a[3],
-      a11 = a[4],
-      a12 = a[5];
-  var a20 = a[6],
-      a21 = a[7],
-      a22 = a[8];
-  var b00 = b[0],
-      b01 = b[1],
-      b02 = b[2];
-  var b10 = b[3],
-      b11 = b[4],
-      b12 = b[5];
-  var b20 = b[6],
-      b21 = b[7],
-      b22 = b[8];
-  out[0] = b00 * a00 + b01 * a10 + b02 * a20;
-  out[1] = b00 * a01 + b01 * a11 + b02 * a21;
-  out[2] = b00 * a02 + b01 * a12 + b02 * a22;
-  out[3] = b10 * a00 + b11 * a10 + b12 * a20;
-  out[4] = b10 * a01 + b11 * a11 + b12 * a21;
-  out[5] = b10 * a02 + b11 * a12 + b12 * a22;
-  out[6] = b20 * a00 + b21 * a10 + b22 * a20;
-  out[7] = b20 * a01 + b21 * a11 + b22 * a21;
-  out[8] = b20 * a02 + b21 * a12 + b22 * a22;
-  return out;
-}
-
 function initTransform(framebufferSize) {
-  const m = new Float64Array(9);
-  reset();
+  const scalar      = new Float64Array(2); // a, d
+  const skew        = new Float64Array(2); // c, b
+  const translation = new Float64Array(2); // e, f
+
+  function getTransform() {
+    let [a, d] = scalar;
+    let [c, b] = skew;
+    let [e, f] = translation;
+    return [a, b, c, d, e, f];
+  }
 
   function reset() {
     let { width, height } = framebufferSize;
 
-    // Default transform maps [0, 0] => [-1, 1] and [width, height] => [1, -1]
-    // NOTE WebGL column-ordering!
-    m[0] = 2 / width;
-    m[1] = 0;
-    m[2] = 0;
-    m[3] = 0;
-    m[4] = -2 / height;
-    m[5] = 0;
-    m[6] = -1;
-    m[7] = 1;
-    m[8] = 1;
+    scalar[0] = 2 / width;
+    scalar[1] = -2 / height;
+    skew[0] = 0;
+    skew[1] = 0;
+    translation[0] = -1;
+    translation[1] = 1;
   }
 
   function setTransform(a, b, c, d, e, f) {
-    // TODO: Resize canvas to displayed size?
     reset();
-    multiply(m, m, [a, b, 0, c, d, 0, e, f, 1]);
+    transform(a, b, c, d, e, f);
   }
 
   function transform(a, b, c, d, e, f) {
-    multiply(m, m, [a, b, 0, c, d, 0, e, f, 1]);
+    translate(e, f);
+    let [a0, d0] = scalar;
+    scalar[0] = a0 * a + skew[0] * b;
+    scalar[1] = d0 * d + skew[1] * c;
+    skew[0] = a0 * c + skew[0] * d;
+    skew[1] = d0 * b + skew[1] * a;
+  }
+
+  function translate(e, f) {
+    translation[0] += scalar[0] * e + skew[0] * f;
+    translation[1] += scalar[1] * f + skew[1] * e;
+  }
+
+  function scale(a, d) {
+    scalar[0] *= a;
+    scalar[1] *= d;
+    skew[0] *= d;
+    skew[1] *= a;
   }
 
   // Mimic Canvas2D API
   const methods = {
     transform,
-    translate: (tx, ty) => transform(1, 0, 0, 1, tx, ty),
-    scale: (sx, sy) => transform(sx, 0, 0, sy, 0, 0),
+    translate,
+    scale,
     setTransform,
-    getTransform: () => m.slice(),
+    getTransform,
   };
 
-  return { matrix: m, methods };
+  return { scalar, skew, translation, methods };
 }
 
 function define(constructor, factory, prototype) {
@@ -462,8 +441,10 @@ function hsl2rgb(h, m1, m2) {
 }
 
 function initUniforms(transform) {
+  const { scalar, skew, translation } = transform;
+
   const uniforms = {
-    projection: transform,
+    scalar, skew, translation, // Pointers. Values updated outside
     fillStyle: [0, 0, 0, 1],
     strokeStyle: [0, 0, 0, 1],
     globalAlpha: 1.0,
@@ -693,7 +674,7 @@ attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 labelPos, charPos;
 attribute vec4 sdfRect; // x, y, w, h
 
-uniform mat3 projection;
+uniform vec2 scalar, skew, translation;
 uniform float fontScale;
 
 varying vec2 texCoord;
@@ -703,7 +684,7 @@ void main() {
   texCoord = sdfRect.xy + dPos;
   vec2 vPos = labelPos + (charPos + dPos) * fontScale;
 
-  vec2 projected = (projection * vec3(vPos, 1)).xy;
+  vec2 projected = scalar * vPos + skew * vPos.yx + translation;
   gl_Position = vec4(projected, 0, 1);
 }
 `;
@@ -732,11 +713,11 @@ void main() {
 var fillVertSrc = `precision highp float;
 attribute vec2 a_position;
 
-uniform mat3 projection;
+uniform vec2 scalar, skew, translation;
 
 void main() {
-  vec2 position = (projection * vec3(a_position, 1)).xy;
-  gl_Position = vec4(position, 0, 1);
+  vec2 projected = scalar * a_position + skew * a_position.yx + translation;
+  gl_Position = vec4(projected, 0, 1);
 }
 `;
 
@@ -752,7 +733,7 @@ void main() {
 
 var strokeVertSrc = `precision highp float;
 uniform float lineWidth, miterLimit;
-uniform mat3 projection;
+uniform vec2 scalar, skew, translation;
 attribute vec2 position;
 attribute vec3 pointA, pointB, pointC, pointD;
 
@@ -808,7 +789,7 @@ void main() {
   miterCoord2 = (m2 * vec3(point - pointC.xy, 1)).xy; 
 
   // Project the display position to clipspace coordinates
-  vec2 projected = (projection * vec3(point, 1)).xy;
+  vec2 projected = scalar * point + skew * point.yx + translation;
   gl_Position = vec4(projected, pointB.z + pointC.z, 1);
 }
 `;
@@ -850,7 +831,7 @@ var circleVertSrc = `precision highp float;
 attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
 
-uniform mat3 projection;
+uniform vec2 scalar, skew, translation;
 uniform float lineWidth;
 
 varying vec2 delta;
@@ -860,7 +841,7 @@ void main() {
   delta = (lineWidth + extend) * quadPos;
   vec2 vPos = circlePos + delta;
 
-  vec2 projected = (projection * vec3(vPos, 1)).xy;
+  vec2 projected = scalar * vPos + skew * vPos.yx + translation;
   gl_Position = vec4(projected, 0, 1);
 }
 `;
@@ -1184,7 +1165,7 @@ function initGLpaint(gl, framebuffer, framebufferSize) {
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
   const transform = initTransform(framebufferSize);
-  const uniforms = initUniforms(transform.matrix);
+  const uniforms = initUniforms(transform);
   const programs = initPrograms(gl, uniforms.values);
 
   const api = {

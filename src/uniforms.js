@@ -1,8 +1,10 @@
 import { rgb as d3rgb } from 'd3-color';
 
 export function initUniforms(transform) {
+  const { scalar, skew, translation } = transform;
+
   const uniforms = {
-    projection: transform,
+    scalar, skew, translation, // Pointers. Values updated outside
     fillStyle: [0, 0, 0, 1],
     strokeStyle: [0, 0, 0, 1],
     globalAlpha: 1.0,

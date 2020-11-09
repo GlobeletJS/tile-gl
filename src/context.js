@@ -9,7 +9,7 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
   const transform = initTransform(framebufferSize);
-  const uniforms = initUniforms(transform.matrix);
+  const uniforms = initUniforms(transform);
   const programs = initPrograms(gl, uniforms.values);
 
   const api = {

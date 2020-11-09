@@ -1,6 +1,6 @@
 precision highp float;
 uniform float lineWidth, miterLimit;
-uniform mat3 projection;
+uniform vec2 scalar, skew, translation;
 attribute vec2 position;
 attribute vec3 pointA, pointB, pointC, pointD;
 
@@ -56,6 +56,6 @@ void main() {
   miterCoord2 = (m2 * vec3(point - pointC.xy, 1)).xy; 
 
   // Project the display position to clipspace coordinates
-  vec2 projected = (projection * vec3(point, 1)).xy;
+  vec2 projected = scalar * point + skew * point.yx + translation;
   gl_Position = vec4(projected, pointB.z + pointC.z, 1);
 }
