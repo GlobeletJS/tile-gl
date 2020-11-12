@@ -1,4 +1,5 @@
 precision highp float;
+
 uniform vec4 strokeStyle;
 uniform float lineWidth, globalAlpha;
 

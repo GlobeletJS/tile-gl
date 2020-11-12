@@ -8,17 +8,16 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-  const transform = initTransform(framebufferSize);
+  const transform = initTransform(gl, framebuffer, framebufferSize);
   const uniforms = initUniforms(transform);
   const programs = initPrograms(gl, uniforms.values);
 
   const api = {
     gl,
     canvas: framebufferSize,
-    bindFramebufferAndSetViewport,
 
     save: () => null,
-    restore,
+    restore: () => gl.disable(gl.SCISSOR_TEST),
     clear,
     clearRect: () => clear(), // TODO: clipRect() before clear()?
     clipRect,
@@ -45,21 +44,10 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
     gl.scissor(...roundedArgs);
   }
 
-  function restore() {
-    gl.disable(gl.SCISSOR_TEST);
-    transform.methods.setTransform(1, 0, 0, 1, 0, 0);
-  }
-
   function fillRect(x, y, width, height) {
     clipRect(x, y, width, height);
     let opacity = uniforms.values.globalAlpha;
     let color = uniforms.values.fillStyle.map(c => c * opacity);
     clear(color);
-  }
-
-  function bindFramebufferAndSetViewport() {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    let { width, height } = framebufferSize;
-    gl.viewport(0, 0, width, height);
   }
 }

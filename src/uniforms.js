@@ -1,12 +1,13 @@
 import { rgb as d3rgb } from 'd3-color';
 
 export function initUniforms(transform) {
-  const { scalar, skew, translation } = transform;
+  const { tileTransform, screenScale } = transform;
 
   const uniforms = {
-    scalar, skew, translation, // Pointers. Values updated outside
-    fillStyle: [0, 0, 0, 1],
-    strokeStyle: [0, 0, 0, 1],
+    tileTransform, screenScale, // Pointers. Values updated outside
+    translation: new Float32Array([0, 0]),
+    fillStyle: new Float32Array([0, 0, 0, 1]),
+    strokeStyle: new Float32Array([0, 0, 0, 1]),
     globalAlpha: 1.0,
     lineWidth: 1.0,
     miterLimit: 10.0,
@@ -18,13 +19,18 @@ export function initUniforms(transform) {
   // Mimic Canvas2D API
   const setters = {
     set globalAlpha(val) {
+      if (val < 0.0 || val > 1.0) return;
       uniforms.globalAlpha = val;
     },
     set fillStyle(val) {
-      uniforms.fillStyle = convertColor(val);
+      let color = convertColor(val);
+      if (!color || color.length !== 4) return;
+      uniforms.fillStyle.set(convertColor(val));
     },
     set strokeStyle(val) {
-      uniforms.strokeStyle = convertColor(val);
+      let color = convertColor(val);
+      if (!color || color.length !== 4) return;
+      uniforms.strokeStyle.set(convertColor(val));
     },
     set lineWidth(val) {
       uniforms.lineWidth = val;
@@ -38,6 +44,10 @@ export function initUniforms(transform) {
     },
     set fontSize(val) {
       uniforms.fontScale = val / 24.0; // TODO: get divisor from sdf-manager?
+    },
+    set translation(val) {
+      if (!val || val.length !== 2) return;
+      uniforms.translation.set(val);
     },
     // TODO: implement dashed lines, patterns
     setLineDash: () => null,

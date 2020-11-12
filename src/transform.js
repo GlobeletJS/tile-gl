@@ -1,60 +1,25 @@
-export function initTransform(framebufferSize) {
-  const scalar      = new Float64Array(2); // a, d
-  const skew        = new Float64Array(2); // c, b
-  const translation = new Float64Array(2); // e, f
+export function initTransform(gl, framebuffer, framebufferSize) {
+  const tileTransform = new Float64Array(3); // shiftX, shiftY, scale
+  const screenScale   = new Float64Array(3); // 2 / width, -2 / height, pixRatio
 
-  function getTransform() {
-    let [a, d] = scalar;
-    let [c, b] = skew;
-    let [e, f] = translation;
-    return [a, b, c, d, e, f];
+  function setTileTransform(dx, dy, scale) {
+    tileTransform.set([dx, dy, scale]);
   }
 
-  function reset() {
+  function bindFramebufferAndSetViewport(pixRatio = 1) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     let { width, height } = framebufferSize;
-
-    scalar[0] = 2 / width;
-    scalar[1] = -2 / height;
-    skew[0] = 0;
-    skew[1] = 0;
-    translation[0] = -1;
-    translation[1] = 1;
+    gl.viewport(0, 0, width, height);
+    screenScale.set([2 / width, -2 / height, pixRatio]);
   }
 
-  function setTransform(a, b, c, d, e, f) {
-    reset();
-    transform(a, b, c, d, e, f);
-  }
+  return {
+    methods: {
+      setTileTransform,
+      bindFramebufferAndSetViewport,
+    },
 
-  function transform(a, b, c, d, e, f) {
-    translate(e, f);
-    let [a0, d0] = scalar;
-    scalar[0] = a0 * a + skew[0] * b;
-    scalar[1] = d0 * d + skew[1] * c;
-    skew[0] = a0 * c + skew[0] * d;
-    skew[1] = d0 * b + skew[1] * a;
-  }
-
-  function translate(e, f) {
-    translation[0] += scalar[0] * e + skew[0] * f;
-    translation[1] += scalar[1] * f + skew[1] * e;
-  }
-
-  function scale(a, d) {
-    scalar[0] *= a;
-    scalar[1] *= d;
-    skew[0] *= d;
-    skew[1] *= a;
-  }
-
-  // Mimic Canvas2D API
-  const methods = {
-    transform,
-    translate,
-    scale,
-    setTransform,
-    getTransform,
+    tileTransform,
+    screenScale,
   };
-
-  return { scalar, skew, translation, methods };
 }

@@ -1,13 +1,16 @@
 precision highp float;
-uniform float lineWidth, miterLimit;
-uniform vec2 scalar, skew, translation;
+
 attribute vec2 position;
 attribute vec3 pointA, pointB, pointC, pointD;
+
+uniform vec3 tileTransform; // shiftX, shiftY, scale
+uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
+uniform float lineWidth, miterLimit;
 
 varying float yCoord;
 varying vec2 miterCoord1, miterCoord2;
 
-mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v) {
+mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   // Find a coordinate basis vector aligned along the bisector
   bool isCap = length(v) < 0.0001; // TODO: think about units
   vec2 vHat = (isCap)
@@ -30,32 +33,43 @@ mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v) {
     : miterLimit + 1.0;
   float bevelLength = abs(dot(yHat, m0));
   float tx = (miterLength > miterLimit)
-    ? 0.5 * lineWidth * bevelLength
-    : 0.5 * lineWidth * miterLength;
+    ? 0.5 * pixWidth * bevelLength
+    : 0.5 * pixWidth * miterLength;
 
-  float ty = isCap ? 1.2 * lineWidth : 0.0;
+  float ty = isCap ? 1.2 * pixWidth : 0.0;
 
   return mat3(m0.x, m1.x, 0, m0.y, m1.y, 0, tx, ty, 1);
 }
 
 void main() {
-  vec2 xAxis = pointC.xy - pointB.xy;
+  // Transform vertex positions from tile to map coordinates
+  vec2 mapA = pointA.xy * tileTransform.z + tileTransform.xy;
+  vec2 mapB = pointB.xy * tileTransform.z + tileTransform.xy;
+  vec2 mapC = pointC.xy * tileTransform.z + tileTransform.xy;
+  vec2 mapD = pointD.xy * tileTransform.z + tileTransform.xy;
+
+  vec2 xAxis = mapC - mapB;
   vec2 xBasis = normalize(xAxis);
   vec2 yBasis = vec2(-xBasis.y, xBasis.x);
 
   // Get coordinate transforms for the miters
-  mat3 m1 = miterTransform(xBasis, yBasis, pointA.xy - pointB.xy);
-  mat3 m2 = miterTransform(-xBasis, yBasis, pointD.xy - pointC.xy);
+  float pixWidth = lineWidth * screenScale.z;
+  mat3 m1 = miterTransform(xBasis, yBasis, mapA - mapB, pixWidth);
+  mat3 m2 = miterTransform(-xBasis, yBasis, mapD - mapC, pixWidth);
 
   // Find the position of the current instance vertex, in 3 coordinate systems
-  vec2 extend = miterLimit * xBasis * lineWidth * (position.x - 0.5);
+  vec2 extend = miterLimit * xBasis * pixWidth * (position.x - 0.5);
   // Add one pixel on either side of the line for the anti-alias taper
-  yCoord = (lineWidth + 2.0) * position.y;
-  vec2 point = pointB.xy + xAxis * position.x + yBasis * yCoord + extend;
-  miterCoord1 = (m1 * vec3(point - pointB.xy, 1)).xy;
-  miterCoord2 = (m2 * vec3(point - pointC.xy, 1)).xy; 
+  float y = (pixWidth + 2.0) * position.y;
+  vec2 point = mapB + xAxis * position.x + yBasis * y + extend;
+  miterCoord1 = (m1 * vec3(point - mapB, 1)).xy;
+  miterCoord2 = (m2 * vec3(point - mapC, 1)).xy;
 
-  // Project the display position to clipspace coordinates
-  vec2 projected = scalar * point + skew * point.yx + translation;
+  // Remove pixRatio from varying (we taper edges using unscaled value)
+  yCoord = y / screenScale.z;
+
+  // Convert to clipspace coordinates
+  vec2 projected = point * screenScale.xy + vec2(-1.0, 1.0);
+
   gl_Position = vec4(projected, pointB.z + pointC.z, 1);
 }

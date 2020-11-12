@@ -1,62 +1,27 @@
-function initTransform(framebufferSize) {
-  const scalar      = new Float64Array(2); // a, d
-  const skew        = new Float64Array(2); // c, b
-  const translation = new Float64Array(2); // e, f
+function initTransform(gl, framebuffer, framebufferSize) {
+  const tileTransform = new Float64Array(3); // shiftX, shiftY, scale
+  const screenScale   = new Float64Array(3); // 2 / width, -2 / height, pixRatio
 
-  function getTransform() {
-    let [a, d] = scalar;
-    let [c, b] = skew;
-    let [e, f] = translation;
-    return [a, b, c, d, e, f];
+  function setTileTransform(dx, dy, scale) {
+    tileTransform.set([dx, dy, scale]);
   }
 
-  function reset() {
+  function bindFramebufferAndSetViewport(pixRatio = 1) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     let { width, height } = framebufferSize;
-
-    scalar[0] = 2 / width;
-    scalar[1] = -2 / height;
-    skew[0] = 0;
-    skew[1] = 0;
-    translation[0] = -1;
-    translation[1] = 1;
+    gl.viewport(0, 0, width, height);
+    screenScale.set([2 / width, -2 / height, pixRatio]);
   }
 
-  function setTransform(a, b, c, d, e, f) {
-    reset();
-    transform(a, b, c, d, e, f);
-  }
+  return {
+    methods: {
+      setTileTransform,
+      bindFramebufferAndSetViewport,
+    },
 
-  function transform(a, b, c, d, e, f) {
-    translate(e, f);
-    let [a0, d0] = scalar;
-    scalar[0] = a0 * a + skew[0] * b;
-    scalar[1] = d0 * d + skew[1] * c;
-    skew[0] = a0 * c + skew[0] * d;
-    skew[1] = d0 * b + skew[1] * a;
-  }
-
-  function translate(e, f) {
-    translation[0] += scalar[0] * e + skew[0] * f;
-    translation[1] += scalar[1] * f + skew[1] * e;
-  }
-
-  function scale(a, d) {
-    scalar[0] *= a;
-    scalar[1] *= d;
-    skew[0] *= d;
-    skew[1] *= a;
-  }
-
-  // Mimic Canvas2D API
-  const methods = {
-    transform,
-    translate,
-    scale,
-    setTransform,
-    getTransform,
+    tileTransform,
+    screenScale,
   };
-
-  return { scalar, skew, translation, methods };
 }
 
 function define(constructor, factory, prototype) {
@@ -441,12 +406,13 @@ function hsl2rgb(h, m1, m2) {
 }
 
 function initUniforms(transform) {
-  const { scalar, skew, translation } = transform;
+  const { tileTransform, screenScale } = transform;
 
   const uniforms = {
-    scalar, skew, translation, // Pointers. Values updated outside
-    fillStyle: [0, 0, 0, 1],
-    strokeStyle: [0, 0, 0, 1],
+    tileTransform, screenScale, // Pointers. Values updated outside
+    translation: new Float32Array([0, 0]),
+    fillStyle: new Float32Array([0, 0, 0, 1]),
+    strokeStyle: new Float32Array([0, 0, 0, 1]),
     globalAlpha: 1.0,
     lineWidth: 1.0,
     miterLimit: 10.0,
@@ -458,13 +424,18 @@ function initUniforms(transform) {
   // Mimic Canvas2D API
   const setters = {
     set globalAlpha(val) {
+      if (val < 0.0 || val > 1.0) return;
       uniforms.globalAlpha = val;
     },
     set fillStyle(val) {
-      uniforms.fillStyle = convertColor(val);
+      let color = convertColor(val);
+      if (!color || color.length !== 4) return;
+      uniforms.fillStyle.set(convertColor(val));
     },
     set strokeStyle(val) {
-      uniforms.strokeStyle = convertColor(val);
+      let color = convertColor(val);
+      if (!color || color.length !== 4) return;
+      uniforms.strokeStyle.set(convertColor(val));
     },
     set lineWidth(val) {
       uniforms.lineWidth = val;
@@ -478,6 +449,10 @@ function initUniforms(transform) {
     },
     set fontSize(val) {
       uniforms.fontScale = val / 24.0; // TODO: get divisor from sdf-manager?
+    },
+    set translation(val) {
+      if (!val || val.length !== 2) return;
+      uniforms.translation.set(val);
     },
     // TODO: implement dashed lines, patterns
     setLineDash: () => null,
@@ -674,17 +649,24 @@ attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 labelPos, charPos;
 attribute vec4 sdfRect; // x, y, w, h
 
-uniform vec2 scalar, skew, translation;
+uniform vec3 tileTransform; // shiftX, shiftY, scale
+uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform float fontScale;
 
 varying vec2 texCoord;
 
 void main() {
+  // Transform label position from tile to map coordinates
+  vec2 mapPos = labelPos * tileTransform.z + tileTransform.xy;
+
+  // Shift to the appropriate corner of the current instance quad
   vec2 dPos = sdfRect.zw * quadPos;
   texCoord = sdfRect.xy + dPos;
-  vec2 vPos = labelPos + (charPos + dPos) * fontScale;
+  vec2 vPos = mapPos + (charPos + dPos) * fontScale * screenScale.z;
 
-  vec2 projected = scalar * vPos + skew * vPos.yx + translation;
+  // Convert to clipspace coordinates
+  vec2 projected = vPos * screenScale.xy + vec2(-1.0, 1.0);
+
   gl_Position = vec4(projected, 0, 1);
 }
 `;
@@ -711,12 +693,19 @@ void main() {
 `;
 
 var fillVertSrc = `precision highp float;
+
 attribute vec2 a_position;
 
-uniform vec2 scalar, skew, translation;
+uniform vec3 tileTransform; // shiftX, shiftY, scale
+uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
+uniform vec2 translation;   // From style property paint["fill-translate"]
 
 void main() {
-  vec2 projected = scalar * a_position + skew * a_position.yx + translation;
+  // Transform from tile to map coordinates
+  vec2 mapPos = a_position * tileTransform.z + tileTransform.xy + translation;
+
+  // Convert to clipspace coordinates
+  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
   gl_Position = vec4(projected, 0, 1);
 }
 `;
@@ -732,15 +721,18 @@ void main() {
 `;
 
 var strokeVertSrc = `precision highp float;
-uniform float lineWidth, miterLimit;
-uniform vec2 scalar, skew, translation;
+
 attribute vec2 position;
 attribute vec3 pointA, pointB, pointC, pointD;
+
+uniform vec3 tileTransform; // shiftX, shiftY, scale
+uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
+uniform float lineWidth, miterLimit;
 
 varying float yCoord;
 varying vec2 miterCoord1, miterCoord2;
 
-mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v) {
+mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   // Find a coordinate basis vector aligned along the bisector
   bool isCap = length(v) < 0.0001; // TODO: think about units
   vec2 vHat = (isCap)
@@ -763,38 +755,50 @@ mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v) {
     : miterLimit + 1.0;
   float bevelLength = abs(dot(yHat, m0));
   float tx = (miterLength > miterLimit)
-    ? 0.5 * lineWidth * bevelLength
-    : 0.5 * lineWidth * miterLength;
+    ? 0.5 * pixWidth * bevelLength
+    : 0.5 * pixWidth * miterLength;
 
-  float ty = isCap ? 1.2 * lineWidth : 0.0;
+  float ty = isCap ? 1.2 * pixWidth : 0.0;
 
   return mat3(m0.x, m1.x, 0, m0.y, m1.y, 0, tx, ty, 1);
 }
 
 void main() {
-  vec2 xAxis = pointC.xy - pointB.xy;
+  // Transform vertex positions from tile to map coordinates
+  vec2 mapA = pointA.xy * tileTransform.z + tileTransform.xy;
+  vec2 mapB = pointB.xy * tileTransform.z + tileTransform.xy;
+  vec2 mapC = pointC.xy * tileTransform.z + tileTransform.xy;
+  vec2 mapD = pointD.xy * tileTransform.z + tileTransform.xy;
+
+  vec2 xAxis = mapC - mapB;
   vec2 xBasis = normalize(xAxis);
   vec2 yBasis = vec2(-xBasis.y, xBasis.x);
 
   // Get coordinate transforms for the miters
-  mat3 m1 = miterTransform(xBasis, yBasis, pointA.xy - pointB.xy);
-  mat3 m2 = miterTransform(-xBasis, yBasis, pointD.xy - pointC.xy);
+  float pixWidth = lineWidth * screenScale.z;
+  mat3 m1 = miterTransform(xBasis, yBasis, mapA - mapB, pixWidth);
+  mat3 m2 = miterTransform(-xBasis, yBasis, mapD - mapC, pixWidth);
 
   // Find the position of the current instance vertex, in 3 coordinate systems
-  vec2 extend = miterLimit * xBasis * lineWidth * (position.x - 0.5);
+  vec2 extend = miterLimit * xBasis * pixWidth * (position.x - 0.5);
   // Add one pixel on either side of the line for the anti-alias taper
-  yCoord = (lineWidth + 2.0) * position.y;
-  vec2 point = pointB.xy + xAxis * position.x + yBasis * yCoord + extend;
-  miterCoord1 = (m1 * vec3(point - pointB.xy, 1)).xy;
-  miterCoord2 = (m2 * vec3(point - pointC.xy, 1)).xy; 
+  float y = (pixWidth + 2.0) * position.y;
+  vec2 point = mapB + xAxis * position.x + yBasis * y + extend;
+  miterCoord1 = (m1 * vec3(point - mapB, 1)).xy;
+  miterCoord2 = (m2 * vec3(point - mapC, 1)).xy;
 
-  // Project the display position to clipspace coordinates
-  vec2 projected = scalar * point + skew * point.yx + translation;
+  // Remove pixRatio from varying (we taper edges using unscaled value)
+  yCoord = y / screenScale.z;
+
+  // Convert to clipspace coordinates
+  vec2 projected = point * screenScale.xy + vec2(-1.0, 1.0);
+
   gl_Position = vec4(projected, pointB.z + pointC.z, 1);
 }
 `;
 
 var strokeFragSrc = `precision highp float;
+
 uniform vec4 strokeStyle;
 uniform float lineWidth, globalAlpha;
 
@@ -831,17 +835,23 @@ var circleVertSrc = `precision highp float;
 attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
 
-uniform vec2 scalar, skew, translation;
+uniform vec3 tileTransform; // shiftX, shiftY, scale
+uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform float lineWidth;
 
 varying vec2 delta;
 
 void main() {
-  float extend = 2.0; // Extra space in the quad for tapering
-  delta = (lineWidth + extend) * quadPos;
-  vec2 vPos = circlePos + delta;
+  // Transform circle position from tile to map coordinates
+  vec2 mapPos = circlePos * tileTransform.z + tileTransform.xy;
 
-  vec2 projected = scalar * vPos + skew * vPos.yx + translation;
+  // Shift to the appropriate corner of the current instance quad
+  float extend = 2.0; // Extra space in the quad for tapering
+  delta = (lineWidth + extend) * quadPos * screenScale.z;
+  vec2 vPos = mapPos + delta;
+
+  // Convert to clipspace coordinates
+  vec2 projected = vPos * screenScale.xy + vec2(-1.0, 1.0);
   gl_Position = vec4(projected, 0, 1);
 }
 `;
@@ -1164,17 +1174,16 @@ function initGLpaint(gl, framebuffer, framebufferSize) {
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-  const transform = initTransform(framebufferSize);
+  const transform = initTransform(gl, framebuffer, framebufferSize);
   const uniforms = initUniforms(transform);
   const programs = initPrograms(gl, uniforms.values);
 
   const api = {
     gl,
     canvas: framebufferSize,
-    bindFramebufferAndSetViewport,
 
     save: () => null,
-    restore,
+    restore: () => gl.disable(gl.SCISSOR_TEST),
     clear,
     clearRect: () => clear(), // TODO: clipRect() before clear()?
     clipRect,
@@ -1201,22 +1210,11 @@ function initGLpaint(gl, framebuffer, framebufferSize) {
     gl.scissor(...roundedArgs);
   }
 
-  function restore() {
-    gl.disable(gl.SCISSOR_TEST);
-    transform.methods.setTransform(1, 0, 0, 1, 0, 0);
-  }
-
   function fillRect(x, y, width, height) {
     clipRect(x, y, width, height);
     let opacity = uniforms.values.globalAlpha;
     let color = uniforms.values.fillStyle.map(c => c * opacity);
     clear(color);
-  }
-
-  function bindFramebufferAndSetViewport() {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    let { width, height } = framebufferSize;
-    gl.viewport(0, 0, width, height);
   }
 }
 
