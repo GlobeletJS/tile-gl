@@ -11,7 +11,6 @@ export function initUniforms(transform) {
     globalAlpha: 1.0,
     lineWidth: 1.0,
     miterLimit: 10.0,
-    fontScale: 1.0,
     sdf: null,
     sdfDim: [256, 256],
   };
@@ -41,9 +40,6 @@ export function initUniforms(transform) {
     set font(val) {
       uniforms.sdf = val.sampler;
       uniforms.sdfDim = [val.width, val.height];
-    },
-    set fontSize(val) {
-      uniforms.fontScale = val / 24.0; // TODO: get divisor from sdf-manager?
     },
     set translation(val) {
       if (!val || val.length !== 2) return;

@@ -35,7 +35,7 @@ export function initTextBufferLoader(gl, constructVao) {
 
     const charPos = {
       buffer: gl.createBuffer(),
-      numComponents: 2,
+      numComponents: 3,
       type: gl.FLOAT,
       normalize: false,
       stride: 0,

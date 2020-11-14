@@ -37,7 +37,7 @@
   "dependencies": {
     "earcut": "^2.2.2",
     "gl-matrix": "^3.3.0",
-    "yawgl": "^0.2.0"
+    "yawgl": "github:GlobeletJS/yawgl"
   },
   "sideEffects": false
 }

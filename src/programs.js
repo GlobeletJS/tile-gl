@@ -20,14 +20,16 @@ export function initPrograms(gl, uniforms) {
 
   function fillText(buffers) {
     let { textVao, numInstances } = buffers;
-    programs.text.setupDraw({ uniforms, vao: textVao });
+    programs.text.setupDraw(uniforms);
+    gl.bindVertexArray(textVao);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
     gl.bindVertexArray(null);
   }
 
   function fill(buffers) {
     let { fillVao, indices: { vertexCount, type, offset } } = buffers;
-    programs.fill.setupDraw({ uniforms, vao: fillVao });
+    programs.fill.setupDraw(uniforms);
+    gl.bindVertexArray(fillVao);
     gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
     gl.bindVertexArray(null);
   }
@@ -35,9 +37,11 @@ export function initPrograms(gl, uniforms) {
   function stroke(buffers) {
     let { strokeVao, circleVao, numInstances } = buffers;
     if (strokeVao) {
-      programs.line.setupDraw({ uniforms, vao: strokeVao });
+      programs.line.setupDraw(uniforms);
+      gl.bindVertexArray(strokeVao);
     } else if (circleVao) {
-      programs.circle.setupDraw({ uniforms, vao: circleVao });
+      programs.circle.setupDraw(uniforms);
+      gl.bindVertexArray(circleVao);
     } else {
       return;
     }
