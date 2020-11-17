@@ -22,9 +22,11 @@ export default [{
     resolve(),
     commonjs(),
   ],
+  external: ['pbf'],
+  treeshake: { moduleSideEffects: "no-external" },
   output: {
     file: 'dist/serializer.bundle.js',
     format: 'esm',
-    name: 'serializers',
+    name: 'initSerializer',
   }
 }];

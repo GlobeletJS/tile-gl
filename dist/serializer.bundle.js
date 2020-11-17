@@ -773,10 +773,348 @@ function indexPolygon(coords) {
   return { vertices, indices };
 }
 
-const serializers = {
-  circle: parseCircle,
-  line: parseLine,
-  fill: parseFill,
+const GLYPH_PBF_BORDER = 3;
+const ONE_EM = 24;
+
+const ATLAS_PADDING = 1;
+
+const RECT_BUFFER = GLYPH_PBF_BORDER + ATLAS_PADDING;
+
+function layoutLine(glyphs, origin, spacing, scalar) {
+  var xCursor = origin[0];
+  const y0 = origin[1];
+
+  return glyphs.flatMap(g => {
+    let { left, top, advance } = g.metrics;
+
+    let dx = xCursor + left - RECT_BUFFER;
+    let dy = y0 - top - RECT_BUFFER;
+
+    xCursor += advance + spacing;
+
+    return [dx, dy, scalar];
+  });
+}
+
+function getGlyphInfo(feature, atlas) {
+  const { font, charCodes } = feature;
+  const positions = atlas.positions[font];
+
+  if (!positions || !charCodes || !charCodes.length) return;
+
+  const info = feature.charCodes.map(code => {
+    let pos = positions[code];
+    if (!pos) return;
+    let { metrics, rect } = pos;
+    return { code, metrics, rect };
+  });
+
+  return info.filter(i => i !== undefined);
+}
+
+function getTextBoxShift(anchor) {
+  // Shift the top-left corner of the text bounding box
+  // by the returned value * bounding box dimensions
+  switch (anchor) {
+    case "top-left":
+      return [ 0.0,  0.0];
+    case "top-right":
+      return [-1.0,  0.0];
+    case "top":
+      return [-0.5,  0.0];
+    case "bottom-left":
+      return [ 0.0, -1.0];
+    case "bottom-right":
+      return [-1.0, -1.0];
+    case "bottom":
+      return [-0.5, -1.0];
+    case "left":
+      return [ 0.0, -0.5];
+    case "right":
+      return [-1.0, -0.5];
+    case "center":
+    default:
+      return [-0.5, -0.5];
+  }
+}
+
+function getLineShift(justify, boxShiftX) {
+  // Shift the start of the text line (left side) by the
+  // returned value * (boundingBoxWidth - lineWidth)
+  switch (justify) {
+    case "auto":
+      return -boxShiftX;
+    case "left":
+      return 0;
+    case "right":
+      return 1;
+    case "center":
+    default:
+      return 0.5;
+  }
+}
+
+const whitespace = {
+  // From mapbox-gl-js/src/symbol/shaping.js
+  [0x09]: true, // tab
+  [0x0a]: true, // newline
+  [0x0b]: true, // vertical tab
+  [0x0c]: true, // form feed
+  [0x0d]: true, // carriage return
+  [0x20]: true, // space
 };
 
-export { serializers };
+const breakable = {
+  // From mapbox-gl-js/src/symbol/shaping.js
+  [0x0a]:   true, // newline
+  [0x20]:   true, // space
+  [0x26]:   true, // ampersand
+  [0x28]:   true, // left parenthesis
+  [0x29]:   true, // right parenthesis
+  [0x2b]:   true, // plus sign
+  [0x2d]:   true, // hyphen-minus
+  [0x2f]:   true, // solidus
+  [0xad]:   true, // soft hyphen
+  [0xb7]:   true, // middle dot
+  [0x200b]: true, // zero-width space
+  [0x2010]: true, // hyphen
+  [0x2013]: true, // en dash
+  [0x2027]: true  // interpunct
+};
+
+function getBreakPoints(glyphs, spacing, targetWidth) {
+  const potentialLineBreaks = [];
+  const last = glyphs.length - 1;
+  let cursor = 0;
+
+  glyphs.forEach((g, i) => {
+    let { code, metrics: { advance } } = g;
+    if (!whitespace[code]) cursor += advance + spacing;
+
+    if (i == last) return;
+    if (!breakable[code] 
+      //&& !charAllowsIdeographicBreaking(code)
+    ) return;
+
+    let breakInfo = evaluateBreak(
+      i + 1,
+      cursor,
+      targetWidth,
+      potentialLineBreaks,
+      calculatePenalty(code, glyphs[i + 1].code),
+      false
+    );
+    potentialLineBreaks.push(breakInfo);
+  });
+
+  const lastBreak = evaluateBreak(
+    glyphs.length,
+    cursor,
+    targetWidth,
+    potentialLineBreaks,
+    0,
+    true
+  );
+
+  return leastBadBreaks(lastBreak);
+}
+
+function leastBadBreaks(lastBreak) {
+  if (!lastBreak) return [];
+  return leastBadBreaks(lastBreak.priorBreak).concat(lastBreak.index);
+}
+
+function evaluateBreak(index, x, targetWidth, breaks, penalty, isLastBreak) {
+  // Start by assuming the supplied (index, x) is the first break
+  const init = {
+    index, x,
+    priorBreak: null,
+    badness: calculateBadness(x)
+  };
+
+  // Now consider all previous possible break points, and
+  // return the pair corresponding to the best combination of breaks
+  return breaks.reduce((best, prev) => {
+    const badness = calculateBadness(x - prev.x) + prev.badness;
+    if (badness < best.badness) {
+      best.priorBreak = prev;
+      best.badness = badness;
+    }
+    return best;
+  }, init);
+
+  function calculateBadness(width) {
+    const raggedness = (width - targetWidth) ** 2;
+
+    if (!isLastBreak) return raggedness + Math.abs(penalty) * penalty;
+
+    // Last line: prefer shorter than average
+    return (width < targetWidth)
+      ? raggedness / 2
+      : raggedness * 2;
+  }
+}
+
+function calculatePenalty(code, nextCode) {
+  let penalty = 0;
+  // Force break on newline
+  if (code === 0x0a) penalty -= 10000;
+  // Penalize open parenthesis at end of line
+  if (code === 0x28 || code === 0xff08) penalty += 50;
+  // Penalize close parenthesis at beginning of line
+  if (nextCode === 0x29 || nextCode === 0xff09) penalty += 50;
+
+  return penalty;
+}
+
+function splitLines(glyphs, spacing, maxWidth) {
+  // glyphs is an Array of Objects with properties { code, metrics, rect }
+  // spacing and maxWidth should already be scaled to the same units as
+  //   glyph.metrics.advance
+  const totalWidth = measureLine(glyphs, spacing);
+
+  const lineCount = Math.ceil(totalWidth / maxWidth);
+  if (lineCount < 1) return [];
+  
+  const targetWidth = totalWidth / lineCount;
+  const breakPoints = getBreakPoints(glyphs, spacing, targetWidth);
+
+  return breakLines(glyphs, breakPoints);
+}
+
+function measureLine(glyphs, spacing) {
+  if (glyphs.length < 1) return 0;
+
+  // No initial value for reduce--so no spacing added for 1st char
+  return glyphs.map(g => g.metrics.advance)
+    .reduce((a, c) => a + c + spacing);
+}
+
+function breakLines(glyphs, breakPoints) {
+  let start = 0;
+
+  return breakPoints.map(lineBreak => {
+    let line = glyphs.slice(start, lineBreak);
+
+    // Trim whitespace from both ends
+    while (line.length && whitespace[line[0].code]) line.shift();
+    while (trailingWhiteSpace(line)) line.pop();
+
+    start = lineBreak;
+    return line;
+  });
+}
+
+function trailingWhiteSpace(line) {
+  let len = line.length;
+  if (!len) return false;
+  return whitespace[line[len - 1].code];
+}
+
+function initShaper(style) {
+  const layout = style.layout;
+
+  return function(feature, zoom, atlas) {
+    // For each feature, compute a list of info for each character:
+    // - x0, y0  defining overall label position
+    // - dx, dy  delta positions relative to label position
+    // - x, y, w, h  defining the position of the glyph within the atlas
+
+    // 1. Get the glyphs for the characters
+    const glyphs = getGlyphInfo(feature, atlas);
+    if (!glyphs) return;
+
+    // 2. Split into lines
+    const spacing = layout["text-letter-spacing"](zoom, feature) * ONE_EM;
+    const maxWidth = layout["text-max-width"](zoom, feature) * ONE_EM;
+    const lines = splitLines(glyphs, spacing, maxWidth);
+    // TODO: What if no labelText, or it is all whitespace?
+
+    // 3. Get dimensions of lines and overall text box
+    const lineWidths = lines.map(line => measureLine(line, spacing));
+    const lineHeight = layout["text-line-height"](zoom, feature) * ONE_EM;
+
+    const boxSize = [Math.max(...lineWidths), lines.length * lineHeight];
+    const textOffset = layout["text-offset"](zoom, feature)
+      .map(c => c * ONE_EM);
+    const boxShift = getTextBoxShift( layout["text-anchor"](zoom, feature) );
+    const boxOrigin = boxShift.map((c, i) => c * boxSize[i] + textOffset[i]);
+
+    // 4. Compute origins for each line
+    const justify = layout["text-justify"](zoom, feature);
+    const lineShiftX = getLineShift(justify, boxShift[0]);
+    const lineOrigins = lineWidths.map((lineWidth, i) => {
+      let x = (boxSize[0] - lineWidth) * lineShiftX + boxOrigin[0];
+      let y = i * lineHeight + boxOrigin[1];
+      return [x, y];
+    });
+
+    // 5. Compute top left corners of the glyphs in each line,
+    //    appending the font size scalar for final positioning
+    const scalar = layout["text-size"](zoom, feature) / ONE_EM;
+    const deltas = lines
+      .flatMap((l, i) => layoutLine(l, lineOrigins[i], spacing, scalar));
+
+    // 6. Fill in label origins for each glyph. TODO: assumes Point geometry
+    const origin = feature.geometry.coordinates.slice();
+    const origins = lines.flat()
+      .flatMap(g => origin);
+
+    // 7. Collect all the glyph rects
+    const rects = lines.flat()
+      .flatMap(g => Object.values(g.rect));
+
+    // 8. Compute bounding box for collision checks
+    const textPadding = layout["text-padding"](zoom, feature);
+    const bbox = [
+      boxOrigin[0] * scalar - textPadding,
+      boxOrigin[1] * scalar - textPadding,
+      (boxOrigin[0] + boxSize[0]) * scalar + textPadding,
+      (boxOrigin[1] + boxSize[1]) * scalar + textPadding
+    ];
+
+    return { origins, deltas, rects, bbox };
+  }
+}
+
+function initShaping(style) {
+  const shaper = initShaper(style);
+
+  return function(feature, zoom, atlas, tree) {
+    // tree is an RBush from the 'rbush' module. NOTE: will be updated!
+
+    const buffers = shaper(feature, zoom, atlas);
+
+    let { origins: [x0, y0], bbox } = buffers;
+    let box = {
+      minX: x0 + bbox[0],
+      minY: y0 + bbox[1],
+      maxX: x0 + bbox[2],
+      maxY: y0 + bbox[3],
+    };
+
+    if (tree.collides(box)) return;
+
+    tree.insert(box);
+
+    // TODO: drop if outside tile?
+    return buffers;
+  };
+}
+
+function initSerializer(style) {
+  switch (style.type) {
+    case "circle":
+      return parseCircle;
+    case "line":
+      return parseLine;
+    case "fill":
+      return parseFill;
+    case "symbol":
+      return initShaping(style);
+    default:
+      throw Error("tile-gl: unknown serializer type!");
+  }
+}
+
+export { initSerializer };
