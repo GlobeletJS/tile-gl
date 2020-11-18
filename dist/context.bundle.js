@@ -890,133 +890,70 @@ void main() {
 }
 `;
 
-function initTextBufferLoader(gl, constructVao) {
-  // Create a buffer with the position of the vertices within one instance
-  const instanceGeom = new Float32Array([
-    0.0,  0.0,   1.0,  0.0,   1.0,  1.0,
-    0.0,  0.0,   1.0,  1.0,   0.0,  1.0
+function initQuad(gl, instanceGeom) {
+  const { x0, y0, w = 1.0, h = 1.0 } = instanceGeom;
+
+  const triangles = new Float32Array([
+    x0, y0,  x0 + w, y0,  x0 + w, y0 + h,
+    x0, y0,  x0 + w, y0 + h,  x0, y0 + h,
   ]);
 
-  const quadPos = {
-    buffer: gl.createBuffer(),
-    numComponents: 2,
-    type: gl.FLOAT,
-    normalize: false,
-    stride: 0,
-    offset: 0,
-    divisor: 0,
-  };
-  gl.bindBuffer(gl.ARRAY_BUFFER, quadPos.buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, instanceGeom, gl.STATIC_DRAW);
+  // Create a buffer with the position of the vertices within one instance
+  return initAttribute(gl, { data: triangles, divisor: 0 });
+}
+
+function initAttribute(gl, options) {
+  // Set defaults for unsupplied values
+  const {
+    buffer = createBuffer(gl, options.data),
+    numComponents = 2,
+    type = gl.FLOAT,
+    normalize = false,
+    stride = 0,
+    offset = 0,
+    divisor = 1,
+  } = options;
+
+  // Return attribute state object
+  return { buffer, numComponents, type, normalize, stride, offset, divisor };
+}
+
+function createBuffer(gl, data) {
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  return buffer;
+}
+
+function initCircleLoader(gl, constructVao) {
+  const quadPos = initQuad(gl, { x0: -0.5, y0: -0.5 });
 
   return function(buffers) {
-    const { origins, deltas, rects } = buffers;
-    const numInstances = origins.length / 2;
+    const { points, tileCoords } = buffers;
 
-    const labelPos = {
-      buffer: gl.createBuffer(),
-      numComponents: 2,
-      type: gl.FLOAT,
-      normalize: false,
-      stride: 0,
-      offset: 0,
-      divisor: 1,
+    const attributes = { 
+      quadPos, 
+      circlePos: initAttribute(gl, { data: points }),
+      tileCoords: initAttribute(gl, { data: tileCoords, numComponents: 3 }),
     };
-    gl.bindBuffer(gl.ARRAY_BUFFER, labelPos.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, origins, gl.STATIC_DRAW);
+    const circleVao = constructVao({ attributes });
 
-    const charPos = {
-      buffer: gl.createBuffer(),
-      numComponents: 3,
-      type: gl.FLOAT,
-      normalize: false,
-      stride: 0,
-      offset: 0,
-      divisor: 1,
-    };
-    gl.bindBuffer(gl.ARRAY_BUFFER, charPos.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, deltas, gl.STATIC_DRAW);
-
-    const sdfRect = {
-      buffer: gl.createBuffer(),
-      numComponents: 4,
-      type: gl.FLOAT,
-      normalize: false,
-      stride: 0,
-      offset: 0,
-      divisor: 1,
-    };
-    gl.bindBuffer(gl.ARRAY_BUFFER, sdfRect.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, rects, gl.STATIC_DRAW);
-
-    const attributes = { quadPos, labelPos, charPos, sdfRect };
-    const textVao = constructVao({ attributes });
-
-    return { textVao, numInstances };
+    return { circleVao, numInstances: points.length / 2 };
   };
 }
 
-function initFillBufferLoader(gl, constructVao, lineLoader) {
-  return function(buffers) {
-    // buffers: { vertices, indices, lines }
+function initLineLoader(gl, constructVao) {
+  const position = initQuad(gl, { x0: 0.0, y0: -0.5 });
 
-    const vertexPositions = {
-      buffer: gl.createBuffer(),
-      numComponents: 2,
-      type: gl.FLOAT,
-      normalize: false,
-      stride: 0,
-      offset: 0
-    };
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositions.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, buffers.vertices, gl.STATIC_DRAW);
-
-    const indices = {
-      buffer: gl.createBuffer(),
-      vertexCount: buffers.indices.length,
-      type: gl.UNSIGNED_SHORT,
-      offset: 0
-    };
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices.buffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, buffers.indices, gl.STATIC_DRAW);
-
-    const attributes = { a_position: vertexPositions };
-    const fillVao = constructVao({ attributes, indices });
-    const path = { fillVao, indices };
-
-    const strokePath = lineLoader(buffers);
-
-    return Object.assign(path, strokePath);
-  }
-}
-
-function initLineBufferLoader(gl, constructVao) {
-  // Create a buffer with the position of the vertices within one instance
-  const instanceGeom = new Float32Array([
-    0, -0.5,   1, -0.5,   1,  0.5,
-    0, -0.5,   1,  0.5,   0,  0.5
-  ]);
-
-  const position = {
-    buffer: gl.createBuffer(),
-    numComponents: 2,
-    type: gl.FLOAT,
-    normalize: false,
-    stride: 0,
-    offset: 0,
-    divisor: 0,
-  };
-  gl.bindBuffer(gl.ARRAY_BUFFER, position.buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, instanceGeom, gl.STATIC_DRAW);
+  const numComponents = 3;
+  const stride = Float32Array.BYTES_PER_ELEMENT * numComponents;
 
   return function(buffers) {
-    const { lines } = buffers;
-    const numComponents = 3;
-    const numInstances = lines.length / numComponents - 3;
+    const { lines, tileCoords } = buffers;
 
     // Create buffer containing the vertex positions
-    const linesBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, linesBuffer);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, lines, gl.STATIC_DRAW);
 
     // Create interleaved attributes pointing to different offsets in buffer
@@ -1026,87 +963,83 @@ function initLineBufferLoader(gl, constructVao) {
       pointB: setupPoint(1),
       pointC: setupPoint(2),
       pointD: setupPoint(3),
+      tileCoords: initAttribute(gl, { data: tileCoords, numComponents: 3 }),
     };
 
-    function setupPoint(offset) {
-      return {
-        buffer: linesBuffer,
-        numComponents: numComponents,
-        type: gl.FLOAT,
-        normalize: false,
-        stride: Float32Array.BYTES_PER_ELEMENT * numComponents,
-        offset: Float32Array.BYTES_PER_ELEMENT * numComponents * offset,
-        divisor: 1
-      };
+    function setupPoint(shift) {
+      const offset = shift * stride;
+      return initAttribute(gl, { buffer, numComponents, stride, offset });
     }
 
     const strokeVao = constructVao({ attributes });
 
-    return { strokeVao, numInstances };
+    return { strokeVao, numInstances: lines.length / numComponents - 3 };
   };
 }
 
-function initCircleBufferLoader(gl, constructVao) {
-  // Create a buffer with the position of the vertices within one instance
-  const instanceGeom = new Float32Array([
-    -0.5, -0.5,   0.5, -0.5,   0.5,  0.5,
-    -0.5, -0.5,   0.5,  0.5,  -0.5,  0.5,
-  ]);
+function initFillLoader(gl, constructVao, lineLoader) {
+  return function(buffers) {
+    const { vertices, indices: indexData, lines, tileCoords } = buffers;
 
-  const quadPos = {
-    buffer: gl.createBuffer(),
-    numComponents: 2,
-    type: gl.FLOAT,
-    normalize: false,
-    stride: 0,
-    offset: 0,
-    divisor: 0,
+    const attributes = {
+      a_position: initAttribute(gl, { data: vertices, divisor: 0 }),
+      tileCoords: initAttribute(gl, { data: tileCoords, numComponents: 3 }),
+    };
+
+    const indices = {
+      buffer: gl.createBuffer(),
+      vertexCount: indexData.length,
+      type: gl.UNSIGNED_SHORT,
+      offset: 0
+    };
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices.buffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW);
+
+    const fillVao = constructVao({ attributes, indices });
+    const path = { fillVao, indices };
+
+    const strokePath = lineLoader(buffers);
+
+    return Object.assign(path, strokePath);
   };
-  gl.bindBuffer(gl.ARRAY_BUFFER, quadPos.buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, instanceGeom, gl.STATIC_DRAW);
+}
+
+function initTextLoader(gl, constructVao) {
+  const quadPos = initQuad(gl, { x0: 0.0, y0: 0.0 });
 
   return function(buffers) {
-    const { points } = buffers;
-    const numInstances = points.length / 2;
+    const { origins, deltas, rects, tileCoords } = buffers;
 
-    const circlePos = {
-      buffer: gl.createBuffer(),
-      numComponents: 2,
-      type: gl.FLOAT,
-      normalize: false,
-      stride: 0,
-      offset: 0,
-      divisor: 1,
+    const attributes = {
+      quadPos,
+      labelPos: initAttribute(gl, { data: origins }),
+      charPos: initAttribute(gl, { data: deltas, numComponents: 3 }),
+      sdfRect: initAttribute(gl, { data: rects, numComponents: 4 }),
+      tileCoords: initAttribute(gl, { data: tileCoords, numComponents: 3 }),
     };
-    gl.bindBuffer(gl.ARRAY_BUFFER, circlePos.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
+    const textVao = constructVao({ attributes });
 
-    const attributes = { quadPos, circlePos };
-    const circleVao = constructVao({ attributes });
-
-    return { circleVao, numInstances };
+    return { textVao, numInstances: origins.length / 2 };
   };
 }
 
 function initBufferLoader(gl, programs) {
-  // TODO: clean this up. Can we import differently?
-  const lineLoader = initLineBufferLoader(gl, programs.line.constructVao);
-  const loaders = {
-    line: lineLoader,
-    fill: initFillBufferLoader(gl, programs.fill.constructVao, lineLoader),
-    circle: initCircleBufferLoader(gl, programs.circle.constructVao),
-    text: initTextBufferLoader(gl, programs.text.constructVao),
-  };
+  const { circle, line, fill, text } = programs;
+
+  const loadCircle = initCircleLoader(gl, circle.constructVao);
+  const loadLine = initLineLoader(gl, line.constructVao);
+  const loadFill = initFillLoader(gl, fill.constructVao, loadLine);
+  const loadText = initTextLoader(gl, text.constructVao);
 
   return function(buffers) {
     if (buffers.vertices) {
-      return loaders.fill(buffers);
+      return loadFill(buffers);
     } else if (buffers.lines) {
-      return loaders.line(buffers);
+      return loadLine(buffers);
     } else if (buffers.points) {
-      return loaders.circle(buffers);
+      return loadCircle(buffers);
     } else if (buffers.origins) {
-      return loaders.text(buffers);
+      return loadText(buffers);
     } else {
       throw("loadBuffers: unknown buffers structure!");
     }

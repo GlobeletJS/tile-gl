@@ -1,27 +1,25 @@
-import { initTextBufferLoader } from "./text.js";
-import { initFillBufferLoader } from "./fill.js";
-import { initLineBufferLoader } from "./line.js";
-import { initCircleBufferLoader } from "./circle.js";
+import { initCircleLoader } from "./circle.js";
+import { initLineLoader } from "./line.js";
+import { initFillLoader } from "./fill.js";
+import { initTextLoader } from "./text.js";
 
 export function initBufferLoader(gl, programs) {
-  // TODO: clean this up. Can we import differently?
-  const lineLoader = initLineBufferLoader(gl, programs.line.constructVao);
-  const loaders = {
-    line: lineLoader,
-    fill: initFillBufferLoader(gl, programs.fill.constructVao, lineLoader),
-    circle: initCircleBufferLoader(gl, programs.circle.constructVao),
-    text: initTextBufferLoader(gl, programs.text.constructVao),
-  };
+  const { circle, line, fill, text } = programs;
+
+  const loadCircle = initCircleLoader(gl, circle.constructVao);
+  const loadLine = initLineLoader(gl, line.constructVao);
+  const loadFill = initFillLoader(gl, fill.constructVao, loadLine);
+  const loadText = initTextLoader(gl, text.constructVao);
 
   return function(buffers) {
     if (buffers.vertices) {
-      return loaders.fill(buffers);
+      return loadFill(buffers);
     } else if (buffers.lines) {
-      return loaders.line(buffers);
+      return loadLine(buffers);
     } else if (buffers.points) {
-      return loaders.circle(buffers);
+      return loadCircle(buffers);
     } else if (buffers.origins) {
-      return loaders.text(buffers);
+      return loadText(buffers);
     } else {
       throw("loadBuffers: unknown buffers structure!");
     }

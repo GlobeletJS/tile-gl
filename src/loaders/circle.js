@@ -1,41 +1,18 @@
-export function initCircleBufferLoader(gl, constructVao) {
-  // Create a buffer with the position of the vertices within one instance
-  const instanceGeom = new Float32Array([
-    -0.5, -0.5,   0.5, -0.5,   0.5,  0.5,
-    -0.5, -0.5,   0.5,  0.5,  -0.5,  0.5,
-  ]);
+import { initQuad, initAttribute } from "./attributes.js";
 
-  const quadPos = {
-    buffer: gl.createBuffer(),
-    numComponents: 2,
-    type: gl.FLOAT,
-    normalize: false,
-    stride: 0,
-    offset: 0,
-    divisor: 0,
-  };
-  gl.bindBuffer(gl.ARRAY_BUFFER, quadPos.buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, instanceGeom, gl.STATIC_DRAW);
+export function initCircleLoader(gl, constructVao) {
+  const quadPos = initQuad(gl, { x0: -0.5, y0: -0.5 });
 
   return function(buffers) {
-    const { points } = buffers;
-    const numInstances = points.length / 2;
+    const { points, tileCoords } = buffers;
 
-    const circlePos = {
-      buffer: gl.createBuffer(),
-      numComponents: 2,
-      type: gl.FLOAT,
-      normalize: false,
-      stride: 0,
-      offset: 0,
-      divisor: 1,
+    const attributes = { 
+      quadPos, 
+      circlePos: initAttribute(gl, { data: points }),
+      tileCoords: initAttribute(gl, { data: tileCoords, numComponents: 3 }),
     };
-    gl.bindBuffer(gl.ARRAY_BUFFER, circlePos.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
-
-    const attributes = { quadPos, circlePos };
     const circleVao = constructVao({ attributes });
 
-    return { circleVao, numInstances };
+    return { circleVao, numInstances: points.length / 2 };
   };
 }

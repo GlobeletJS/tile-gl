@@ -1084,6 +1084,7 @@ function initShaping(style) {
     // tree is an RBush from the 'rbush' module. NOTE: will be updated!
 
     const buffers = shaper(feature, zoom, atlas);
+    if (!buffers) return;
 
     let { origins: [x0, y0], bbox } = buffers;
     let box = {
@@ -1103,15 +1104,43 @@ function initShaping(style) {
 }
 
 function initSerializer(style) {
+  const { getLen, parse } = initParser(style);
+
+  return function(feature, tileCoords, atlas, tree) {
+    const { z, x, y } = tileCoords;
+
+    const buffers = parse(feature, z, atlas, tree);
+
+    if (buffers) buffers.tileCoords = Array
+      .from({ length: getLen(buffers) })
+      .flatMap(v => [z, x, y]);
+
+    return buffers;
+  };
+}
+
+function initParser(style) {
   switch (style.type) {
     case "circle":
-      return parseCircle;
+      return { 
+        getLen: (b) => b.points.length / 2,
+        parse: parseCircle,
+      };
     case "line":
-      return parseLine;
+      return {
+        getLen: (b) => b.lines.length / 3 - 3,
+        parse: parseLine,
+      };
     case "fill":
-      return parseFill;
+      return {
+        getLen: (b) => b.lines.length / 3 - 3,
+        parse: parseFill,
+      };
     case "symbol":
-      return initShaping(style);
+      return {
+        getLen: (b) => b.origins.length / 2,
+        parse: initShaping(style),
+      };
     default:
       throw Error("tile-gl: unknown serializer type!");
   }

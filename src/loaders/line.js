@@ -1,30 +1,17 @@
-export function initLineBufferLoader(gl, constructVao) {
-  // Create a buffer with the position of the vertices within one instance
-  const instanceGeom = new Float32Array([
-    0, -0.5,   1, -0.5,   1,  0.5,
-    0, -0.5,   1,  0.5,   0,  0.5
-  ]);
+import { initQuad, initAttribute } from "./attributes.js";
 
-  const position = {
-    buffer: gl.createBuffer(),
-    numComponents: 2,
-    type: gl.FLOAT,
-    normalize: false,
-    stride: 0,
-    offset: 0,
-    divisor: 0,
-  };
-  gl.bindBuffer(gl.ARRAY_BUFFER, position.buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, instanceGeom, gl.STATIC_DRAW);
+export function initLineLoader(gl, constructVao) {
+  const position = initQuad(gl, { x0: 0.0, y0: -0.5 });
+
+  const numComponents = 3;
+  const stride = Float32Array.BYTES_PER_ELEMENT * numComponents;
 
   return function(buffers) {
-    const { lines } = buffers;
-    const numComponents = 3;
-    const numInstances = lines.length / numComponents - 3;
+    const { lines, tileCoords } = buffers;
 
     // Create buffer containing the vertex positions
-    const linesBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, linesBuffer);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, lines, gl.STATIC_DRAW);
 
     // Create interleaved attributes pointing to different offsets in buffer
@@ -34,22 +21,16 @@ export function initLineBufferLoader(gl, constructVao) {
       pointB: setupPoint(1),
       pointC: setupPoint(2),
       pointD: setupPoint(3),
+      tileCoords: initAttribute(gl, { data: tileCoords, numComponents: 3 }),
     };
 
-    function setupPoint(offset) {
-      return {
-        buffer: linesBuffer,
-        numComponents: numComponents,
-        type: gl.FLOAT,
-        normalize: false,
-        stride: Float32Array.BYTES_PER_ELEMENT * numComponents,
-        offset: Float32Array.BYTES_PER_ELEMENT * numComponents * offset,
-        divisor: 1
-      };
+    function setupPoint(shift) {
+      const offset = shift * stride;
+      return initAttribute(gl, { buffer, numComponents, stride, offset });
     }
 
     const strokeVao = constructVao({ attributes });
 
-    return { strokeVao, numInstances };
+    return { strokeVao, numInstances: lines.length / numComponents - 3 };
   };
 }
