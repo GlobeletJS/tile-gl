@@ -1,9 +1,14 @@
 function initTransform(gl, framebuffer, framebufferSize) {
-  const tileTransform = new Float64Array(3); // shiftX, shiftY, scale
-  const screenScale   = new Float64Array(3); // 2 / width, -2 / height, pixRatio
+  const mapCoords   = new Float64Array(4); // x, y, z, extent of tileset[0]
+  const mapShift    = new Float64Array(3); // translate and extent of tileset[0] 
+  const screenScale = new Float64Array(3); // 2 / width, -2 / height, pixRatio
 
-  function setTileTransform(dx, dy, scale) {
-    tileTransform.set([dx, dy, scale]);
+  function setMapCoords(x, y, z, extent) {
+    mapCoords.set([x, y, z, extent]);
+  }
+
+  function setMapShift(tx, ty, scale) {
+    mapShift.set([tx, ty, scale]);
   }
 
   function bindFramebufferAndSetViewport(pixRatio = 1) {
@@ -15,11 +20,13 @@ function initTransform(gl, framebuffer, framebufferSize) {
 
   return {
     methods: {
-      setTileTransform,
+      setMapCoords,
+      setMapShift,
       bindFramebufferAndSetViewport,
     },
 
-    tileTransform,
+    mapCoords,
+    mapShift,
     screenScale,
   };
 }
@@ -406,10 +413,10 @@ function hsl2rgb(h, m1, m2) {
 }
 
 function initUniforms(transform) {
-  const { tileTransform, screenScale } = transform;
+  const { mapCoords, mapShift, screenScale } = transform;
 
   const uniforms = {
-    tileTransform, screenScale, // Pointers. Values updated outside
+    mapCoords, mapShift, screenScale, // Pointers. Values updated outside
     translation: new Float32Array([0, 0]),
     fillStyle: new Float32Array([0, 0, 0, 1]),
     strokeStyle: new Float32Array([0, 0, 0, 1]),
@@ -660,10 +667,24 @@ function fail(msg, log) {
 
 var preamble = `precision highp float;
 
-uniform vec3 tileTransform; // shiftX, shiftY, scale
+attribute vec3 tileCoords;
+
+uniform vec4 mapCoords; // x, y, z, extent of tileset[0]
+uniform vec3 mapShift;  // translate and scale of tileset[0]
 
 vec2 tileToMap(vec2 tilePos) {
-  return tilePos * tileTransform.z + tileTransform.xy;
+  // Find distance of this tile from top left tile, in tile units
+  float zoomFac = exp2(mapCoords.z - tileCoords.z);
+  vec2 dTile = zoomFac * tileCoords.xy - mapCoords.xy;
+  dTile.x += (dTile.x < 0.0) ? exp2(mapCoords.z) : 0.0;
+
+  // Convert to a translation in pixels
+  vec2 tileTranslate = dTile * mapShift.z + mapShift.xy;
+
+  // Find scaling between tile coordinates and screen pixels
+  float tileScale = zoomFac * mapShift.z / mapCoords.w;
+
+  return tilePos * tileScale + tileTranslate;
 }
 `;
 

@@ -1113,7 +1113,7 @@ function initSerializer(style) {
 
     if (buffers) buffers.tileCoords = Array
       .from({ length: getLen(buffers) })
-      .flatMap(v => [z, x, y]);
+      .flatMap(v => [x, y, z]);
 
     return buffers;
   };

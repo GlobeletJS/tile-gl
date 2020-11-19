@@ -1,10 +1,10 @@
 import { rgb as d3rgb } from 'd3-color';
 
 export function initUniforms(transform) {
-  const { tileTransform, screenScale } = transform;
+  const { mapCoords, mapShift, screenScale } = transform;
 
   const uniforms = {
-    tileTransform, screenScale, // Pointers. Values updated outside
+    mapCoords, mapShift, screenScale, // Pointers. Values updated outside
     translation: new Float32Array([0, 0]),
     fillStyle: new Float32Array([0, 0, 0, 1]),
     strokeStyle: new Float32Array([0, 0, 0, 1]),

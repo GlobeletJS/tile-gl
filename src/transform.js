@@ -1,9 +1,14 @@
 export function initTransform(gl, framebuffer, framebufferSize) {
-  const tileTransform = new Float64Array(3); // shiftX, shiftY, scale
-  const screenScale   = new Float64Array(3); // 2 / width, -2 / height, pixRatio
+  const mapCoords   = new Float64Array(4); // x, y, z, extent of tileset[0]
+  const mapShift    = new Float64Array(3); // translate and extent of tileset[0] 
+  const screenScale = new Float64Array(3); // 2 / width, -2 / height, pixRatio
 
-  function setTileTransform(dx, dy, scale) {
-    tileTransform.set([dx, dy, scale]);
+  function setMapCoords(x, y, z, extent) {
+    mapCoords.set([x, y, z, extent]);
+  }
+
+  function setMapShift(tx, ty, scale) {
+    mapShift.set([tx, ty, scale]);
   }
 
   function bindFramebufferAndSetViewport(pixRatio = 1) {
@@ -15,11 +20,13 @@ export function initTransform(gl, framebuffer, framebufferSize) {
 
   return {
     methods: {
-      setTileTransform,
+      setMapCoords,
+      setMapShift,
       bindFramebufferAndSetViewport,
     },
 
-    tileTransform,
+    mapCoords,
+    mapShift,
     screenScale,
   };
 }
