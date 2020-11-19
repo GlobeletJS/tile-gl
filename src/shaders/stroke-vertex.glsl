@@ -1,9 +1,6 @@
-precision highp float;
-
 attribute vec2 position;
 attribute vec3 pointA, pointB, pointC, pointD;
 
-uniform vec3 tileTransform; // shiftX, shiftY, scale
 uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform float lineWidth, miterLimit;
 
@@ -43,10 +40,10 @@ mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
 
 void main() {
   // Transform vertex positions from tile to map coordinates
-  vec2 mapA = pointA.xy * tileTransform.z + tileTransform.xy;
-  vec2 mapB = pointB.xy * tileTransform.z + tileTransform.xy;
-  vec2 mapC = pointC.xy * tileTransform.z + tileTransform.xy;
-  vec2 mapD = pointD.xy * tileTransform.z + tileTransform.xy;
+  vec2 mapA = tileToMap(pointA.xy);
+  vec2 mapB = tileToMap(pointB.xy);
+  vec2 mapC = tileToMap(pointC.xy);
+  vec2 mapD = tileToMap(pointD.xy);
 
   vec2 xAxis = mapC - mapB;
   vec2 xBasis = normalize(xAxis);

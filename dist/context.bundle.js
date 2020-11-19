@@ -658,23 +658,26 @@ function fail(msg, log) {
   throw Error("yawgl.initProgram: " + msg + ":\n" + log);
 }
 
-var textVertSrc = `precision highp float;
+var preamble = `precision highp float;
 
-attribute vec2 quadPos;  // Vertices of the quad instance
+uniform vec3 tileTransform; // shiftX, shiftY, scale
+
+vec2 tileToMap(vec2 tilePos) {
+  return tilePos * tileTransform.z + tileTransform.xy;
+}
+`;
+
+var textVert = `attribute vec2 quadPos;  // Vertices of the quad instance
 attribute vec2 labelPos; // x, y
 attribute vec3 charPos;  // dx, dy, scale (relative to labelPos)
 attribute vec4 sdfRect;  // x, y, w, h
 
-uniform vec3 tileTransform; // shiftX, shiftY, scale
 uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 
 varying vec2 texCoord;
 
 void main() {
-  texCoord = sdfRect.xy + sdfRect.zw * quadPos;
-
-  // Transform label position from tile to map coordinates
-  vec2 mapPos = labelPos * tileTransform.z + tileTransform.xy;
+  vec2 mapPos = tileToMap(labelPos);
 
   // Shift to the appropriate corner of the current instance quad
   vec2 dPos = (charPos.xy + sdfRect.zw * quadPos) * charPos.z;
@@ -683,11 +686,13 @@ void main() {
   // Convert to clipspace coordinates
   vec2 projected = vPos * screenScale.xy + vec2(-1.0, 1.0);
 
+  texCoord = sdfRect.xy + sdfRect.zw * quadPos;
+
   gl_Position = vec4(projected, 0, 1);
 }
 `;
 
-var textFragSrc = `precision highp float;
+var textFrag = `precision highp float;
 
 uniform sampler2D sdf;
 uniform vec2 sdfDim;
@@ -708,17 +713,13 @@ void main() {
 }
 `;
 
-var fillVertSrc = `precision highp float;
+var fillVert = `attribute vec2 a_position;
 
-attribute vec2 a_position;
-
-uniform vec3 tileTransform; // shiftX, shiftY, scale
 uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform vec2 translation;   // From style property paint["fill-translate"]
 
 void main() {
-  // Transform from tile to map coordinates
-  vec2 mapPos = a_position * tileTransform.z + tileTransform.xy + translation;
+  vec2 mapPos = tileToMap(a_position) + translation * screenScale.z;
 
   // Convert to clipspace coordinates
   vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
@@ -726,7 +727,7 @@ void main() {
 }
 `;
 
-var fillFragSrc = `precision mediump float;
+var fillFrag = `precision mediump float;
 
 uniform vec4 fillStyle;
 uniform float globalAlpha;
@@ -736,12 +737,9 @@ void main() {
 }
 `;
 
-var strokeVertSrc = `precision highp float;
-
-attribute vec2 position;
+var strokeVert = `attribute vec2 position;
 attribute vec3 pointA, pointB, pointC, pointD;
 
-uniform vec3 tileTransform; // shiftX, shiftY, scale
 uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform float lineWidth, miterLimit;
 
@@ -781,10 +779,10 @@ mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
 
 void main() {
   // Transform vertex positions from tile to map coordinates
-  vec2 mapA = pointA.xy * tileTransform.z + tileTransform.xy;
-  vec2 mapB = pointB.xy * tileTransform.z + tileTransform.xy;
-  vec2 mapC = pointC.xy * tileTransform.z + tileTransform.xy;
-  vec2 mapD = pointD.xy * tileTransform.z + tileTransform.xy;
+  vec2 mapA = tileToMap(pointA.xy);
+  vec2 mapB = tileToMap(pointB.xy);
+  vec2 mapC = tileToMap(pointC.xy);
+  vec2 mapD = tileToMap(pointD.xy);
 
   vec2 xAxis = mapC - mapB;
   vec2 xBasis = normalize(xAxis);
@@ -813,7 +811,7 @@ void main() {
 }
 `;
 
-var strokeFragSrc = `precision highp float;
+var strokeFrag = `precision highp float;
 
 uniform vec4 strokeStyle;
 uniform float lineWidth, globalAlpha;
@@ -846,20 +844,16 @@ void main() {
 }
 `;
 
-var circleVertSrc = `precision highp float;
-
-attribute vec2 quadPos; // Vertices of the quad instance
+var circleVert = `attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
 
-uniform vec3 tileTransform; // shiftX, shiftY, scale
 uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform float lineWidth;
 
 varying vec2 delta;
 
 void main() {
-  // Transform circle position from tile to map coordinates
-  vec2 mapPos = circlePos * tileTransform.z + tileTransform.xy;
+  vec2 mapPos = tileToMap(circlePos);
 
   // Shift to the appropriate corner of the current instance quad
   float extend = 2.0; // Extra space in the quad for tapering
@@ -872,7 +866,7 @@ void main() {
 }
 `;
 
-var circleFragSrc = `precision mediump float;
+var circleFrag = `precision mediump float;
 
 uniform highp float lineWidth;
 uniform vec4 strokeStyle;
@@ -889,6 +883,25 @@ void main() {
   gl_FragColor = strokeStyle * globalAlpha * taper;
 }
 `;
+
+const shaders = {
+  text: {
+    vert: preamble + textVert,
+    frag: textFrag,
+  },
+  fill: {
+    vert: preamble + fillVert,
+    frag: fillFrag,
+  },
+  line: {
+    vert: preamble + strokeVert,
+    frag: strokeFrag,
+  },
+  circle: {
+    vert: preamble + circleVert,
+    frag: circleFrag,
+  },
+};
 
 function initQuad(gl, instanceGeom) {
   const { x0, y0, w = 1.0, h = 1.0 } = instanceGeom;
@@ -1074,10 +1087,10 @@ function initAtlasLoader(gl) {
 
 function initPrograms(gl, uniforms) {
   const programs = {
-    text: initProgram(gl, textVertSrc, textFragSrc),
-    fill: initProgram(gl, fillVertSrc, fillFragSrc),
-    line: initProgram(gl, strokeVertSrc, strokeFragSrc),
-    circle: initProgram(gl, circleVertSrc, circleFragSrc),
+    text: initProgram(gl, shaders.text.vert, shaders.text.frag),
+    fill: initProgram(gl, shaders.fill.vert, shaders.fill.frag),
+    line: initProgram(gl, shaders.line.vert, shaders.line.frag),
+    circle: initProgram(gl, shaders.circle.vert, shaders.circle.frag),
   };
 
   function fillText(buffers) {

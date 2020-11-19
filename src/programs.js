@@ -1,21 +1,14 @@
 import * as yawgl from 'yawgl';
-import textVertSrc from "./shaders/text-vertex.glsl";
-import textFragSrc from "./shaders/text-fragment.glsl";
-import fillVertSrc from "./shaders/fill-vertex.glsl";
-import fillFragSrc from "./shaders/fill-fragment.glsl";
-import strokeVertSrc from "./shaders/stroke-vertex.glsl";
-import strokeFragSrc from "./shaders/stroke-fragment.glsl";
-import circleVertSrc from "./shaders/circle-vertex.glsl";
-import circleFragSrc from "./shaders/circle-fragment.glsl";
+import { shaders } from "./shaders/shaders.js";
 import { initBufferLoader } from "./loaders/loader.js";
 import { initAtlasLoader } from "./loaders/atlas.js";
 
 export function initPrograms(gl, uniforms) {
   const programs = {
-    text: yawgl.initProgram(gl, textVertSrc, textFragSrc),
-    fill: yawgl.initProgram(gl, fillVertSrc, fillFragSrc),
-    line: yawgl.initProgram(gl, strokeVertSrc, strokeFragSrc),
-    circle: yawgl.initProgram(gl, circleVertSrc, circleFragSrc),
+    text: yawgl.initProgram(gl, shaders.text.vert, shaders.text.frag),
+    fill: yawgl.initProgram(gl, shaders.fill.vert, shaders.fill.frag),
+    line: yawgl.initProgram(gl, shaders.line.vert, shaders.line.frag),
+    circle: yawgl.initProgram(gl, shaders.circle.vert, shaders.circle.frag),
   };
 
   function fillText(buffers) {

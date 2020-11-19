@@ -1,17 +1,13 @@
-precision highp float;
-
 attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
 
-uniform vec3 tileTransform; // shiftX, shiftY, scale
 uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform float lineWidth;
 
 varying vec2 delta;
 
 void main() {
-  // Transform circle position from tile to map coordinates
-  vec2 mapPos = circlePos * tileTransform.z + tileTransform.xy;
+  vec2 mapPos = tileToMap(circlePos);
 
   // Shift to the appropriate corner of the current instance quad
   float extend = 2.0; // Extra space in the quad for tapering
