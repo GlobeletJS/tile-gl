@@ -19,10 +19,6 @@ export function initFillLoader(gl, constructVao, lineLoader) {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW);
 
     const fillVao = constructVao({ attributes, indices });
-    const path = { fillVao, indices };
-
-    const strokePath = lineLoader(buffers);
-
-    return Object.assign(path, strokePath);
+    return { fillVao, indices };
   };
 }

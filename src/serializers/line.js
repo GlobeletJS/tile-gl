@@ -3,7 +3,7 @@ export function parseLine(feature) {
   if (lines) return { lines };
 }
 
-export function flattenLines(geometry) {
+function flattenLines(geometry) {
   let { type, coordinates } = geometry;
 
   switch (type) {

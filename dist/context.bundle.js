@@ -1015,11 +1015,7 @@ function initFillLoader(gl, constructVao, lineLoader) {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW);
 
     const fillVao = constructVao({ attributes, indices });
-    const path = { fillVao, indices };
-
-    const strokePath = lineLoader(buffers);
-
-    return Object.assign(path, strokePath);
+    return { fillVao, indices };
   };
 }
 
@@ -1047,7 +1043,7 @@ function initBufferLoader(gl, programs) {
 
   const loadCircle = initCircleLoader(gl, circle.constructVao);
   const loadLine = initLineLoader(gl, line.constructVao);
-  const loadFill = initFillLoader(gl, fill.constructVao, loadLine);
+  const loadFill = initFillLoader(gl, fill.constructVao);
   const loadText = initTextLoader(gl, text.constructVao);
 
   return function(buffers) {

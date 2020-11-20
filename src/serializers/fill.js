@@ -1,5 +1,4 @@
 import earcut from 'earcut';
-import { flattenLines } from "./line.js";
 
 export function parseFill(feature) {
   const triangles = triangulate(feature.geometry);
@@ -7,7 +6,6 @@ export function parseFill(feature) {
   if (triangles) return {
     vertices: triangles.vertices,
     indices: triangles.indices,
-    lines: flattenLines(feature.geometry), // For rendering the outline
   };
 }
 
