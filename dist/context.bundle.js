@@ -427,20 +427,15 @@ function initUniforms(transform) {
     sdfDim: [256, 256],
   };
 
-  // Mimic Canvas2D API
   const setters = {
     set globalAlpha(val) {
       if (val < 0.0 || val > 1.0) return;
       uniforms.globalAlpha = val;
     },
     set fillStyle(val) {
-      let color = convertColor(val);
-      if (!color || color.length !== 4) return;
       uniforms.fillStyle.set(convertColor(val));
     },
     set strokeStyle(val) {
-      let color = convertColor(val);
-      if (!color || color.length !== 4) return;
       uniforms.strokeStyle.set(convertColor(val));
     },
     set lineWidth(val) {
@@ -669,8 +664,10 @@ var preamble = `precision highp float;
 
 attribute vec3 tileCoords;
 
-uniform vec4 mapCoords; // x, y, z, extent of tileset[0]
-uniform vec3 mapShift;  // translate and scale of tileset[0]
+uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
+uniform vec3 mapShift;    // translate and scale of tileset[0]
+
+uniform vec3 screenScale; // 2 / width, -2 / height, pixRatio
 
 vec2 tileToMap(vec2 tilePos) {
   // Find distance of this tile from top left tile, in tile units
@@ -686,6 +683,11 @@ vec2 tileToMap(vec2 tilePos) {
 
   return tilePos * tileScale + tileTranslate;
 }
+
+vec4 mapToClip(vec2 mapPos, float z) {
+  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
+  return vec4(projected, z, 1);
+}
 `;
 
 var textVert = `attribute vec2 quadPos;  // Vertices of the quad instance
@@ -693,23 +695,17 @@ attribute vec2 labelPos; // x, y
 attribute vec3 charPos;  // dx, dy, scale (relative to labelPos)
 attribute vec4 sdfRect;  // x, y, w, h
 
-uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
-
 varying vec2 texCoord;
 
 void main() {
+  texCoord = sdfRect.xy + sdfRect.zw * quadPos;
+
   vec2 mapPos = tileToMap(labelPos);
 
   // Shift to the appropriate corner of the current instance quad
-  vec2 dPos = (charPos.xy + sdfRect.zw * quadPos) * charPos.z;
-  vec2 vPos = mapPos + dPos * screenScale.z;
+  vec2 dPos = (charPos.xy + sdfRect.zw * quadPos) * charPos.z * screenScale.z;
 
-  // Convert to clipspace coordinates
-  vec2 projected = vPos * screenScale.xy + vec2(-1.0, 1.0);
-
-  texCoord = sdfRect.xy + sdfRect.zw * quadPos;
-
-  gl_Position = vec4(projected, 0, 1);
+  gl_Position = mapToClip(mapPos + dPos, 0.0);
 }
 `;
 
@@ -736,15 +732,12 @@ void main() {
 
 var fillVert = `attribute vec2 a_position;
 
-uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform vec2 translation;   // From style property paint["fill-translate"]
 
 void main() {
   vec2 mapPos = tileToMap(a_position) + translation * screenScale.z;
 
-  // Convert to clipspace coordinates
-  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
-  gl_Position = vec4(projected, 0, 1);
+  gl_Position = mapToClip(mapPos, 0.0);
 }
 `;
 
@@ -761,7 +754,6 @@ void main() {
 var strokeVert = `attribute vec2 position;
 attribute vec3 pointA, pointB, pointC, pointD;
 
-uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform float lineWidth, miterLimit;
 
 varying float yCoord;
@@ -825,10 +817,7 @@ void main() {
   // Remove pixRatio from varying (we taper edges using unscaled value)
   yCoord = y / screenScale.z;
 
-  // Convert to clipspace coordinates
-  vec2 projected = point * screenScale.xy + vec2(-1.0, 1.0);
-
-  gl_Position = vec4(projected, pointB.z + pointC.z, 1);
+  gl_Position = mapToClip(point, pointB.z + pointC.z);
 }
 `;
 
@@ -868,7 +857,6 @@ void main() {
 var circleVert = `attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
 
-uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform float lineWidth;
 
 varying vec2 delta;
@@ -879,11 +867,8 @@ void main() {
   // Shift to the appropriate corner of the current instance quad
   float extend = 2.0; // Extra space in the quad for tapering
   delta = (lineWidth + extend) * quadPos * screenScale.z;
-  vec2 vPos = mapPos + delta;
 
-  // Convert to clipspace coordinates
-  vec2 projected = vPos * screenScale.xy + vec2(-1.0, 1.0);
-  gl_Position = vec4(projected, 0, 1);
+  gl_Position = mapToClip(mapPos + delta, 0.0);
 }
 `;
 

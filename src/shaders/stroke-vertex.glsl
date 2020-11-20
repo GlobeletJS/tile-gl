@@ -1,7 +1,6 @@
 attribute vec2 position;
 attribute vec3 pointA, pointB, pointC, pointD;
 
-uniform vec3 screenScale;   // 2 / width, -2 / height, pixRatio
 uniform float lineWidth, miterLimit;
 
 varying float yCoord;
@@ -65,8 +64,5 @@ void main() {
   // Remove pixRatio from varying (we taper edges using unscaled value)
   yCoord = y / screenScale.z;
 
-  // Convert to clipspace coordinates
-  vec2 projected = point * screenScale.xy + vec2(-1.0, 1.0);
-
-  gl_Position = vec4(projected, pointB.z + pointC.z, 1);
+  gl_Position = mapToClip(point, pointB.z + pointC.z);
 }

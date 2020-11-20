@@ -2,8 +2,10 @@ precision highp float;
 
 attribute vec3 tileCoords;
 
-uniform vec4 mapCoords; // x, y, z, extent of tileset[0]
-uniform vec3 mapShift;  // translate and scale of tileset[0]
+uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
+uniform vec3 mapShift;    // translate and scale of tileset[0]
+
+uniform vec3 screenScale; // 2 / width, -2 / height, pixRatio
 
 vec2 tileToMap(vec2 tilePos) {
   // Find distance of this tile from top left tile, in tile units
@@ -18,4 +20,9 @@ vec2 tileToMap(vec2 tilePos) {
   float tileScale = zoomFac * mapShift.z / mapCoords.w;
 
   return tilePos * tileScale + tileTranslate;
+}
+
+vec4 mapToClip(vec2 mapPos, float z) {
+  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
+  return vec4(projected, z, 1);
 }

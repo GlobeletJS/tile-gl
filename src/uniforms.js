@@ -15,20 +15,15 @@ export function initUniforms(transform) {
     sdfDim: [256, 256],
   };
 
-  // Mimic Canvas2D API
   const setters = {
     set globalAlpha(val) {
       if (val < 0.0 || val > 1.0) return;
       uniforms.globalAlpha = val;
     },
     set fillStyle(val) {
-      let color = convertColor(val);
-      if (!color || color.length !== 4) return;
       uniforms.fillStyle.set(convertColor(val));
     },
     set strokeStyle(val) {
-      let color = convertColor(val);
-      if (!color || color.length !== 4) return;
       uniforms.strokeStyle.set(convertColor(val));
     },
     set lineWidth(val) {
