@@ -10,6 +10,7 @@ export function initUniforms(transform) {
     strokeStyle: new Float32Array([0, 0, 0, 1]),
     globalAlpha: 1.0,
     lineWidth: 1.0,
+    circleRadius: 5.0,
     miterLimit: 10.0,
     sdf: null,
     sdfDim: [256, 256],
@@ -28,6 +29,9 @@ export function initUniforms(transform) {
     },
     set lineWidth(val) {
       uniforms.lineWidth = val;
+    },
+    set circleRadius(val) {
+      uniforms.circleRadius = val;
     },
     set miterLimit(val) {
       uniforms.miterLimit = val;

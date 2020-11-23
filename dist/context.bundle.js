@@ -422,6 +422,7 @@ function initUniforms(transform) {
     strokeStyle: new Float32Array([0, 0, 0, 1]),
     globalAlpha: 1.0,
     lineWidth: 1.0,
+    circleRadius: 5.0,
     miterLimit: 10.0,
     sdf: null,
     sdfDim: [256, 256],
@@ -440,6 +441,9 @@ function initUniforms(transform) {
     },
     set lineWidth(val) {
       uniforms.lineWidth = val;
+    },
+    set circleRadius(val) {
+      uniforms.circleRadius = val;
     },
     set miterLimit(val) {
       uniforms.miterLimit = val;
@@ -857,7 +861,7 @@ void main() {
 var circleVert = `attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
 
-uniform float lineWidth;
+uniform float circleRadius;
 
 varying vec2 delta;
 
@@ -865,16 +869,16 @@ void main() {
   vec2 mapPos = tileToMap(circlePos);
 
   // Shift to the appropriate corner of the current instance quad
-  float extend = 2.0; // Extra space in the quad for tapering
-  delta = (lineWidth + extend) * quadPos * screenScale.z;
+  delta = 2.0 * quadPos * (circleRadius + 1.0);
+  vec2 dPos = delta * screenScale.z;
 
-  gl_Position = mapToClip(mapPos + delta, 0.0);
+  gl_Position = mapToClip(mapPos + dPos, 0.0);
 }
 `;
 
 var circleFrag = `precision mediump float;
 
-uniform highp float lineWidth;
+uniform highp float circleRadius;
 uniform vec4 strokeStyle;
 uniform float globalAlpha;
 
@@ -883,9 +887,8 @@ varying vec2 delta;
 void main() {
   float r = length(delta);
   float dr = fwidth(r);
-  float radius = lineWidth / 2.0;
 
-  float taper = 1.0 - smoothstep(radius - dr, radius + dr, r);
+  float taper = 1.0 - smoothstep(circleRadius - dr, circleRadius + dr, r);
   gl_FragColor = strokeStyle * globalAlpha * taper;
 }
 `;
