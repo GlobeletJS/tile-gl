@@ -1,5 +1,3 @@
-import { rgb as d3rgb } from 'd3-color';
-
 export function initUniforms(transform) {
   const { mapCoords, mapShift, screenScale } = transform;
 
@@ -22,10 +20,10 @@ export function initUniforms(transform) {
       uniforms.globalAlpha = val;
     },
     set fillStyle(val) {
-      uniforms.fillStyle.set(convertColor(val));
+      uniforms.fillStyle.set(val);
     },
     set strokeStyle(val) {
-      uniforms.strokeStyle.set(convertColor(val));
+      uniforms.strokeStyle.set(val);
     },
     set lineWidth(val) {
       uniforms.lineWidth = val;
@@ -50,9 +48,4 @@ export function initUniforms(transform) {
   };
 
   return { values: uniforms, setters };
-
-  function convertColor(cssString) {
-    let c = d3rgb(cssString);
-    return [c.r / 255, c.g / 255, c.b / 255, c.opacity];
-  }
 }
