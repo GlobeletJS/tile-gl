@@ -1,6 +1,6 @@
-import { parseCircle } from "./serializers/circle.js";
-import { parseLine } from "./serializers/line.js";
-import { parseFill } from "./serializers/fill.js";
+import { parseCircle } from "./circle/serializer.js";
+import { parseLine } from "./line/serializer.js";
+import { parseFill } from "./fill/serializer.js";
 import { initShaping } from 'tile-labeler';
 
 export function initSerializer(style) {

@@ -37,7 +37,7 @@
     "earcut": "^2.2.2",
     "gl-matrix": "^3.3.0",
     "tile-labeler": "^0.1.1",
-    "yawgl": "github:GlobeletJS/yawgl"
+    "yawgl": "file:../yawgl"
   },
   "sideEffects": false
 }

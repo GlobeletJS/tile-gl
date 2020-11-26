@@ -5,7 +5,7 @@ import { glsl } from "./glsl-plugin.js";
 
 // Bundling is only needed for some sub-modules
 export default [{
-  input: 'src/context.js',
+  input: 'src/main.js',
   plugins: [
     glsl(),
     resolve(),

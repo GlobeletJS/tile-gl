@@ -1,35 +1,32 @@
-import { initTransform } from "./transform.js";
-import { initUniforms } from "./uniforms.js";
-import { initPrograms } from "./programs.js";
+import preamble from "./preamble.glsl";
+import { initProgram } from 'yawgl';
+import { initQuad, initAttribute } from "./attributes.js";
 
-export function initGLpaint(gl, framebuffer, framebufferSize) {
+export function initContext(gl, framebuffer, framebufferSize) {
   // Input is an extended WebGL context, as created by yawgl.getExtendedContext
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-  const transform = initTransform(gl, framebuffer, framebufferSize);
-  const uniforms = initUniforms(transform);
-  const programs = initPrograms(gl, uniforms.values);
-
-  const api = {
+  return {
     gl,
+    initQuad: (geom) => initQuad(gl, geom),
+    initAttribute: (options) => initAttribute(gl, options),
+    initProgram: (vert, frag) => initProgram(gl, preamble + vert, frag),
     canvas: framebufferSize,
 
-    save: () => null,
-    restore: () => gl.disable(gl.SCISSOR_TEST),
+    bindFramebufferAndSetViewport,
     clear,
-    clearRect: () => clear(), // TODO: clipRect() before clear()?
     clipRect,
-    fillRect,
+    drawInstancedQuads,
+    drawElements,
   };
 
-  Object.assign(api, transform.methods, programs);
-  Object.defineProperties(api,
-    Object.getOwnPropertyDescriptors(uniforms.setters)
-  );
-
-  return api;
+  function bindFramebufferAndSetViewport(pixRatio = 1) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    let { width, height } = framebufferSize;
+    gl.viewport(0, 0, width, height);
+  }
 
   function clear(color = [0.0, 0.0, 0.0, 0.0]) {
     gl.disable(gl.SCISSOR_TEST);
@@ -44,10 +41,16 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
     gl.scissor(...roundedArgs);
   }
 
-  function fillRect(x, y, width, height) {
-    clipRect(x, y, width, height);
-    let opacity = uniforms.values.globalAlpha;
-    let color = uniforms.values.fillStyle.map(c => c * opacity);
-    clear(color);
+  function drawInstancedQuads(vao, numInstances) {
+    gl.bindVertexArray(vao);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
+    gl.bindVertexArray(null);
+  }
+
+  function drawElements(vao, indices) {
+    const { vertexCount, type, offset } = indices;
+    gl.bindVertexArray(vao);
+    gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+    gl.bindVertexArray(null);
   }
 }

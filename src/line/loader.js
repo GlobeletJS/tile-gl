@@ -1,7 +1,7 @@
-import { initQuad, initAttribute } from "./attributes.js";
+export function initLineLoader(context, constructVao) {
+  const { gl, initQuad, initAttribute } = context;
 
-export function initLineLoader(gl, constructVao) {
-  const position = initQuad(gl, { x0: 0.0, y0: -0.5 });
+  const position = initQuad({ x0: 0.0, y0: -0.5 });
 
   const numComponents = 3;
   const stride = Float32Array.BYTES_PER_ELEMENT * numComponents;
@@ -21,16 +21,16 @@ export function initLineLoader(gl, constructVao) {
       pointB: setupPoint(1),
       pointC: setupPoint(2),
       pointD: setupPoint(3),
-      tileCoords: initAttribute(gl, { data: tileCoords, numComponents: 3 }),
+      tileCoords: initAttribute({ data: tileCoords, numComponents: 3 }),
     };
 
     function setupPoint(shift) {
       const offset = shift * stride;
-      return initAttribute(gl, { buffer, numComponents, stride, offset });
+      return initAttribute({ buffer, numComponents, stride, offset });
     }
 
-    const strokeVao = constructVao({ attributes });
+    const vao = constructVao({ attributes });
 
-    return { strokeVao, numInstances: lines.length / numComponents - 3 };
+    return { vao, numInstances: lines.length / numComponents - 3 };
   };
 }
