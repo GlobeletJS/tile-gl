@@ -20,8 +20,10 @@ export function initGrid(context, useProgram, setters) {
     screenScale([ 2 / width, -2 / height, pixRatio ]);
 
     const { x, y, z } = tileset[0];
+    const j = 1 << z;
+    const xw = x - Math.floor(x / j) * j;
     const extent = 512; // TODO: don't assume this!!
-    mapCoords([x, y, z, extent]);
+    mapCoords([xw, y, z, extent]);
 
     const { translate, scale } = tileset;
     const pixScale = scale * pixRatio;
