@@ -10,42 +10,6 @@ export function initSetters(pairs, uniformSetters) {
   };
 }
 
-export function initGrid(context, useProgram, setters) {
-  const { screenScale, mapCoords, mapShift } = setters;
-
-  return function(tileset, pixRatio = 1) {
-    useProgram();
-
-    const { width, height } = context.canvas;
-    screenScale([ 2 / width, -2 / height, pixRatio ]);
-
-    const { x, y, z } = tileset[0];
-    const j = 1 << z;
-    const xw = x - Math.floor(x / j) * j;
-    const extent = 512; // TODO: don't assume this!!
-    mapCoords([xw, y, z, extent]);
-
-    const { translate, scale } = tileset;
-    const pixScale = scale * pixRatio;
-    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * pixScale);
-    mapShift([dx, dy, pixScale]);
-
-    return [translate, pixScale];
-  };
-}
-
-export function initTilesetPainter(setGrid, zoomFuncs, paintTile) {
-  return function({ tileset, zoom, pixRatio = 1 }) {
-    if (!tileset || !tileset.length) return;
-
-    const [translate, scale] = setGrid(tileset, pixRatio);
-
-    zoomFuncs.forEach(f => f(zoom));
-
-    tileset.forEach(box => paintTile(box, zoom, translate, scale));
-  };
-}
-
 export function initVectorTilePainter(context, program) {
   const { id, setAtlas, dataFuncs, draw } = program;
 

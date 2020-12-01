@@ -2,12 +2,8 @@ import vert from "./vert.glsl";
 import frag from "./frag.glsl";
 import { initTextLoader } from "./loader.js";
 import { initAtlasLoader } from "./atlas.js";
-import {
-  initGrid,
-  initSetters,
-  initVectorTilePainter,
-  initTilesetPainter,
-} from "../util.js";
+import { initGrid, initTilesetPainter } from "../grid.js";
+import { initSetters, initVectorTilePainter } from "../util.js";
 
 export function initText(context) {
   const program = context.initProgram(vert, frag);

@@ -1,11 +1,7 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
-import {
-  initGrid,
-  initSetters,
-  initVectorTilePainter,
-  initTilesetPainter,
-} from "../util.js";
+import { initGrid, initTilesetPainter } from "../grid.js";
+import { initSetters, initVectorTilePainter } from "../util.js";
 
 export function initCircle(context) {
   const program = context.initProgram(vert, frag);
