@@ -28,7 +28,7 @@ function initParser(style) {
       };
     case "line":
       return {
-        getLen: (b) => b.lines.length / 3 - 3,
+        getLen: (b) => b.lines.length / 3,
         parse: parseLine,
       };
     case "fill":
