@@ -1,6 +1,15 @@
-function parseCircle(feature) {
-  const points = flattenPoints(feature.geometry);
-  if (points) return { points };
+function initCircleParsing(style) {
+  // TODO: check for property-dependence of 
+  //   circleRadius, globalAlpha, strokeStyle
+
+  return function(feature) {
+    const points = flattenPoints(feature.geometry);
+    if (!points) return;
+    
+    return { 
+      points 
+    };
+  };
 }
 
 function flattenPoints(geometry) {
@@ -16,9 +25,18 @@ function flattenPoints(geometry) {
   }
 }
 
-function parseLine(feature) {
-  const lines = flattenLines(feature.geometry);
-  if (lines) return { lines };
+function initLineParsing(style) {
+  // TODO: check for property-dependence of 
+  //   lineWidth, lineGapWidth, globalAlpha, strokeStyle
+
+  return function(feature) {
+    const lines = flattenLines(feature.geometry);
+    if (!lines) return;
+
+    return {
+      lines
+    };
+  };
 }
 
 function flattenLines(geometry) {
@@ -739,12 +757,17 @@ earcut.flatten = function (data) {
 };
 earcut_1.default = default_1;
 
-function parseFill(feature) {
-  const triangles = triangulate(feature.geometry);
+function initFillParsing(style) {
+  // TODO: check for property-dependence of globalAlpha, fillStyle
 
-  if (triangles) return {
-    vertices: triangles.vertices,
-    indices: triangles.indices,
+  return function(feature) {
+    const triangles = triangulate(feature.geometry);
+    if (!triangles) return;
+
+    return {
+      vertices: triangles.vertices,
+      indices: triangles.indices,
+    };
   };
 }
 
@@ -1123,17 +1146,17 @@ function initParser(style) {
     case "circle":
       return { 
         getLen: (b) => b.points.length / 2,
-        parse: parseCircle,
+        parse: initCircleParsing(),
       };
     case "line":
       return {
         getLen: (b) => b.lines.length / 3,
-        parse: parseLine,
+        parse: initLineParsing(),
       };
     case "fill":
       return {
         getLen: (b) => b.vertices.length / 2,
-        parse: parseFill,
+        parse: initFillParsing(),
       };
     case "symbol":
       return {

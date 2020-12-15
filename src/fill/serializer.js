@@ -1,11 +1,16 @@
 import earcut from 'earcut';
 
-export function parseFill(feature) {
-  const triangles = triangulate(feature.geometry);
+export function initFillParsing(style) {
+  // TODO: check for property-dependence of globalAlpha, fillStyle
 
-  if (triangles) return {
-    vertices: triangles.vertices,
-    indices: triangles.indices,
+  return function(feature) {
+    const triangles = triangulate(feature.geometry);
+    if (!triangles) return;
+
+    return {
+      vertices: triangles.vertices,
+      indices: triangles.indices,
+    };
   };
 }
 

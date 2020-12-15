@@ -266,7 +266,7 @@ function initContext(gl, framebuffer, framebufferSize) {
     drawElements,
   };
 
-  function bindFramebufferAndSetViewport(pixRatio = 1) {
+  function bindFramebufferAndSetViewport() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     let { width, height } = framebufferSize;
     gl.viewport(0, 0, width, height);

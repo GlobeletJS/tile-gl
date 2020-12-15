@@ -1,6 +1,15 @@
-export function parseLine(feature) {
-  const lines = flattenLines(feature.geometry);
-  if (lines) return { lines };
+export function initLineParsing(style) {
+  // TODO: check for property-dependence of 
+  //   lineWidth, lineGapWidth, globalAlpha, strokeStyle
+
+  return function(feature) {
+    const lines = flattenLines(feature.geometry);
+    if (!lines) return;
+
+    return {
+      lines
+    };
+  };
 }
 
 function flattenLines(geometry) {

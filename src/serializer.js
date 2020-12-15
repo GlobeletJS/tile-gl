@@ -1,6 +1,6 @@
-import { parseCircle } from "./circle/serializer.js";
-import { parseLine } from "./line/serializer.js";
-import { parseFill } from "./fill/serializer.js";
+import { initCircleParsing } from "./circle/serializer.js";
+import { initLineParsing } from "./line/serializer.js";
+import { initFillParsing } from "./fill/serializer.js";
 import { initShaping } from 'tile-labeler';
 
 export function initSerializer(style) {
@@ -24,17 +24,17 @@ function initParser(style) {
     case "circle":
       return { 
         getLen: (b) => b.points.length / 2,
-        parse: parseCircle,
+        parse: initCircleParsing(style),
       };
     case "line":
       return {
         getLen: (b) => b.lines.length / 3,
-        parse: parseLine,
+        parse: initLineParsing(style),
       };
     case "fill":
       return {
         getLen: (b) => b.vertices.length / 2,
-        parse: parseFill,
+        parse: initFillParsing(style),
       };
     case "symbol":
       return {
