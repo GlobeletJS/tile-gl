@@ -1,6 +1,6 @@
 import preamble from "./preamble.glsl";
 import { initProgram } from 'yawgl';
-import { initQuad, initAttribute } from "./attributes.js";
+import { initQuad, initAttribute, initIndices, createBuffer } from "./attributes.js";
 
 export function initContext(gl, framebuffer, framebufferSize) {
   // Input is an extended WebGL context, as created by yawgl.getExtendedContext
@@ -12,6 +12,8 @@ export function initContext(gl, framebuffer, framebufferSize) {
     gl,
     initQuad: (geom) => initQuad(gl, geom),
     initAttribute: (options) => initAttribute(gl, options),
+    initIndices: (options) => initIndices(gl, options),
+    createBuffer: (data) => createBuffer(gl, data),
     initProgram: (vert, frag) => initProgram(gl, preamble + vert, frag),
     canvas: framebufferSize,
 

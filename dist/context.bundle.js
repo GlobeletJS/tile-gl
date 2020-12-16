@@ -239,10 +239,20 @@ function initAttribute(gl, options) {
   return { buffer, numComponents, type, normalize, stride, offset, divisor };
 }
 
-function createBuffer(gl, data) {
+function initIndices(gl, options) {
+  const {
+    buffer = createBuffer(gl, options.data, gl.ELEMENT_ARRAY_BUFFER),
+    type = gl.UNSIGNED_SHORT,
+    offset = 0,
+  } = options;
+
+  return { buffer, type, offset, vertexCount: options.data.length };
+}
+
+function createBuffer(gl, data, bindPoint = gl.ARRAY_BUFFER) {
   const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  gl.bindBuffer(bindPoint, buffer);
+  gl.bufferData(bindPoint, data, gl.STATIC_DRAW);
   return buffer;
 }
 
@@ -256,6 +266,8 @@ function initContext(gl, framebuffer, framebufferSize) {
     gl,
     initQuad: (geom) => initQuad(gl, geom),
     initAttribute: (options) => initAttribute(gl, options),
+    initIndices: (options) => initIndices(gl, options),
+    createBuffer: (data) => createBuffer(gl, data),
     initProgram: (vert, frag) => initProgram(gl, preamble + vert, frag),
     canvas: framebufferSize,
 
@@ -582,7 +594,7 @@ void main() {
 `;
 
 function initLineLoader(context, constructVao) {
-  const { gl, initQuad, initAttribute } = context;
+  const { initQuad, createBuffer, initAttribute } = context;
 
   const position = initQuad({ x0: 0.0, y0: -0.5 });
 
@@ -593,9 +605,7 @@ function initLineLoader(context, constructVao) {
     const { lines, tileCoords } = buffers;
 
     // Create buffer containing the vertex positions
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, lines, gl.STATIC_DRAW);
+    const buffer = createBuffer(lines);
 
     // Create interleaved attributes pointing to different offsets in buffer
     const attributes = {
@@ -676,24 +686,20 @@ void main() {
 `;
 
 function initFillLoader(context, constructVao) {
-  const { gl, initAttribute } = context;
+  const { initAttribute, initIndices } = context;
 
   return function(buffers) {
-    const { vertices, indices: indexData, lines, tileCoords } = buffers;
+    const { vertices, indices: indexData, colors, tileCoords } = buffers;
 
     const attributes = {
       a_position: initAttribute({ data: vertices, divisor: 0 }),
       tileCoords: initAttribute({ data: tileCoords, numComponents: 3 }),
     };
+    if (colors) {
+      attributes.color = initAttribute({ data: colors, numComponents: 4 });
+    }
 
-    const indices = {
-      buffer: gl.createBuffer(),
-      vertexCount: indexData.length,
-      type: gl.UNSIGNED_SHORT,
-      offset: 0
-    };
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices.buffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW);
+    const indices = initIndices({ data: indexData });
 
     const vao = constructVao({ attributes, indices });
     return { vao, indices };

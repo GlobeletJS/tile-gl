@@ -1,5 +1,5 @@
 export function initLineLoader(context, constructVao) {
-  const { gl, initQuad, initAttribute } = context;
+  const { initQuad, createBuffer, initAttribute } = context;
 
   const position = initQuad({ x0: 0.0, y0: -0.5 });
 
@@ -10,9 +10,7 @@ export function initLineLoader(context, constructVao) {
     const { lines, tileCoords } = buffers;
 
     // Create buffer containing the vertex positions
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, lines, gl.STATIC_DRAW);
+    const buffer = createBuffer(lines);
 
     // Create interleaved attributes pointing to different offsets in buffer
     const attributes = {

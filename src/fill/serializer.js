@@ -1,16 +1,26 @@
 import earcut from 'earcut';
 
 export function initFillParsing(style) {
-  // TODO: check for property-dependence of globalAlpha, fillStyle
+  // TODO: check for property-dependence of globalAlpha
+  const getColor = style.paint["fill-color"];
 
   return function(feature) {
     const triangles = triangulate(feature.geometry);
     if (!triangles) return;
 
-    return {
+    const buffers = {
       vertices: triangles.vertices,
       indices: triangles.indices,
     };
+
+    if (getColor.type === "property") {
+      let color = getColor(null, feature);
+      buffers.colors = Array
+        .from({ length: triangles.vertices.length / 2 })
+        .flatMap(v => color);
+    }
+
+    return buffers;
   };
 }
 

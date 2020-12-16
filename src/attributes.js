@@ -26,9 +26,19 @@ export function initAttribute(gl, options) {
   return { buffer, numComponents, type, normalize, stride, offset, divisor };
 }
 
-function createBuffer(gl, data) {
+export function initIndices(gl, options) {
+  const {
+    buffer = createBuffer(gl, options.data, gl.ELEMENT_ARRAY_BUFFER),
+    type = gl.UNSIGNED_SHORT,
+    offset = 0,
+  } = options;
+
+  return { buffer, type, offset, vertexCount: options.data.length };
+}
+
+export function createBuffer(gl, data, bindPoint = gl.ARRAY_BUFFER) {
   const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  gl.bindBuffer(bindPoint, buffer);
+  gl.bufferData(bindPoint, data, gl.STATIC_DRAW);
   return buffer;
 }
