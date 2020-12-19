@@ -123,11 +123,13 @@ function createUniformSetters(gl, program) {
     [gl.SAMPLER_CUBE]: 1,
   };
 
-  const numUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
-  const uniformInfo = Array.from({ length: numUniforms })
+  // Collect info about all the uniforms used by the program
+  const uniformInfo = Array
+    .from({ length: gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) })
     .map((v, i) => gl.getActiveUniform(program, i))
     .filter(info => info !== undefined);
 
+  const textureTypes = [gl.SAMPLER_2D, gl.SAMPLER_CUBE];
   var textureUnit = 0;
 
   return uniformInfo.reduce((d, info) => {
@@ -139,41 +141,59 @@ function createUniformSetters(gl, program) {
     //d[key] = wrapSetter(setter, isArray, type, size);
     d[key] = createUniformSetter(gl, program, info, textureUnit);
 
-    if (type === gl.TEXTURE_2D || type === gl.TEXTURE_CUBE_MAP) {
-      textureUnit += size;
-    }
+    if (textureTypes.includes(type)) textureUnit += size;
 
     return d;
   }, {});
 }
 
-function getVao(gl, program, attributeState) {
-  const { attributes, indices } = attributeState;
+function initAttributes(gl, program) {
+  // Construct a dictionary of the indices of each attribute used by program
+  const attrIndices = Array
+    .from({ length: gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES) })
+    .map((v, i) => gl.getActiveAttrib(program, i))
+    .reduce((d, { name }, index) => (d[name] = index, d), {});
 
-  const vao = gl.createVertexArray();
-  gl.bindVertexArray(vao);
+  // Construct a dictionary of functions to set a constant value for a given
+  // vertex attribute, when a per-vertex buffer is not needed
+  const constantSetters = Object.entries(attrIndices).reduce((d, [name, i]) => {
+    d[name] = function(v) {
+      if (![1, 2, 3, 4].includes(v.length)) return;
+      gl.disableVertexAttribArray(i);
+      const methodName = "vertexAttrib" + v.length + "fv";
+      gl[methodName](i, v);
+    };
+    return d;
+  }, {});
 
-  Object.entries(attributes).forEach(([name, a]) => {
-    var index = gl.getAttribLocation(program, name);
-    if (index < 0) return;
+  function constructVao({ attributes, indices }) {
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
 
-    gl.enableVertexAttribArray(index);
-    gl.bindBuffer(gl.ARRAY_BUFFER, a.buffer);
-    gl.vertexAttribPointer(
-      index, // index of attribute in program
-      a.numComponents || a.size, // Number of elements to read per vertex
-      a.type || gl.FLOAT, // Type of each element
-      a.normalize || false, // Whether to normalize it
-      a.stride || 0, // Byte spacing between vertices
-      a.offset || 0 // Byte # to start reading from
-    );
-    gl.vertexAttribDivisor(index, a.divisor || 0);
-  });
+    Object.entries(attributes).forEach(([name, a]) => {
+      const index = attrIndices[name];
+      if (index === undefined) return;
 
-  if (indices) gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices.buffer);
+      gl.enableVertexAttribArray(index);
+      gl.bindBuffer(gl.ARRAY_BUFFER, a.buffer);
+      gl.vertexAttribPointer(
+        index,                // index of attribute in program
+        a.numComponents || a.size, // Number of elements to read per vertex
+        a.type || gl.FLOAT,   // Type of each element
+        a.normalize || false, // Whether to normalize it
+        a.stride || 0,        // Byte spacing between vertices
+        a.offset || 0         // Byte # to start reading from
+      );
+      gl.vertexAttribDivisor(index, a.divisor || 0);
+    });
 
-  gl.bindVertexArray(null);
-  return vao;
+    if (indices) gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices.buffer);
+
+    gl.bindVertexArray(null);
+    return vao;
+  }
+
+  return { constantSetters, constructVao };
 }
 
 function initProgram(gl, vertexSrc, fragmentSrc) {
@@ -186,10 +206,13 @@ function initProgram(gl, vertexSrc, fragmentSrc) {
     fail("Unable to link the program", gl.getProgramInfoLog(program));
   }
 
+  const { constantSetters, constructVao } = initAttributes(gl, program);
+  const uniformSetters = createUniformSetters(gl, program);
+
   return {
-    uniformSetters: createUniformSetters(gl, program),
+    uniformSetters: Object.assign(uniformSetters, constantSetters),
     use: () => gl.useProgram(program),
-    constructVao: (attributeState) => getVao(gl, program, attributeState),
+    constructVao,
   };
 }
 
@@ -665,11 +688,16 @@ function initLine(context) {
 }
 
 var vert$2 = `attribute vec2 a_position;
+attribute vec4 color;
 
 uniform vec2 translation;   // From style property paint["fill-translate"]
 
+varying vec4 fillStyle;
+
 void main() {
   vec2 mapPos = tileToMap(a_position) + translation * screenScale.z;
+
+  fillStyle = color;
 
   gl_Position = mapToClip(mapPos, 0.0);
 }
@@ -677,8 +705,9 @@ void main() {
 
 var frag$2 = `precision mediump float;
 
-uniform vec4 fillStyle;
 uniform float globalAlpha;
+
+varying vec4 fillStyle;
 
 void main() {
     gl_FragColor = fillStyle * globalAlpha;
@@ -722,12 +751,14 @@ function initFill(context) {
     const { id, paint } = style;
 
     const { zoomFuncs, dataFuncs } = initSetters([
-      [paint["fill-color"],     "fillStyle"],
+      //[paint["fill-color"],     "fillStyle"],
+      [paint["fill-color"],     "color"],
       [paint["fill-opacity"],   "globalAlpha"],
       [paint["fill-translate"], "translation"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs, draw });
+    //const paintTile = initVectorTilePainter(context, { id, dataFuncs, draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };

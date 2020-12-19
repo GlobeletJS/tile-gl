@@ -20,12 +20,14 @@ export function initFill(context) {
     const { id, paint } = style;
 
     const { zoomFuncs, dataFuncs } = initSetters([
-      [paint["fill-color"],     "fillStyle"],
+      //[paint["fill-color"],     "fillStyle"],
+      [paint["fill-color"],     "color"],
       [paint["fill-opacity"],   "globalAlpha"],
       [paint["fill-translate"], "translation"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs, draw });
+    //const paintTile = initVectorTilePainter(context, { id, dataFuncs, draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 
