@@ -158,8 +158,12 @@ function initAttributes(gl, program) {
   // vertex attribute, when a per-vertex buffer is not needed
   const constantSetters = Object.entries(attrIndices).reduce((d, [name, i]) => {
     d[name] = function(v) {
-      if (![1, 2, 3, 4].includes(v.length)) return;
       gl.disableVertexAttribArray(i);
+
+      // For float attributes, the supplied value may be a Number
+      if (v.length === undefined) return gl.vertexAttrib1f(i, v);
+
+      if (![1, 2, 3, 4].includes(v.length)) return;
       const methodName = "vertexAttrib" + v.length + "fv";
       gl[methodName](i, v);
     };
@@ -687,17 +691,18 @@ function initLine(context) {
   return { load, initPainter };
 }
 
-var vert$2 = `attribute vec2 a_position;
+var vert$2 = `attribute vec2 position;
 attribute vec4 color;
+attribute float opacity;
 
 uniform vec2 translation;   // From style property paint["fill-translate"]
 
 varying vec4 fillStyle;
 
 void main() {
-  vec2 mapPos = tileToMap(a_position) + translation * screenScale.z;
+  vec2 mapPos = tileToMap(position) + translation * screenScale.z;
 
-  fillStyle = color;
+  fillStyle = color * opacity;
 
   gl_Position = mapToClip(mapPos, 0.0);
 }
@@ -705,30 +710,31 @@ void main() {
 
 var frag$2 = `precision mediump float;
 
-uniform float globalAlpha;
-
 varying vec4 fillStyle;
 
 void main() {
-    gl_FragColor = fillStyle * globalAlpha;
+    gl_FragColor = fillStyle;
 }
 `;
 
 function initFillLoader(context, constructVao) {
   const { initAttribute, initIndices } = context;
 
+  const attrInfo = {
+    position: { divisor: 0 },
+    tileCoords: { numComponents: 3 },
+    color: { numComponents: 4 },
+    opacity: { numComponents: 1 },
+  };
+
   return function(buffers) {
-    const { vertices, indices: indexData, color, tileCoords } = buffers;
+    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
+      let data = buffers[key];
+      if (data) d[key] = initAttribute(Object.assign({ data }, info));
+      return d;
+    }, {});
 
-    const attributes = {
-      a_position: initAttribute({ data: vertices, divisor: 0 }),
-      tileCoords: initAttribute({ data: tileCoords, numComponents: 3 }),
-    };
-    if (color) {
-      attributes.color = initAttribute({ data: color, numComponents: 4 });
-    }
-
-    const indices = initIndices({ data: indexData });
+    const indices = initIndices({ data: buffers.indices });
 
     const vao = constructVao({ attributes, indices });
     return { vao, indices };
@@ -751,13 +757,11 @@ function initFill(context) {
     const { id, paint } = style;
 
     const { zoomFuncs, dataFuncs } = initSetters([
-      //[paint["fill-color"],     "fillStyle"],
       [paint["fill-color"],     "color"],
-      [paint["fill-opacity"],   "globalAlpha"],
+      [paint["fill-opacity"],   "opacity"],
       [paint["fill-translate"], "translation"],
     ], uniformSetters);
 
-    //const paintTile = initVectorTilePainter(context, { id, dataFuncs, draw });
     const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
@@ -898,7 +902,7 @@ function initGLpaint(gl, framebuffer, framebufferSize) {
   };
 
   function loadBuffers(buffers) {
-    if (buffers.vertices) {
+    if (buffers.indices) {
       return programs.fill.load(buffers);
     } else if (buffers.lines) {
       return programs.line.load(buffers);

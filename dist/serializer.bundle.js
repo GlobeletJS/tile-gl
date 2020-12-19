@@ -758,24 +758,28 @@ earcut.flatten = function (data) {
 earcut_1.default = default_1;
 
 function initFillParsing(style) {
-  // TODO: check for property-dependence of globalAlpha
-  const getColor = style.paint["fill-color"];
+  const { paint } = style;
+
+  const dataFuncs = [
+    [paint["fill-color"],   "color"],
+    [paint["fill-opacity"], "opacity"],
+  ].filter(([get, key]) => get.type === "property");
 
   return function(feature) {
     const triangles = triangulate(feature.geometry);
     if (!triangles) return;
 
     const buffers = {
-      vertices: triangles.vertices,
+      position: triangles.vertices,
       indices: triangles.indices,
     };
 
-    if (getColor.type === "property") {
-      let color = getColor(null, feature);
-      buffers.color = Array
-        .from({ length: triangles.vertices.length / 2 })
-        .flatMap(v => color);
-    }
+    const length = triangles.vertices.length / 2;
+
+    dataFuncs.forEach(([get, key]) => {
+      let val = get(null, feature);
+      buffers[key] = Array.from({ length }).flatMap(v => val);
+    });
 
     return buffers;
   };
@@ -1165,7 +1169,7 @@ function initParser(style) {
       };
     case "fill":
       return {
-        getLen: (b) => b.vertices.length / 2,
+        getLen: (b) => b.position.length / 2,
         parse: initFillParsing(style),
       };
     case "symbol":

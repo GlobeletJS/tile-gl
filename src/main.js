@@ -18,7 +18,7 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
   };
 
   function loadBuffers(buffers) {
-    if (buffers.vertices) {
+    if (buffers.indices) {
       return programs.fill.load(buffers);
     } else if (buffers.lines) {
       return programs.line.load(buffers);

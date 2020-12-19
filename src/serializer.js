@@ -33,7 +33,7 @@ function initParser(style) {
       };
     case "fill":
       return {
-        getLen: (b) => b.vertices.length / 2,
+        getLen: (b) => b.position.length / 2,
         parse: initFillParsing(style),
       };
     case "symbol":
