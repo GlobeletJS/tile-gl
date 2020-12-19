@@ -4,6 +4,7 @@ import { initCircle } from "./circle/program.js";
 import { initLine } from "./line/program.js";
 import { initFill } from "./fill/program.js";
 import { initText } from "./text/program.js";
+import { initAtlasLoader } from "./atlas.js";
 
 export function initGLpaint(gl, framebuffer, framebufferSize) {
   const context = initContext(gl, framebuffer, framebufferSize);
@@ -44,7 +45,7 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
     bindFramebufferAndSetViewport: context.bindFramebufferAndSetViewport,
     clear: context.clear,
     loadBuffers,
-    loadAtlas: programs.symbol.loadAtlas,
+    loadAtlas: initAtlasLoader(gl),
     initPainter,
   };
 }

@@ -718,14 +718,14 @@ function initFillLoader(context, constructVao) {
   const { initAttribute, initIndices } = context;
 
   return function(buffers) {
-    const { vertices, indices: indexData, colors, tileCoords } = buffers;
+    const { vertices, indices: indexData, color, tileCoords } = buffers;
 
     const attributes = {
       a_position: initAttribute({ data: vertices, divisor: 0 }),
       tileCoords: initAttribute({ data: tileCoords, numComponents: 3 }),
     };
-    if (colors) {
-      attributes.color = initAttribute({ data: colors, numComponents: 4 });
+    if (color) {
+      attributes.color = initAttribute({ data: color, numComponents: 4 });
     }
 
     const indices = initIndices({ data: indexData });
@@ -825,39 +825,12 @@ function initTextLoader(context, constructVao) {
   };
 }
 
-function initAtlasLoader(gl) {
-  return function(atlas) {
-    const { width, height, data } = atlas;
-
-    const target = gl.TEXTURE_2D;
-    const texture = gl.createTexture();
-    gl.bindTexture(target, texture);
-
-    const level = 0;
-    const format = gl.ALPHA;
-    const border = 0;
-    const type = gl.UNSIGNED_BYTE;
-
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-
-    gl.texImage2D(target, level, format, 
-      width, height, border, format, type, data);
-
-    gl.texParameteri(target, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(target, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-    return { width, height, sampler: texture };
-  };
-}
-
 function initText(context) {
   const program = context.initProgram(vert$3, frag$3);
   const { use, uniformSetters, constructVao } = program;
   const grid = initGrid(context, use, uniformSetters);
 
   const load = initTextLoader(context, constructVao);
-  const loadAtlas = initAtlasLoader(context.gl);
 
   function draw(buffers) {
     const { vao, numInstances } = buffers;
@@ -884,7 +857,33 @@ function initText(context) {
     const paintTile = initVectorTilePainter(context, progInfo);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
-  return { load, loadAtlas, initPainter };
+  return { load, initPainter };
+}
+
+function initAtlasLoader(gl) {
+  return function(atlas) {
+    const { width, height, data } = atlas;
+
+    const target = gl.TEXTURE_2D;
+    const texture = gl.createTexture();
+    gl.bindTexture(target, texture);
+
+    const level = 0;
+    const format = gl.ALPHA;
+    const border = 0;
+    const type = gl.UNSIGNED_BYTE;
+
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
+    gl.texImage2D(target, level, format, 
+      width, height, border, format, type, data);
+
+    gl.texParameteri(target, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(target, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+    return { width, height, sampler: texture };
+  };
 }
 
 function initGLpaint(gl, framebuffer, framebufferSize) {
@@ -926,7 +925,7 @@ function initGLpaint(gl, framebuffer, framebufferSize) {
     bindFramebufferAndSetViewport: context.bindFramebufferAndSetViewport,
     clear: context.clear,
     loadBuffers,
-    loadAtlas: programs.symbol.loadAtlas,
+    loadAtlas: initAtlasLoader(gl),
     initPainter,
   };
 }

@@ -1,7 +1,6 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
 import { initTextLoader } from "./loader.js";
-import { initAtlasLoader } from "./atlas.js";
 import { initGrid, initTilesetPainter } from "../grid.js";
 import { initSetters, initVectorTilePainter } from "../util.js";
 
@@ -11,7 +10,6 @@ export function initText(context) {
   const grid = initGrid(context, use, uniformSetters);
 
   const load = initTextLoader(context, constructVao);
-  const loadAtlas = initAtlasLoader(context.gl);
 
   function draw(buffers) {
     const { vao, numInstances } = buffers;
@@ -39,5 +37,5 @@ export function initText(context) {
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 
-  return { load, loadAtlas, initPainter };
+  return { load, initPainter };
 }

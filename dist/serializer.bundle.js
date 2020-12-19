@@ -772,7 +772,7 @@ function initFillParsing(style) {
 
     if (getColor.type === "property") {
       let color = getColor(null, feature);
-      buffers.colors = Array
+      buffers.color = Array
         .from({ length: triangles.vertices.length / 2 })
         .flatMap(v => color);
     }
