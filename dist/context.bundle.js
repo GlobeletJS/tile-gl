@@ -534,11 +534,14 @@ function initCircle(context) {
 
 var vert$1 = `attribute vec2 quadPos;
 attribute vec3 pointA, pointB, pointC, pointD;
+attribute vec4 color;
+attribute float opacity;
 
 uniform float lineWidth, miterLimit;
 
 varying float yCoord;
 varying vec2 miterCoord1, miterCoord2;
+varying vec4 strokeStyle;
 
 mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   // Find a coordinate basis vector aligned along the bisector
@@ -598,17 +601,22 @@ void main() {
   // Remove pixRatio from varying (we taper edges using unscaled value)
   yCoord = y / screenScale.z;
 
+  // TODO: should this premultiplication be done in tile-stencil?
+  //vec4 premult = vec4(color.rgb * color.a, color.a);
+  //strokeStyle = premult * opacity;
+  strokeStyle = color * opacity;
+
   gl_Position = mapToClip(point, pointB.z + pointC.z);
 }
 `;
 
 var frag$1 = `precision highp float;
 
-uniform vec4 strokeStyle;
-uniform float lineWidth, globalAlpha;
+uniform float lineWidth;
 
 varying float yCoord;
 varying vec2 miterCoord1, miterCoord2;
+varying vec4 strokeStyle;
 
 void main() {
   float step0 = fwidth(yCoord) * 0.707;
@@ -630,8 +638,7 @@ void main() {
     step(-0.01 * step1.y, miterCoord1.y) *
     step(0.01 * step2.y, miterCoord2.y);
 
-  vec4 premult = vec4(strokeStyle.rgb * strokeStyle.a, strokeStyle.a);
-  gl_FragColor = premult * globalAlpha * antialias * taperx * tapery;
+  gl_FragColor = strokeStyle * antialias * taperx * tapery;
 }
 `;
 
@@ -640,29 +647,40 @@ function initLineLoader(context, constructVao) {
 
   const quadPos = initQuad({ x0: 0.0, y0: -0.5 });
 
+  const attrInfo = {
+    tileCoords: { numComponents: 3 },
+    color: { numComponents: 4 },
+    opacity: { numComponents: 1 },
+  };
+
   const numComponents = 3;
   const stride = Float32Array.BYTES_PER_ELEMENT * numComponents;
 
   return function(buffers) {
-    const { lines, tileCoords } = buffers;
+    const { lines } = buffers;
 
     // Create buffer containing the vertex positions
     const buffer = createBuffer(lines);
 
     // Create interleaved attributes pointing to different offsets in buffer
-    const attributes = {
+    const geometryAttributes = {
       quadPos,
       pointA: setupPoint(0),
       pointB: setupPoint(1),
       pointC: setupPoint(2),
       pointD: setupPoint(3),
-      tileCoords: initAttribute({ data: tileCoords, numComponents: 3 }),
     };
 
     function setupPoint(shift) {
       const offset = shift * stride;
       return initAttribute({ buffer, numComponents, stride, offset });
     }
+
+    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
+      let data = buffers[key];
+      if (data) d[key] = initAttribute(Object.assign({ data }, info));
+      return d;
+    }, geometryAttributes);
 
     const vao = constructVao({ attributes });
 
@@ -693,14 +711,14 @@ function initLine(context) {
       [layout["line-miter-limit"], "miterLimit"],
 
       [paint["line-width"],     "lineWidth"],
-      [paint["line-color"],     "strokeStyle"],
-      [paint["line-opacity"],   "globalAlpha"],
+      [paint["line-color"],     "color"],
+      [paint["line-opacity"],   "opacity"],
       // line-gap-width,
       // line-translate, line-translate-anchor,
       // line-offset, line-blur, line-gradient, line-pattern
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs, draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };

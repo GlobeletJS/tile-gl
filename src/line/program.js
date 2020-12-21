@@ -27,14 +27,14 @@ export function initLine(context) {
       [layout["line-miter-limit"], "miterLimit"],
 
       [paint["line-width"],     "lineWidth"],
-      [paint["line-color"],     "strokeStyle"],
-      [paint["line-opacity"],   "globalAlpha"],
+      [paint["line-color"],     "color"],
+      [paint["line-opacity"],   "opacity"],
       // line-gap-width,
       // line-translate, line-translate-anchor,
       // line-offset, line-blur, line-gradient, line-pattern
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs, draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 

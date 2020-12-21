@@ -1,10 +1,10 @@
 precision highp float;
 
-uniform vec4 strokeStyle;
-uniform float lineWidth, globalAlpha;
+uniform float lineWidth;
 
 varying float yCoord;
 varying vec2 miterCoord1, miterCoord2;
+varying vec4 strokeStyle;
 
 void main() {
   float step0 = fwidth(yCoord) * 0.707;
@@ -26,6 +26,5 @@ void main() {
     step(-0.01 * step1.y, miterCoord1.y) *
     step(0.01 * step2.y, miterCoord2.y);
 
-  vec4 premult = vec4(strokeStyle.rgb * strokeStyle.a, strokeStyle.a);
-  gl_FragColor = premult * globalAlpha * antialias * taperx * tapery;
+  gl_FragColor = strokeStyle * antialias * taperx * tapery;
 }

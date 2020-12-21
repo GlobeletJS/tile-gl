@@ -1,10 +1,13 @@
 attribute vec2 quadPos;
 attribute vec3 pointA, pointB, pointC, pointD;
+attribute vec4 color;
+attribute float opacity;
 
 uniform float lineWidth, miterLimit;
 
 varying float yCoord;
 varying vec2 miterCoord1, miterCoord2;
+varying vec4 strokeStyle;
 
 mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   // Find a coordinate basis vector aligned along the bisector
@@ -63,6 +66,11 @@ void main() {
 
   // Remove pixRatio from varying (we taper edges using unscaled value)
   yCoord = y / screenScale.z;
+
+  // TODO: should this premultiplication be done in tile-stencil?
+  //vec4 premult = vec4(color.rgb * color.a, color.a);
+  //strokeStyle = premult * opacity;
+  strokeStyle = color * opacity;
 
   gl_Position = mapToClip(point, pointB.z + pointC.z);
 }

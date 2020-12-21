@@ -1,6 +1,11 @@
 export function initLineParsing(style) {
-  // TODO: check for property-dependence of 
-  //   lineWidth, lineGapWidth, globalAlpha, strokeStyle
+  const { paint } = style;
+
+  // TODO: check for property-dependence of lineWidth, lineGapWidth
+  const dataFuncs = [
+    [paint["line-color"], "color"],
+    [paint["line-opacity"], "opacity"],
+  ].filter(([get, key]) => get.type === "property");
 
   return function(feature, { z, x, y }) {
     const lines = flattenLines(feature.geometry);
@@ -8,10 +13,17 @@ export function initLineParsing(style) {
 
     const length = lines.length / 3;
 
-    return {
+    const buffers = {
       lines,
       tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
     };
+
+    dataFuncs.forEach(([get, key]) => {
+      let val = get(null, feature);
+      buffers[key] = Array.from({ length }).flatMap(v => val);
+    });
+
+    return buffers;
   };
 }
 
