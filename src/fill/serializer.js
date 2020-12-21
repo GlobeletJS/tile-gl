@@ -8,16 +8,17 @@ export function initFillParsing(style) {
     [paint["fill-opacity"], "opacity"],
   ].filter(([get, key]) => get.type === "property");
 
-  return function(feature) {
+  return function(feature, { z, x, y }) {
     const triangles = triangulate(feature.geometry);
     if (!triangles) return;
+
+    const length = triangles.vertices.length / 2;
 
     const buffers = {
       position: triangles.vertices,
       indices: triangles.indices,
+      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
     };
-
-    const length = triangles.vertices.length / 2;
 
     dataFuncs.forEach(([get, key]) => {
       let val = get(null, feature);

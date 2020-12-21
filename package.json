@@ -36,7 +36,7 @@
   "dependencies": {
     "earcut": "^2.2.2",
     "gl-matrix": "^3.3.0",
-    "tile-labeler": "^0.1.1",
+    "tile-labeler": "^0.1.2",
     "yawgl": "github:GlobeletJS/yawgl"
   },
   "sideEffects": false

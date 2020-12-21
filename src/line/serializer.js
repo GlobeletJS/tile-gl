@@ -2,12 +2,15 @@ export function initLineParsing(style) {
   // TODO: check for property-dependence of 
   //   lineWidth, lineGapWidth, globalAlpha, strokeStyle
 
-  return function(feature) {
+  return function(feature, { z, x, y }) {
     const lines = flattenLines(feature.geometry);
     if (!lines) return;
 
+    const length = lines.length / 3;
+
     return {
-      lines
+      lines,
+      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
     };
   };
 }

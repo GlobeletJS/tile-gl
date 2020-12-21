@@ -2,12 +2,15 @@ function initCircleParsing(style) {
   // TODO: check for property-dependence of 
   //   circleRadius, globalAlpha, strokeStyle
 
-  return function(feature) {
+  return function(feature, { z, x, y }) {
     const points = flattenPoints(feature.geometry);
     if (!points) return;
+
+    const length = points.length / 2;
     
     return { 
-      points 
+      points,
+      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
     };
   };
 }
@@ -29,12 +32,15 @@ function initLineParsing(style) {
   // TODO: check for property-dependence of 
   //   lineWidth, lineGapWidth, globalAlpha, strokeStyle
 
-  return function(feature) {
+  return function(feature, { z, x, y }) {
     const lines = flattenLines(feature.geometry);
     if (!lines) return;
 
+    const length = lines.length / 3;
+
     return {
-      lines
+      lines,
+      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
     };
   };
 }
@@ -765,16 +771,17 @@ function initFillParsing(style) {
     [paint["fill-opacity"], "opacity"],
   ].filter(([get, key]) => get.type === "property");
 
-  return function(feature) {
+  return function(feature, { z, x, y }) {
     const triangles = triangulate(feature.geometry);
     if (!triangles) return;
+
+    const length = triangles.vertices.length / 2;
 
     const buffers = {
       position: triangles.vertices,
       indices: triangles.indices,
+      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
     };
-
-    const length = triangles.vertices.length / 2;
 
     dataFuncs.forEach(([get, key]) => {
       let val = get(null, feature);
@@ -1116,10 +1123,11 @@ function initShaper(style) {
 function initShaping(style) {
   const shaper = initShaper(style);
 
-  return function(feature, zoom, atlas, tree) {
+  return function(feature, tileCoords, atlas, tree) {
     // tree is an RBush from the 'rbush' module. NOTE: will be updated!
 
-    const buffers = shaper(feature, zoom, atlas);
+    const { z, x, y } = tileCoords;
+    const buffers = shaper(feature, z, atlas);
     if (!buffers) return;
 
     let { origins: [x0, y0], bbox } = buffers;
@@ -1131,8 +1139,10 @@ function initShaping(style) {
     };
 
     if (tree.collides(box)) return;
-
     tree.insert(box);
+
+    const length = buffers.origins.length / 2;
+    buffers.tileCoords = Array.from({ length }).flatMap(v => [x, y, z]);
 
     // TODO: drop if outside tile?
     return buffers;
@@ -1140,43 +1150,15 @@ function initShaping(style) {
 }
 
 function initSerializer(style) {
-  const { getLen, parse } = initParser(style);
-
-  return function(feature, tileCoords, atlas, tree) {
-    const { z, x, y } = tileCoords;
-
-    const buffers = parse(feature, z, atlas, tree);
-
-    if (buffers) buffers.tileCoords = Array
-      .from({ length: getLen(buffers) })
-      .flatMap(v => [x, y, z]);
-
-    return buffers;
-  };
-}
-
-function initParser(style) {
   switch (style.type) {
     case "circle":
-      return { 
-        getLen: (b) => b.points.length / 2,
-        parse: initCircleParsing(),
-      };
+      return initCircleParsing();
     case "line":
-      return {
-        getLen: (b) => b.lines.length / 3,
-        parse: initLineParsing(),
-      };
+      return initLineParsing();
     case "fill":
-      return {
-        getLen: (b) => b.position.length / 2,
-        parse: initFillParsing(style),
-      };
+      return initFillParsing(style);
     case "symbol":
-      return {
-        getLen: (b) => b.origins.length / 2,
-        parse: initShaping(style),
-      };
+      return initShaping(style);
     default:
       throw Error("tile-gl: unknown serializer type!");
   }

@@ -2,12 +2,15 @@ export function initCircleParsing(style) {
   // TODO: check for property-dependence of 
   //   circleRadius, globalAlpha, strokeStyle
 
-  return function(feature) {
+  return function(feature, { z, x, y }) {
     const points = flattenPoints(feature.geometry);
     if (!points) return;
+
+    const length = points.length / 2;
     
     return { 
-      points 
+      points,
+      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
     };
   };
 }
