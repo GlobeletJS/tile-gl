@@ -1,4 +1,4 @@
-attribute vec2 position;
+attribute vec2 quadPos;
 attribute vec3 pointA, pointB, pointC, pointD;
 
 uniform float lineWidth, miterLimit;
@@ -54,10 +54,10 @@ void main() {
   mat3 m2 = miterTransform(-xBasis, yBasis, mapD - mapC, pixWidth);
 
   // Find the position of the current instance vertex, in 3 coordinate systems
-  vec2 extend = miterLimit * xBasis * pixWidth * (position.x - 0.5);
+  vec2 extend = miterLimit * xBasis * pixWidth * (quadPos.x - 0.5);
   // Add one pixel on either side of the line for the anti-alias taper
-  float y = (pixWidth + 2.0) * position.y;
-  vec2 point = mapB + xAxis * position.x + yBasis * y + extend;
+  float y = (pixWidth + 2.0) * quadPos.y;
+  vec2 point = mapB + xAxis * quadPos.x + yBasis * y + extend;
   miterCoord1 = (m1 * vec3(point - mapB, 1)).xy;
   miterCoord2 = (m2 * vec3(point - mapC, 1)).xy;
 

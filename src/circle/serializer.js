@@ -1,17 +1,29 @@
 export function initCircleParsing(style) {
-  // TODO: check for property-dependence of 
-  //   circleRadius, globalAlpha, strokeStyle
+  const { paint } = style;
+
+  const dataFuncs = [
+    [paint["circle-radius"],  "radius"],
+    [paint["circle-color"],   "color"],
+    [paint["circle-opacity"], "opacity"],
+  ].filter(([get, key]) => get.type === "property");
 
   return function(feature, { z, x, y }) {
-    const points = flattenPoints(feature.geometry);
-    if (!points) return;
+    const circlePos = flattenPoints(feature.geometry);
+    if (!circlePos) return;
 
-    const length = points.length / 2;
+    const length = circlePos.length / 2;
     
-    return { 
-      points,
+    const buffers = { 
+      circlePos,
       tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
     };
+
+    dataFuncs.forEach(([get, key]) => {
+      let val = get(null, feature);
+      buffers[key] = Array.from({ length }).flatMap(v => val);
+    });
+
+    return buffers;
   };
 }
 

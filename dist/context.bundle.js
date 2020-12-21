@@ -354,17 +354,24 @@ function initBackground(context) {
 
 var vert = `attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
-
-uniform float circleRadius;
+attribute float radius;
+attribute vec4 color;
+attribute float opacity;
 
 varying vec2 delta;
+varying vec4 strokeStyle;
+varying float circleRadius;
 
 void main() {
   vec2 mapPos = tileToMap(circlePos);
 
   // Shift to the appropriate corner of the current instance quad
-  delta = 2.0 * quadPos * (circleRadius + 1.0);
+  delta = 2.0 * quadPos * (radius + 1.0);
   vec2 dPos = delta * screenScale.z;
+
+  strokeStyle = color * opacity;
+  // TODO: normalize delta? Then can drop one varying
+  circleRadius = radius;
 
   gl_Position = mapToClip(mapPos + dPos, 0.0);
 }
@@ -372,18 +379,16 @@ void main() {
 
 var frag = `precision mediump float;
 
-uniform highp float circleRadius;
-uniform vec4 strokeStyle;
-uniform float globalAlpha;
-
 varying vec2 delta;
+varying vec4 strokeStyle;
+varying float circleRadius;
 
 void main() {
   float r = length(delta);
   float dr = fwidth(r);
 
   float taper = 1.0 - smoothstep(circleRadius - dr, circleRadius + dr, r);
-  gl_FragColor = strokeStyle * globalAlpha * taper;
+  gl_FragColor = strokeStyle * taper;
 }
 `;
 
@@ -479,22 +484,32 @@ function initVectorTilePainter(context, program) {
 }
 
 function initCircle(context) {
-  const program = context.initProgram(vert, frag);
+  const { initProgram, initQuad, initAttribute } = context;
+
+  const program = initProgram(vert, frag);
   const { use, uniformSetters, constructVao } = program;
 
   const grid = initGrid(context, use, uniformSetters);
 
-  const quadPos = context.initQuad({ x0: -0.5, y0: -0.5 });
+  const quadPos = initQuad({ x0: -0.5, y0: -0.5 });
+
+  const attrInfo = {
+    circlePos: {},
+    tileCoords: { numComponents: 3 },
+    radius: { numComponents: 1 },
+    color: { numComponents: 4 },
+    opacity: { numComponents: 1 },
+  };
 
   function load(buffers) {
-    const { points, tileCoords } = buffers;
-    const attributes = {
-      quadPos,
-      circlePos: context.initAttribute({ data: points }),
-      tileCoords: context.initAttribute({ data: tileCoords, numComponents: 3 }),
-    };
+    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
+      let data = buffers[key];
+      if (data) d[key] = initAttribute(Object.assign({ data }, info));
+      return d;
+    }, { quadPos });
+
     const vao = constructVao({ attributes });
-    return { vao, numInstances: points.length / 2 };
+    return { vao, numInstances: buffers.circlePos.length / 2 };
   }
 
   function draw(buffers) {
@@ -506,18 +521,18 @@ function initCircle(context) {
     const { id, paint } = style;
 
     const { zoomFuncs, dataFuncs } = initSetters([
-      [paint["circle-radius"],  "circleRadius"],
-      [paint["circle-color"],   "strokeStyle"],
-      [paint["circle-opacity"], "globalAlpha"],
+      [paint["circle-radius"],  "radius"],
+      [paint["circle-color"],   "color"],
+      [paint["circle-opacity"], "opacity"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs, draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
 }
 
-var vert$1 = `attribute vec2 position;
+var vert$1 = `attribute vec2 quadPos;
 attribute vec3 pointA, pointB, pointC, pointD;
 
 uniform float lineWidth, miterLimit;
@@ -573,10 +588,10 @@ void main() {
   mat3 m2 = miterTransform(-xBasis, yBasis, mapD - mapC, pixWidth);
 
   // Find the position of the current instance vertex, in 3 coordinate systems
-  vec2 extend = miterLimit * xBasis * pixWidth * (position.x - 0.5);
+  vec2 extend = miterLimit * xBasis * pixWidth * (quadPos.x - 0.5);
   // Add one pixel on either side of the line for the anti-alias taper
-  float y = (pixWidth + 2.0) * position.y;
-  vec2 point = mapB + xAxis * position.x + yBasis * y + extend;
+  float y = (pixWidth + 2.0) * quadPos.y;
+  vec2 point = mapB + xAxis * quadPos.x + yBasis * y + extend;
   miterCoord1 = (m1 * vec3(point - mapB, 1)).xy;
   miterCoord2 = (m2 * vec3(point - mapC, 1)).xy;
 
@@ -623,7 +638,7 @@ void main() {
 function initLineLoader(context, constructVao) {
   const { initQuad, createBuffer, initAttribute } = context;
 
-  const position = initQuad({ x0: 0.0, y0: -0.5 });
+  const quadPos = initQuad({ x0: 0.0, y0: -0.5 });
 
   const numComponents = 3;
   const stride = Float32Array.BYTES_PER_ELEMENT * numComponents;
@@ -636,7 +651,7 @@ function initLineLoader(context, constructVao) {
 
     // Create interleaved attributes pointing to different offsets in buffer
     const attributes = {
-      position,
+      quadPos,
       pointA: setupPoint(0),
       pointB: setupPoint(1),
       pointC: setupPoint(2),
@@ -906,7 +921,7 @@ function initGLpaint(gl, framebuffer, framebufferSize) {
       return programs.fill.load(buffers);
     } else if (buffers.lines) {
       return programs.line.load(buffers);
-    } else if (buffers.points) {
+    } else if (buffers.circlePos) {
       return programs.circle.load(buffers);
     } else if (buffers.origins) {
       return programs.symbol.load(buffers);

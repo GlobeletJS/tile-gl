@@ -1,7 +1,7 @@
 export function initLineLoader(context, constructVao) {
   const { initQuad, createBuffer, initAttribute } = context;
 
-  const position = initQuad({ x0: 0.0, y0: -0.5 });
+  const quadPos = initQuad({ x0: 0.0, y0: -0.5 });
 
   const numComponents = 3;
   const stride = Float32Array.BYTES_PER_ELEMENT * numComponents;
@@ -14,7 +14,7 @@ export function initLineLoader(context, constructVao) {
 
     // Create interleaved attributes pointing to different offsets in buffer
     const attributes = {
-      position,
+      quadPos,
       pointA: setupPoint(0),
       pointB: setupPoint(1),
       pointC: setupPoint(2),

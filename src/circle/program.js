@@ -4,22 +4,32 @@ import { initGrid, initTilesetPainter } from "../grid.js";
 import { initSetters, initVectorTilePainter } from "../util.js";
 
 export function initCircle(context) {
-  const program = context.initProgram(vert, frag);
+  const { initProgram, initQuad, initAttribute } = context;
+
+  const program = initProgram(vert, frag);
   const { use, uniformSetters, constructVao } = program;
 
   const grid = initGrid(context, use, uniformSetters);
 
-  const quadPos = context.initQuad({ x0: -0.5, y0: -0.5 });
+  const quadPos = initQuad({ x0: -0.5, y0: -0.5 });
+
+  const attrInfo = {
+    circlePos: {},
+    tileCoords: { numComponents: 3 },
+    radius: { numComponents: 1 },
+    color: { numComponents: 4 },
+    opacity: { numComponents: 1 },
+  };
 
   function load(buffers) {
-    const { points, tileCoords } = buffers;
-    const attributes = {
-      quadPos,
-      circlePos: context.initAttribute({ data: points }),
-      tileCoords: context.initAttribute({ data: tileCoords, numComponents: 3 }),
-    };
+    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
+      let data = buffers[key];
+      if (data) d[key] = initAttribute(Object.assign({ data }, info));
+      return d;
+    }, { quadPos });
+
     const vao = constructVao({ attributes });
-    return { vao, numInstances: points.length / 2 };
+    return { vao, numInstances: buffers.circlePos.length / 2 };
   }
 
   function draw(buffers) {
@@ -31,12 +41,12 @@ export function initCircle(context) {
     const { id, paint } = style;
 
     const { zoomFuncs, dataFuncs } = initSetters([
-      [paint["circle-radius"],  "circleRadius"],
-      [paint["circle-color"],   "strokeStyle"],
-      [paint["circle-opacity"], "globalAlpha"],
+      [paint["circle-radius"],  "radius"],
+      [paint["circle-color"],   "color"],
+      [paint["circle-opacity"], "opacity"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs, draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 

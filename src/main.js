@@ -22,7 +22,7 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
       return programs.fill.load(buffers);
     } else if (buffers.lines) {
       return programs.line.load(buffers);
-    } else if (buffers.points) {
+    } else if (buffers.circlePos) {
       return programs.circle.load(buffers);
     } else if (buffers.origins) {
       return programs.symbol.load(buffers);
