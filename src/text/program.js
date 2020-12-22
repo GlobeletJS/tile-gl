@@ -20,15 +20,14 @@ export function initText(context) {
     const { id, paint } = style;
 
     const { zoomFuncs, dataFuncs } = initSetters([
-      [paint["text-color"],     "fillStyle"],
-      [paint["text-opacity"],   "globalAlpha"],
+      [paint["text-color"],   "color"],
+      [paint["text-opacity"], "opacity"],
 
       // text-halo-color
       // TODO: sprites
     ], uniformSetters);
 
-    const progInfo = { id, dataFuncs, setAtlas };
-    const paintTile = initVectorTilePainter(context, progInfo);
+    const paintTile = initVectorTilePainter(context, id, setAtlas);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 

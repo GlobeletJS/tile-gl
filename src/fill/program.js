@@ -20,7 +20,7 @@ export function initFill(context) {
       [paint["fill-translate"], "translation"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [] });
+    const paintTile = initVectorTilePainter(context, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 

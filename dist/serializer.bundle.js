@@ -1078,9 +1078,7 @@ function trailingWhiteSpace(line) {
   return whitespace[line[len - 1].code];
 }
 
-function initShaper(style) {
-  const layout = style.layout;
-
+function initShaper(layout) {
   return function(feature, zoom, atlas) {
     // For each feature, compute a list of info for each character:
     // - x0, y0  defining overall label position
@@ -1119,16 +1117,16 @@ function initShaper(style) {
     // 5. Compute top left corners of the glyphs in each line,
     //    appending the font size scalar for final positioning
     const scalar = layout["text-size"](zoom, feature) / ONE_EM;
-    const deltas = lines
+    const charPos = lines
       .flatMap((l, i) => layoutLine(l, lineOrigins[i], spacing, scalar));
 
     // 6. Fill in label origins for each glyph. TODO: assumes Point geometry
     const origin = feature.geometry.coordinates.slice();
-    const origins = lines.flat()
+    const labelPos = lines.flat()
       .flatMap(g => origin);
 
     // 7. Collect all the glyph rects
-    const rects = lines.flat()
+    const sdfRect = lines.flat()
       .flatMap(g => Object.values(g.rect));
 
     // 8. Compute bounding box for collision checks
@@ -1140,12 +1138,19 @@ function initShaper(style) {
       (boxOrigin[1] + boxSize[1]) * scalar + textPadding
     ];
 
-    return { origins, deltas, rects, bbox };
+    return { labelPos, charPos, sdfRect, bbox };
   }
 }
 
 function initShaping(style) {
-  const shaper = initShaper(style);
+  const { layout, paint } = style;
+
+  const shaper = initShaper(layout);
+
+  const dataFuncs = [
+    [paint["text-color"],   "color"],
+    [paint["text-opacity"], "opacity"],
+  ].filter(([get, key]) => get.type === "property");
 
   return function(feature, tileCoords, atlas, tree) {
     // tree is an RBush from the 'rbush' module. NOTE: will be updated!
@@ -1154,7 +1159,7 @@ function initShaping(style) {
     const buffers = shaper(feature, z, atlas);
     if (!buffers) return;
 
-    let { origins: [x0, y0], bbox } = buffers;
+    let { labelPos: [x0, y0], bbox } = buffers;
     let box = {
       minX: x0 + bbox[0],
       minY: y0 + bbox[1],
@@ -1165,8 +1170,13 @@ function initShaping(style) {
     if (tree.collides(box)) return;
     tree.insert(box);
 
-    const length = buffers.origins.length / 2;
+    const length = buffers.labelPos.length / 2;
     buffers.tileCoords = Array.from({ length }).flatMap(v => [x, y, z]);
+
+    dataFuncs.forEach(([get, key]) => {
+      let val = get(null, feature);
+      buffers[key] = Array.from({ length }).flatMap(v => val);
+    });
 
     // TODO: drop if outside tile?
     return buffers;

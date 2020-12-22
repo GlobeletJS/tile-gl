@@ -3,18 +3,24 @@ export function initTextLoader(context, constructVao) {
 
   const quadPos = initQuad({ x0: 0.0, y0: 0.0 });
 
-  return function(buffers) {
-    const { origins, deltas, rects, tileCoords } = buffers;
+  const attrInfo = {
+    labelPos: {},
+    charPos: { numComponents: 3 },
+    sdfRect: { numComponents: 4 },
+    tileCoords: { numComponents: 3 },
+    color: { numComponents: 4 },
+    opacity: { numComponents: 1 },
+  };
 
-    const attributes = {
-      quadPos,
-      labelPos: initAttribute({ data: origins }),
-      charPos: initAttribute({ data: deltas, numComponents: 3 }),
-      sdfRect: initAttribute({ data: rects, numComponents: 4 }),
-      tileCoords: initAttribute({ data: tileCoords, numComponents: 3 }),
-    };
+  return function(buffers) {
+    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
+      let data = buffers[key];
+      if (data) d[key] = initAttribute(Object.assign({ data }, info));
+      return d;
+    }, { quadPos });
+
     const vao = constructVao({ attributes });
 
-    return { vao, numInstances: origins.length / 2 };
+    return { vao, numInstances: buffers.labelPos.length / 2 };
   };
 }

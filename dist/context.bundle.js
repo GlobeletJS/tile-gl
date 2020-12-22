@@ -440,7 +440,7 @@ function initTilesetPainter(setGrid, zoomFuncs, paintTile) {
 
     subsets.forEach(({ setter, tiles }) => {
       setter();
-      tiles.forEach(box => paintTile(box, zoom, translate, scale));
+      tiles.forEach(box => paintTile(box, translate, scale));
     });
   };
 }
@@ -457,14 +457,12 @@ function initSetters(pairs, uniformSetters) {
   };
 }
 
-function initVectorTilePainter(context, program) {
-  const { id, setAtlas, dataFuncs } = program;
-
-  return function(tileBox, zoom, translate, scale) {
+function initVectorTilePainter(context, layerId, setAtlas) {
+  return function(tileBox, translate, scale) {
     const { x, y, tile } = tileBox;
     const { layers, atlas } = tile.data;
 
-    const data = layers[id];
+    const data = layers[layerId];
     if (!data) return;
 
     const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
@@ -472,13 +470,8 @@ function initVectorTilePainter(context, program) {
 
     if (setAtlas && atlas) setAtlas(atlas);
 
-    data.compressed.forEach(f => drawFeature(zoom, f));
+    data.compressed.forEach(f => context.draw(f.path));
   };
-
-  function drawFeature(zoom, feature) {
-    dataFuncs.forEach(f => f(zoom, feature));
-    context.draw(feature.path);
-  }
 }
 
 function initCircle(context) {
@@ -519,7 +512,7 @@ function initCircle(context) {
       [paint["circle-opacity"], "opacity"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [] });
+    const paintTile = initVectorTilePainter(context, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -706,7 +699,7 @@ function initLine(context) {
       // line-offset, line-blur, line-gradient, line-pattern
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [] });
+    const paintTile = initVectorTilePainter(context, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -778,7 +771,7 @@ function initFill(context) {
       [paint["fill-translate"], "translation"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [] });
+    const paintTile = initVectorTilePainter(context, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -788,10 +781,15 @@ var vert$3 = `attribute vec2 quadPos;  // Vertices of the quad instance
 attribute vec2 labelPos; // x, y
 attribute vec3 charPos;  // dx, dy, scale (relative to labelPos)
 attribute vec4 sdfRect;  // x, y, w, h
+attribute vec4 color;
+attribute float opacity;
 
 varying vec2 texCoord;
+varying vec4 fillStyle;
 
 void main() {
+  fillStyle = color * opacity;
+
   texCoord = sdfRect.xy + sdfRect.zw * quadPos;
 
   vec2 mapPos = tileToMap(labelPos);
@@ -807,9 +805,8 @@ var frag$3 = `precision highp float;
 
 uniform sampler2D sdf;
 uniform vec2 sdfDim;
-uniform vec4 fillStyle;
-uniform float globalAlpha;
 
+varying vec4 fillStyle;
 varying vec2 texCoord;
 
 void main() {
@@ -820,7 +817,7 @@ void main() {
 
   // TODO: threshold 0.5 looks too pixelated. Why?
   float alpha = smoothstep(-0.8, 0.8, -screenDist);
-  gl_FragColor = fillStyle * (alpha * globalAlpha);
+  gl_FragColor = fillStyle * alpha;
 }
 `;
 
@@ -829,19 +826,25 @@ function initTextLoader(context, constructVao) {
 
   const quadPos = initQuad({ x0: 0.0, y0: 0.0 });
 
-  return function(buffers) {
-    const { origins, deltas, rects, tileCoords } = buffers;
+  const attrInfo = {
+    labelPos: {},
+    charPos: { numComponents: 3 },
+    sdfRect: { numComponents: 4 },
+    tileCoords: { numComponents: 3 },
+    color: { numComponents: 4 },
+    opacity: { numComponents: 1 },
+  };
 
-    const attributes = {
-      quadPos,
-      labelPos: initAttribute({ data: origins }),
-      charPos: initAttribute({ data: deltas, numComponents: 3 }),
-      sdfRect: initAttribute({ data: rects, numComponents: 4 }),
-      tileCoords: initAttribute({ data: tileCoords, numComponents: 3 }),
-    };
+  return function(buffers) {
+    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
+      let data = buffers[key];
+      if (data) d[key] = initAttribute(Object.assign({ data }, info));
+      return d;
+    }, { quadPos });
+
     const vao = constructVao({ attributes });
 
-    return { vao, numInstances: origins.length / 2 };
+    return { vao, numInstances: buffers.labelPos.length / 2 };
   };
 }
 
@@ -861,15 +864,14 @@ function initText(context) {
     const { id, paint } = style;
 
     const { zoomFuncs, dataFuncs } = initSetters([
-      [paint["text-color"],     "fillStyle"],
-      [paint["text-opacity"],   "globalAlpha"],
+      [paint["text-color"],   "color"],
+      [paint["text-opacity"], "opacity"],
 
       // text-halo-color
       // TODO: sprites
     ], uniformSetters);
 
-    const progInfo = { id, dataFuncs, setAtlas };
-    const paintTile = initVectorTilePainter(context, progInfo);
+    const paintTile = initVectorTilePainter(context, id, setAtlas);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -919,7 +921,7 @@ function initGLpaint(gl, framebuffer, framebufferSize) {
       return programs.line.load(buffers);
     } else if (buffers.circlePos) {
       return programs.circle.load(buffers);
-    } else if (buffers.origins) {
+    } else if (buffers.labelPos) {
       return programs.symbol.load(buffers);
     } else {
       throw("loadBuffers: unknown buffers structure!");

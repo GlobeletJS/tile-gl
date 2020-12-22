@@ -48,7 +48,7 @@ export function initTilesetPainter(setGrid, zoomFuncs, paintTile) {
 
     subsets.forEach(({ setter, tiles }) => {
       setter();
-      tiles.forEach(box => paintTile(box, zoom, translate, scale));
+      tiles.forEach(box => paintTile(box, translate, scale));
     });
   };
 }

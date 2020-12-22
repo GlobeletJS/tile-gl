@@ -10,14 +10,12 @@ export function initSetters(pairs, uniformSetters) {
   };
 }
 
-export function initVectorTilePainter(context, program) {
-  const { id, setAtlas, dataFuncs } = program;
-
-  return function(tileBox, zoom, translate, scale) {
+export function initVectorTilePainter(context, layerId, setAtlas) {
+  return function(tileBox, translate, scale) {
     const { x, y, tile } = tileBox;
     const { layers, atlas } = tile.data;
 
-    const data = layers[id];
+    const data = layers[layerId];
     if (!data) return;
 
     const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
@@ -25,11 +23,6 @@ export function initVectorTilePainter(context, program) {
 
     if (setAtlas && atlas) setAtlas(atlas);
 
-    data.compressed.forEach(f => drawFeature(zoom, f));
+    data.compressed.forEach(f => context.draw(f.path));
   };
-
-  function drawFeature(zoom, feature) {
-    dataFuncs.forEach(f => f(zoom, feature));
-    context.draw(feature.path);
-  }
 }

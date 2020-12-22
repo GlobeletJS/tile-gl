@@ -2,9 +2,8 @@ precision highp float;
 
 uniform sampler2D sdf;
 uniform vec2 sdfDim;
-uniform vec4 fillStyle;
-uniform float globalAlpha;
 
+varying vec4 fillStyle;
 varying vec2 texCoord;
 
 void main() {
@@ -15,5 +14,5 @@ void main() {
 
   // TODO: threshold 0.5 looks too pixelated. Why?
   float alpha = smoothstep(-0.8, 0.8, -screenDist);
-  gl_FragColor = fillStyle * (alpha * globalAlpha);
+  gl_FragColor = fillStyle * alpha;
 }

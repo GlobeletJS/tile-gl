@@ -24,7 +24,7 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
       return programs.line.load(buffers);
     } else if (buffers.circlePos) {
       return programs.circle.load(buffers);
-    } else if (buffers.origins) {
+    } else if (buffers.labelPos) {
       return programs.symbol.load(buffers);
     } else {
       throw("loadBuffers: unknown buffers structure!");
