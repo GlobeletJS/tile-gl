@@ -32,11 +32,6 @@ export function initCircle(context) {
     return { vao, numInstances: buffers.circlePos.length / 2 };
   }
 
-  function draw(buffers) {
-    const { vao, numInstances } = buffers;
-    context.drawInstancedQuads(vao, numInstances);
-  }
-
   function initPainter(style) {
     const { id, paint } = style;
 
@@ -46,7 +41,7 @@ export function initCircle(context) {
       [paint["circle-opacity"], "opacity"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [] });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 

@@ -11,11 +11,6 @@ export function initFill(context) {
 
   const load = initFillLoader(context, constructVao);
 
-  function draw(buffers) {
-    const { vao, indices } = buffers;
-    context.drawElements(vao, indices);
-  }
-
   function initPainter(style) {
     const { id, paint } = style;
 
@@ -25,7 +20,7 @@ export function initFill(context) {
       [paint["fill-translate"], "translation"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [] });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 

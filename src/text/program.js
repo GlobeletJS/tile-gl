@@ -11,11 +11,6 @@ export function initText(context) {
 
   const load = initTextLoader(context, constructVao);
 
-  function draw(buffers) {
-    const { vao, numInstances } = buffers;
-    context.drawInstancedQuads(vao, numInstances);
-  }
-
   function setAtlas(atlas) {
     uniformSetters.sdf(atlas.sampler);
     uniformSetters.sdfDim([atlas.width, atlas.height]);
@@ -32,7 +27,7 @@ export function initText(context) {
       // TODO: sprites
     ], uniformSetters);
 
-    const progInfo = { id, dataFuncs, setAtlas, draw };
+    const progInfo = { id, dataFuncs, setAtlas };
     const paintTile = initVectorTilePainter(context, progInfo);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };

@@ -12,11 +12,6 @@ export function initLine(context) {
 
   const load = initLineLoader(context, constructVao);
 
-  function draw(buffers) {
-    const { vao, numInstances } = buffers;
-    context.drawInstancedQuads(vao, numInstances);
-  }
-
   function initPainter(style) {
     const { id, layout, paint } = style;
 
@@ -34,7 +29,7 @@ export function initLine(context) {
       // line-offset, line-blur, line-gradient, line-pattern
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [] });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 

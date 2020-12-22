@@ -301,8 +301,7 @@ function initContext(gl, framebuffer, framebufferSize) {
     bindFramebufferAndSetViewport,
     clear,
     clipRect,
-    drawInstancedQuads,
-    drawElements,
+    draw,
   };
 
   function bindFramebufferAndSetViewport() {
@@ -324,16 +323,15 @@ function initContext(gl, framebuffer, framebufferSize) {
     gl.scissor(...roundedArgs);
   }
 
-  function drawInstancedQuads(vao, numInstances) {
+  function draw({ vao, indices, numInstances }) {
     gl.bindVertexArray(vao);
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
-    gl.bindVertexArray(null);
-  }
-
-  function drawElements(vao, indices) {
-    const { vertexCount, type, offset } = indices;
-    gl.bindVertexArray(vao);
-    gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+    if (indices) {
+      let { vertexCount, type, offset } = indices;
+      gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+    } else {
+      // Assume quad instances
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
+    }
     gl.bindVertexArray(null);
   }
 }
@@ -460,7 +458,7 @@ function initSetters(pairs, uniformSetters) {
 }
 
 function initVectorTilePainter(context, program) {
-  const { id, setAtlas, dataFuncs, draw } = program;
+  const { id, setAtlas, dataFuncs } = program;
 
   return function(tileBox, zoom, translate, scale) {
     const { x, y, tile } = tileBox;
@@ -479,7 +477,7 @@ function initVectorTilePainter(context, program) {
 
   function drawFeature(zoom, feature) {
     dataFuncs.forEach(f => f(zoom, feature));
-    draw(feature.path);
+    context.draw(feature.path);
   }
 }
 
@@ -512,11 +510,6 @@ function initCircle(context) {
     return { vao, numInstances: buffers.circlePos.length / 2 };
   }
 
-  function draw(buffers) {
-    const { vao, numInstances } = buffers;
-    context.drawInstancedQuads(vao, numInstances);
-  }
-
   function initPainter(style) {
     const { id, paint } = style;
 
@@ -526,7 +519,7 @@ function initCircle(context) {
       [paint["circle-opacity"], "opacity"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [] });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -696,11 +689,6 @@ function initLine(context) {
 
   const load = initLineLoader(context, constructVao);
 
-  function draw(buffers) {
-    const { vao, numInstances } = buffers;
-    context.drawInstancedQuads(vao, numInstances);
-  }
-
   function initPainter(style) {
     const { id, layout, paint } = style;
 
@@ -718,7 +706,7 @@ function initLine(context) {
       // line-offset, line-blur, line-gradient, line-pattern
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [] });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -781,11 +769,6 @@ function initFill(context) {
 
   const load = initFillLoader(context, constructVao);
 
-  function draw(buffers) {
-    const { vao, indices } = buffers;
-    context.drawElements(vao, indices);
-  }
-
   function initPainter(style) {
     const { id, paint } = style;
 
@@ -795,7 +778,7 @@ function initFill(context) {
       [paint["fill-translate"], "translation"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [], draw });
+    const paintTile = initVectorTilePainter(context, { id, dataFuncs: [] });
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -869,11 +852,6 @@ function initText(context) {
 
   const load = initTextLoader(context, constructVao);
 
-  function draw(buffers) {
-    const { vao, numInstances } = buffers;
-    context.drawInstancedQuads(vao, numInstances);
-  }
-
   function setAtlas(atlas) {
     uniformSetters.sdf(atlas.sampler);
     uniformSetters.sdfDim([atlas.width, atlas.height]);
@@ -890,7 +868,7 @@ function initText(context) {
       // TODO: sprites
     ], uniformSetters);
 
-    const progInfo = { id, dataFuncs, setAtlas, draw };
+    const progInfo = { id, dataFuncs, setAtlas };
     const paintTile = initVectorTilePainter(context, progInfo);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }

@@ -20,8 +20,7 @@ export function initContext(gl, framebuffer, framebufferSize) {
     bindFramebufferAndSetViewport,
     clear,
     clipRect,
-    drawInstancedQuads,
-    drawElements,
+    draw,
   };
 
   function bindFramebufferAndSetViewport() {
@@ -43,16 +42,15 @@ export function initContext(gl, framebuffer, framebufferSize) {
     gl.scissor(...roundedArgs);
   }
 
-  function drawInstancedQuads(vao, numInstances) {
+  function draw({ vao, indices, numInstances }) {
     gl.bindVertexArray(vao);
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
-    gl.bindVertexArray(null);
-  }
-
-  function drawElements(vao, indices) {
-    const { vertexCount, type, offset } = indices;
-    gl.bindVertexArray(vao);
-    gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+    if (indices) {
+      let { vertexCount, type, offset } = indices;
+      gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+    } else {
+      // Assume quad instances
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
+    }
     gl.bindVertexArray(null);
   }
 }

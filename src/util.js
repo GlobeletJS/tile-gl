@@ -11,7 +11,7 @@ export function initSetters(pairs, uniformSetters) {
 }
 
 export function initVectorTilePainter(context, program) {
-  const { id, setAtlas, dataFuncs, draw } = program;
+  const { id, setAtlas, dataFuncs } = program;
 
   return function(tileBox, zoom, translate, scale) {
     const { x, y, tile } = tileBox;
@@ -30,6 +30,6 @@ export function initVectorTilePainter(context, program) {
 
   function drawFeature(zoom, feature) {
     dataFuncs.forEach(f => f(zoom, feature));
-    draw(feature.path);
+    context.draw(feature.path);
   }
 }
