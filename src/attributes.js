@@ -29,7 +29,7 @@ export function initAttribute(gl, options) {
 export function initIndices(gl, options) {
   const {
     buffer = createBuffer(gl, options.data, gl.ELEMENT_ARRAY_BUFFER),
-    type = gl.UNSIGNED_SHORT,
+    type = gl.UNSIGNED_INT,
     offset = 0,
   } = options;
 

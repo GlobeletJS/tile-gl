@@ -269,7 +269,7 @@ function initAttribute(gl, options) {
 function initIndices(gl, options) {
   const {
     buffer = createBuffer(gl, options.data, gl.ELEMENT_ARRAY_BUFFER),
-    type = gl.UNSIGNED_SHORT,
+    type = gl.UNSIGNED_INT,
     offset = 0,
   } = options;
 
@@ -470,7 +470,7 @@ function initVectorTilePainter(context, layerId, setAtlas) {
 
     if (setAtlas && atlas) setAtlas(atlas);
 
-    data.compressed.forEach(f => context.draw(f.path));
+    context.draw(data.buffers);
   };
 }
 
@@ -736,9 +736,9 @@ function initFillLoader(context, constructVao) {
 
   const attrInfo = {
     position: { divisor: 0 },
-    tileCoords: { numComponents: 3 },
-    color: { numComponents: 4 },
-    opacity: { numComponents: 1 },
+    tileCoords: { numComponents: 3, divisor: 0 },
+    color: { numComponents: 4, divisor: 0 },
+    opacity: { numComponents: 1, divisor: 0 },
   };
 
   return function(buffers) {

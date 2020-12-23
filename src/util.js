@@ -23,6 +23,6 @@ export function initVectorTilePainter(context, layerId, setAtlas) {
 
     if (setAtlas && atlas) setAtlas(atlas);
 
-    data.compressed.forEach(f => context.draw(f.path));
+    context.draw(data.buffers);
   };
 }

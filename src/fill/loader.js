@@ -3,9 +3,9 @@ export function initFillLoader(context, constructVao) {
 
   const attrInfo = {
     position: { divisor: 0 },
-    tileCoords: { numComponents: 3 },
-    color: { numComponents: 4 },
-    opacity: { numComponents: 1 },
+    tileCoords: { numComponents: 3, divisor: 0 },
+    color: { numComponents: 4, divisor: 0 },
+    opacity: { numComponents: 1, divisor: 0 },
   };
 
   return function(buffers) {
