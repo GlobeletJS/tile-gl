@@ -14,7 +14,7 @@ export function initFill(context) {
   function initPainter(style) {
     const { id, paint } = style;
 
-    const { zoomFuncs, dataFuncs } = initSetters([
+    const zoomFuncs = initSetters([
       [paint["fill-color"],     "color"],
       [paint["fill-opacity"],   "opacity"],
       [paint["fill-translate"], "translation"],

@@ -15,7 +15,7 @@ export function initLine(context) {
   function initPainter(style) {
     const { id, layout, paint } = style;
 
-    const { zoomFuncs, dataFuncs } = initSetters([
+    const zoomFuncs = initSetters([
       // TODO: move these to serialization step??
       //[layout["line-cap"],      "lineCap"],
       //[layout["line-join"],     "lineJoin"],

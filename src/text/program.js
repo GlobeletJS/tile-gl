@@ -19,7 +19,7 @@ export function initText(context) {
   function initPainter(style) {
     const { id, paint } = style;
 
-    const { zoomFuncs, dataFuncs } = initSetters([
+    const zoomFuncs = initSetters([
       [paint["text-color"],   "color"],
       [paint["text-opacity"], "opacity"],
 

@@ -35,7 +35,7 @@ export function initCircle(context) {
   function initPainter(style) {
     const { id, paint } = style;
 
-    const { zoomFuncs, dataFuncs } = initSetters([
+    const zoomFuncs = initSetters([
       [paint["circle-radius"],  "radius"],
       [paint["circle-color"],   "color"],
       [paint["circle-opacity"], "opacity"],

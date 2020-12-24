@@ -446,15 +446,12 @@ function initTilesetPainter(setGrid, zoomFuncs, paintTile) {
 }
 
 function initSetters(pairs, uniformSetters) {
-  function pair([get, key]) {
-    let set = uniformSetters[key];
-    return (z, f) => set(get(z, f));
-  }
-
-  return {
-    zoomFuncs: pairs.filter(p => p[0].type !== "property").map(pair),
-    dataFuncs: pairs.filter(p => p[0].type === "property").map(pair),
-  };
+  return pairs
+    .filter(([get]) => get.type !== "property")
+    .map(([get, key]) => {
+      let set = uniformSetters[key];
+      return (z, f) => set(get(z, f));
+    });
 }
 
 function initVectorTilePainter(context, layerId, setAtlas) {
@@ -506,7 +503,7 @@ function initCircle(context) {
   function initPainter(style) {
     const { id, paint } = style;
 
-    const { zoomFuncs, dataFuncs } = initSetters([
+    const zoomFuncs = initSetters([
       [paint["circle-radius"],  "radius"],
       [paint["circle-color"],   "color"],
       [paint["circle-opacity"], "opacity"],
@@ -685,7 +682,7 @@ function initLine(context) {
   function initPainter(style) {
     const { id, layout, paint } = style;
 
-    const { zoomFuncs, dataFuncs } = initSetters([
+    const zoomFuncs = initSetters([
       // TODO: move these to serialization step??
       //[layout["line-cap"],      "lineCap"],
       //[layout["line-join"],     "lineJoin"],
@@ -765,7 +762,7 @@ function initFill(context) {
   function initPainter(style) {
     const { id, paint } = style;
 
-    const { zoomFuncs, dataFuncs } = initSetters([
+    const zoomFuncs = initSetters([
       [paint["fill-color"],     "color"],
       [paint["fill-opacity"],   "opacity"],
       [paint["fill-translate"], "translation"],
@@ -863,7 +860,7 @@ function initText(context) {
   function initPainter(style) {
     const { id, paint } = style;
 
-    const { zoomFuncs, dataFuncs } = initSetters([
+    const zoomFuncs = initSetters([
       [paint["text-color"],   "color"],
       [paint["text-opacity"], "opacity"],
 
