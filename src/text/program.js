@@ -4,10 +4,10 @@ import { initTextLoader } from "./loader.js";
 import { initGrid, initTilesetPainter } from "../grid.js";
 import { initSetters, initVectorTilePainter } from "../util.js";
 
-export function initText(context) {
-  const program = context.initProgram(vert, frag);
+export function initText(context, framebufferSize, preamble) {
+  const program = context.initProgram(preamble + vert, frag);
   const { use, uniformSetters, constructVao } = program;
-  const grid = initGrid(context, use, uniformSetters);
+  const grid = initGrid(framebufferSize, use, uniformSetters);
 
   const load = initTextLoader(context, constructVao);
 
@@ -27,7 +27,7 @@ export function initText(context) {
       // TODO: sprites
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, id, setAtlas);
+    const paintTile = initVectorTilePainter(context, framebufferSize, id, setAtlas);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 

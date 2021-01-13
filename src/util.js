@@ -7,7 +7,7 @@ export function initSetters(pairs, uniformSetters) {
     });
 }
 
-export function initVectorTilePainter(context, layerId, setAtlas) {
+export function initVectorTilePainter(context, framebufferSize, layerId, setAtlas) {
   return function(tileBox, translate, scale) {
     const { x, y, tile } = tileBox;
     const { layers, atlas } = tile.data;
@@ -16,7 +16,8 @@ export function initVectorTilePainter(context, layerId, setAtlas) {
     if (!data) return;
 
     const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    context.clipRect(x0, y0, scale, scale);
+    const yflip = framebufferSize.height - y0 - scale;
+    context.clipRect(x0, yflip, scale, scale);
 
     if (setAtlas && atlas) setAtlas(atlas);
 

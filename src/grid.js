@@ -1,10 +1,10 @@
-export function initGrid(context, useProgram, setters) {
+export function initGrid(framebufferSize, useProgram, setters) {
   const { screenScale, mapCoords, mapShift } = setters;
 
   return function(tileset, pixRatio = 1) {
     useProgram();
 
-    const { width, height } = context.canvas;
+    const { width, height } = framebufferSize;
     screenScale([ 2 / width, -2 / height, pixRatio ]);
 
     const { x, y, z } = tileset[0];

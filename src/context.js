@@ -1,21 +1,14 @@
-import preamble from "./preamble.glsl";
 import { initProgram } from 'yawgl';
-import { initQuad, initAttribute, initIndices, createBuffer } from "./attributes.js";
+import { initAttributeMethods } from "./attributes.js";
 
-export function initContext(gl, framebuffer, framebufferSize) {
+export function initContext(gl) {
   // Input is an extended WebGL context, as created by yawgl.getExtendedContext
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-  return {
-    gl,
-    initQuad: (geom) => initQuad(gl, geom),
-    initAttribute: (options) => initAttribute(gl, options),
-    initIndices: (options) => initIndices(gl, options),
-    createBuffer: (data) => createBuffer(gl, data),
-    initProgram: (vert, frag) => initProgram(gl, preamble + vert, frag),
-    canvas: framebufferSize,
+  const api = { gl,
+    initProgram: (vert, frag) => initProgram(gl, vert, frag),
 
     bindFramebufferAndSetViewport,
     clear,
@@ -23,9 +16,10 @@ export function initContext(gl, framebuffer, framebufferSize) {
     draw,
   };
 
-  function bindFramebufferAndSetViewport() {
+  return Object.assign(api, initAttributeMethods(gl));
+
+  function bindFramebufferAndSetViewport(framebuffer, { width, height }) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    let { width, height } = framebufferSize;
     gl.viewport(0, 0, width, height);
   }
 
@@ -37,8 +31,7 @@ export function initContext(gl, framebuffer, framebufferSize) {
 
   function clipRect(x, y, width, height) {
     gl.enable(gl.SCISSOR_TEST);
-    let yflip = framebufferSize.height - y - height;
-    let roundedArgs = [x, yflip, width, height].map(Math.round);
+    let roundedArgs = [x, y, width, height].map(Math.round);
     gl.scissor(...roundedArgs);
   }
 

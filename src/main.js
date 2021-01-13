@@ -1,5 +1,6 @@
 import { initContext } from "./context.js";
 import { initBackground } from "./background/program.js";
+import preamble from "./preamble.glsl";
 import { initCircle } from "./circle/program.js";
 import { initLine } from "./line/program.js";
 import { initFill } from "./fill/program.js";
@@ -7,14 +8,14 @@ import { initText } from "./text/program.js";
 import { initAtlasLoader } from "./atlas.js";
 
 export function initGLpaint(gl, framebuffer, framebufferSize) {
-  const context = initContext(gl, framebuffer, framebufferSize);
+  const context = initContext(gl);
 
   const programs = {
     "background": initBackground(context),
-    "circle": initCircle(context),
-    "line":   initLine(context),
-    "fill":   initFill(context),
-    "symbol": initText(context),
+    "circle": initCircle(context, framebufferSize, preamble),
+    "line":   initLine(context, framebufferSize, preamble),
+    "fill":   initFill(context, framebufferSize, preamble),
+    "symbol": initText(context, framebufferSize, preamble),
   };
 
   function loadBuffers(buffers) {
@@ -31,6 +32,10 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
     }
   }
 
+  function bindFramebufferAndSetViewport() {
+    return context.bindFramebufferAndSetViewport(framebuffer, framebufferSize);
+  }
+
   function initPainter(style) {
     const { id, type, source, minzoom = 0, maxzoom = 24 } = style;
 
@@ -42,7 +47,7 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
   }
 
   return {
-    bindFramebufferAndSetViewport: context.bindFramebufferAndSetViewport,
+    bindFramebufferAndSetViewport,
     clear: context.clear,
     loadBuffers,
     loadAtlas: initAtlasLoader(gl),

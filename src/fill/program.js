@@ -4,10 +4,10 @@ import { initFillLoader } from "./loader.js";
 import { initGrid, initTilesetPainter } from "../grid.js";
 import { initSetters, initVectorTilePainter } from "../util.js";
 
-export function initFill(context) {
-  const program = context.initProgram(vert, frag);
+export function initFill(context, framebufferSize, preamble) {
+  const program = context.initProgram(preamble + vert, frag);
   const { use, uniformSetters, constructVao } = program;
-  const grid = initGrid(context, use, uniformSetters);
+  const grid = initGrid(framebufferSize, use, uniformSetters);
 
   const load = initFillLoader(context, constructVao);
 
@@ -20,7 +20,7 @@ export function initFill(context) {
       [paint["fill-translate"], "translation"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, id);
+    const paintTile = initVectorTilePainter(context, framebufferSize, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 

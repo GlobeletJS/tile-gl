@@ -1,35 +1,3 @@
-var preamble = `precision highp float;
-
-attribute vec3 tileCoords;
-
-uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
-uniform vec3 mapShift;    // translate and scale of tileset[0]
-
-uniform vec3 screenScale; // 2 / width, -2 / height, pixRatio
-
-vec2 tileToMap(vec2 tilePos) {
-  // Find distance of this tile from top left tile, in tile units
-  float zoomFac = exp2(mapCoords.z - tileCoords.z);
-  vec2 dTile = zoomFac * tileCoords.xy - mapCoords.xy;
-  // tileCoords.x and mapCoords.x are both wrapped to the range [0..exp(z)]
-  // If the right edge of the tile is left of the map, we need to unwrap dTile
-  dTile.x += (dTile.x + zoomFac <= 0.0) ? exp2(mapCoords.z) : 0.0;
-
-  // Convert to a translation in pixels
-  vec2 tileTranslate = dTile * mapShift.z + mapShift.xy;
-
-  // Find scaling between tile coordinates and screen pixels
-  float tileScale = zoomFac * mapShift.z / mapCoords.w;
-
-  return tilePos * tileScale + tileTranslate;
-}
-
-vec4 mapToClip(vec2 mapPos, float z) {
-  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
-  return vec4(projected, z, 1);
-}
-`;
-
 function createUniformSetter(gl, program, info, textureUnit) {
   const { name, type, size } = info;
   const isArray = name.endsWith("[0]");
@@ -240,65 +208,61 @@ function fail(msg, log) {
   throw Error("yawgl.initProgram: " + msg + ":\n" + log);
 }
 
-function initQuad(gl, instanceGeom) {
-  const { x0, y0, w = 1.0, h = 1.0 } = instanceGeom;
+function initAttributeMethods(gl) {
+  return { createBuffer, initAttribute, initIndices, initQuad };
 
-  const triangles = new Float32Array([
-    x0, y0,  x0 + w, y0,  x0 + w, y0 + h,
-    x0, y0,  x0 + w, y0 + h,  x0, y0 + h,
-  ]);
+  function createBuffer(data, bindPoint = gl.ARRAY_BUFFER) {
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(bindPoint, buffer);
+    gl.bufferData(bindPoint, data, gl.STATIC_DRAW);
+    return buffer;
+  }
 
-  // Create a buffer with the position of the vertices within one instance
-  return initAttribute(gl, { data: triangles, divisor: 0 });
+  function initAttribute(options) {
+    // Set defaults for unsupplied values
+    const {
+      buffer = createBuffer(options.data),
+      numComponents = 2,
+      type = gl.FLOAT,
+      normalize = false,
+      stride = 0,
+      offset = 0,
+      divisor = 1,
+    } = options;
+
+    // Return attribute state object
+    return { buffer, numComponents, type, normalize, stride, offset, divisor };
+  }
+
+  function initIndices(options) {
+    const {
+      buffer = createBuffer(options.data, gl.ELEMENT_ARRAY_BUFFER),
+      type = gl.UNSIGNED_INT,
+      offset = 0,
+    } = options;
+
+    return { buffer, type, offset, vertexCount: options.data.length };
+  }
+
+  function initQuad({ x0, y0, w = 1.0, h = 1.0 }) {
+    // Create a buffer with the position of the vertices within one instance
+    const triangles = new Float32Array([
+      x0, y0,  x0 + w, y0,  x0 + w, y0 + h,
+      x0, y0,  x0 + w, y0 + h,  x0, y0 + h,
+    ]);
+
+    return initAttribute({ data: triangles, divisor: 0 });
+  }
 }
 
-function initAttribute(gl, options) {
-  // Set defaults for unsupplied values
-  const {
-    buffer = createBuffer(gl, options.data),
-    numComponents = 2,
-    type = gl.FLOAT,
-    normalize = false,
-    stride = 0,
-    offset = 0,
-    divisor = 1,
-  } = options;
-
-  // Return attribute state object
-  return { buffer, numComponents, type, normalize, stride, offset, divisor };
-}
-
-function initIndices(gl, options) {
-  const {
-    buffer = createBuffer(gl, options.data, gl.ELEMENT_ARRAY_BUFFER),
-    type = gl.UNSIGNED_INT,
-    offset = 0,
-  } = options;
-
-  return { buffer, type, offset, vertexCount: options.data.length };
-}
-
-function createBuffer(gl, data, bindPoint = gl.ARRAY_BUFFER) {
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(bindPoint, buffer);
-  gl.bufferData(bindPoint, data, gl.STATIC_DRAW);
-  return buffer;
-}
-
-function initContext(gl, framebuffer, framebufferSize) {
+function initContext(gl) {
   // Input is an extended WebGL context, as created by yawgl.getExtendedContext
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-  return {
-    gl,
-    initQuad: (geom) => initQuad(gl, geom),
-    initAttribute: (options) => initAttribute(gl, options),
-    initIndices: (options) => initIndices(gl, options),
-    createBuffer: (data) => createBuffer(gl, data),
-    initProgram: (vert, frag) => initProgram(gl, preamble + vert, frag),
-    canvas: framebufferSize,
+  const api = { gl,
+    initProgram: (vert, frag) => initProgram(gl, vert, frag),
 
     bindFramebufferAndSetViewport,
     clear,
@@ -306,9 +270,10 @@ function initContext(gl, framebuffer, framebufferSize) {
     draw,
   };
 
-  function bindFramebufferAndSetViewport() {
+  return Object.assign(api, initAttributeMethods(gl));
+
+  function bindFramebufferAndSetViewport(framebuffer, { width, height }) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    let { width, height } = framebufferSize;
     gl.viewport(0, 0, width, height);
   }
 
@@ -320,8 +285,7 @@ function initContext(gl, framebuffer, framebufferSize) {
 
   function clipRect(x, y, width, height) {
     gl.enable(gl.SCISSOR_TEST);
-    let yflip = framebufferSize.height - y - height;
-    let roundedArgs = [x, yflip, width, height].map(Math.round);
+    let roundedArgs = [x, y, width, height].map(Math.round);
     gl.scissor(...roundedArgs);
   }
 
@@ -351,6 +315,38 @@ function initBackground(context) {
 
   return { initPainter };
 }
+
+var preamble = `precision highp float;
+
+attribute vec3 tileCoords;
+
+uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
+uniform vec3 mapShift;    // translate and scale of tileset[0]
+
+uniform vec3 screenScale; // 2 / width, -2 / height, pixRatio
+
+vec2 tileToMap(vec2 tilePos) {
+  // Find distance of this tile from top left tile, in tile units
+  float zoomFac = exp2(mapCoords.z - tileCoords.z);
+  vec2 dTile = zoomFac * tileCoords.xy - mapCoords.xy;
+  // tileCoords.x and mapCoords.x are both wrapped to the range [0..exp(z)]
+  // If the right edge of the tile is left of the map, we need to unwrap dTile
+  dTile.x += (dTile.x + zoomFac <= 0.0) ? exp2(mapCoords.z) : 0.0;
+
+  // Convert to a translation in pixels
+  vec2 tileTranslate = dTile * mapShift.z + mapShift.xy;
+
+  // Find scaling between tile coordinates and screen pixels
+  float tileScale = zoomFac * mapShift.z / mapCoords.w;
+
+  return tilePos * tileScale + tileTranslate;
+}
+
+vec4 mapToClip(vec2 mapPos, float z) {
+  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
+  return vec4(projected, z, 1);
+}
+`;
 
 var vert = `attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
@@ -392,13 +388,13 @@ void main() {
 }
 `;
 
-function initGrid(context, useProgram, setters) {
+function initGrid(framebufferSize, useProgram, setters) {
   const { screenScale, mapCoords, mapShift } = setters;
 
   return function(tileset, pixRatio = 1) {
     useProgram();
 
-    const { width, height } = context.canvas;
+    const { width, height } = framebufferSize;
     screenScale([ 2 / width, -2 / height, pixRatio ]);
 
     const { x, y, z } = tileset[0];
@@ -456,7 +452,7 @@ function initSetters(pairs, uniformSetters) {
     });
 }
 
-function initVectorTilePainter(context, layerId, setAtlas) {
+function initVectorTilePainter(context, framebufferSize, layerId, setAtlas) {
   return function(tileBox, translate, scale) {
     const { x, y, tile } = tileBox;
     const { layers, atlas } = tile.data;
@@ -465,7 +461,8 @@ function initVectorTilePainter(context, layerId, setAtlas) {
     if (!data) return;
 
     const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    context.clipRect(x0, y0, scale, scale);
+    const yflip = framebufferSize.height - y0 - scale;
+    context.clipRect(x0, yflip, scale, scale);
 
     if (setAtlas && atlas) setAtlas(atlas);
 
@@ -473,13 +470,13 @@ function initVectorTilePainter(context, layerId, setAtlas) {
   };
 }
 
-function initCircle(context) {
+function initCircle(context, framebufferSize, preamble) {
   const { initProgram, initQuad, initAttribute } = context;
 
-  const program = initProgram(vert, frag);
+  const program = initProgram(preamble + vert, frag);
   const { use, uniformSetters, constructVao } = program;
 
-  const grid = initGrid(context, use, uniformSetters);
+  const grid = initGrid(framebufferSize, use, uniformSetters);
 
   const quadPos = initQuad({ x0: -0.5, y0: -0.5 });
 
@@ -511,7 +508,7 @@ function initCircle(context) {
       [paint["circle-opacity"], "opacity"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, id);
+    const paintTile = initVectorTilePainter(context, framebufferSize, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -673,11 +670,11 @@ function initLineLoader(context, constructVao) {
   };
 }
 
-function initLine(context) {
-  const program = context.initProgram(vert$1, frag$1);
+function initLine(context, framebufferSize, preamble) {
+  const program = context.initProgram(preamble + vert$1, frag$1);
   const { use, uniformSetters, constructVao } = program;
 
-  const grid = initGrid(context, use, uniformSetters);
+  const grid = initGrid(framebufferSize, use, uniformSetters);
 
   const load = initLineLoader(context, constructVao);
 
@@ -698,7 +695,7 @@ function initLine(context) {
       // line-offset, line-blur, line-gradient, line-pattern
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, id);
+    const paintTile = initVectorTilePainter(context, framebufferSize, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -754,10 +751,10 @@ function initFillLoader(context, constructVao) {
   };
 }
 
-function initFill(context) {
-  const program = context.initProgram(vert$2, frag$2);
+function initFill(context, framebufferSize, preamble) {
+  const program = context.initProgram(preamble + vert$2, frag$2);
   const { use, uniformSetters, constructVao } = program;
-  const grid = initGrid(context, use, uniformSetters);
+  const grid = initGrid(framebufferSize, use, uniformSetters);
 
   const load = initFillLoader(context, constructVao);
 
@@ -770,7 +767,7 @@ function initFill(context) {
       [paint["fill-translate"], "translation"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, id);
+    const paintTile = initVectorTilePainter(context, framebufferSize, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -847,10 +844,10 @@ function initTextLoader(context, constructVao) {
   };
 }
 
-function initText(context) {
-  const program = context.initProgram(vert$3, frag$3);
+function initText(context, framebufferSize, preamble) {
+  const program = context.initProgram(preamble + vert$3, frag$3);
   const { use, uniformSetters, constructVao } = program;
-  const grid = initGrid(context, use, uniformSetters);
+  const grid = initGrid(framebufferSize, use, uniformSetters);
 
   const load = initTextLoader(context, constructVao);
 
@@ -870,7 +867,7 @@ function initText(context) {
       // TODO: sprites
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, id, setAtlas);
+    const paintTile = initVectorTilePainter(context, framebufferSize, id, setAtlas);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
   return { load, initPainter };
@@ -903,14 +900,14 @@ function initAtlasLoader(gl) {
 }
 
 function initGLpaint(gl, framebuffer, framebufferSize) {
-  const context = initContext(gl, framebuffer, framebufferSize);
+  const context = initContext(gl);
 
   const programs = {
     "background": initBackground(context),
-    "circle": initCircle(context),
-    "line":   initLine(context),
-    "fill":   initFill(context),
-    "symbol": initText(context),
+    "circle": initCircle(context, framebufferSize, preamble),
+    "line":   initLine(context, framebufferSize, preamble),
+    "fill":   initFill(context, framebufferSize, preamble),
+    "symbol": initText(context, framebufferSize, preamble),
   };
 
   function loadBuffers(buffers) {
@@ -927,6 +924,10 @@ function initGLpaint(gl, framebuffer, framebufferSize) {
     }
   }
 
+  function bindFramebufferAndSetViewport() {
+    return context.bindFramebufferAndSetViewport(framebuffer, framebufferSize);
+  }
+
   function initPainter(style) {
     const { id, type, source, minzoom = 0, maxzoom = 24 } = style;
 
@@ -938,7 +939,7 @@ function initGLpaint(gl, framebuffer, framebufferSize) {
   }
 
   return {
-    bindFramebufferAndSetViewport: context.bindFramebufferAndSetViewport,
+    bindFramebufferAndSetViewport,
     clear: context.clear,
     loadBuffers,
     loadAtlas: initAtlasLoader(gl),

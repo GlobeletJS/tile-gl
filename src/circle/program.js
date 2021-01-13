@@ -3,13 +3,13 @@ import frag from "./frag.glsl";
 import { initGrid, initTilesetPainter } from "../grid.js";
 import { initSetters, initVectorTilePainter } from "../util.js";
 
-export function initCircle(context) {
+export function initCircle(context, framebufferSize, preamble) {
   const { initProgram, initQuad, initAttribute } = context;
 
-  const program = initProgram(vert, frag);
+  const program = initProgram(preamble + vert, frag);
   const { use, uniformSetters, constructVao } = program;
 
-  const grid = initGrid(context, use, uniformSetters);
+  const grid = initGrid(framebufferSize, use, uniformSetters);
 
   const quadPos = initQuad({ x0: -0.5, y0: -0.5 });
 
@@ -41,7 +41,7 @@ export function initCircle(context) {
       [paint["circle-opacity"], "opacity"],
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, id);
+    const paintTile = initVectorTilePainter(context, framebufferSize, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   };
 
