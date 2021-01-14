@@ -1,10 +1,10 @@
 export function initTextLoader(context, constructVao) {
   const { initQuad, initAttribute } = context;
 
-  const quadPos = initQuad({ x0: 0.0, y0: 0.0 });
+  const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
   const attrInfo = {
-    labelPos: {},
+    labelPos: { numComponents: 2 },
     charPos: { numComponents: 3 },
     sdfRect: { numComponents: 4 },
     tileCoords: { numComponents: 3 },
@@ -21,6 +21,6 @@ export function initTextLoader(context, constructVao) {
 
     const vao = constructVao({ attributes });
 
-    return { vao, numInstances: buffers.labelPos.length / 2 };
+    return { vao, instanceCount: buffers.labelPos.length / 2 };
   };
 }

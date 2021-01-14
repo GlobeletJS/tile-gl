@@ -2,7 +2,7 @@ export function initFillLoader(context, constructVao) {
   const { initAttribute, initIndices } = context;
 
   const attrInfo = {
-    position: { divisor: 0 },
+    position: { numComponents: 2, divisor: 0 },
     tileCoords: { numComponents: 3, divisor: 0 },
     color: { numComponents: 4, divisor: 0 },
     opacity: { numComponents: 1, divisor: 0 },
@@ -16,8 +16,9 @@ export function initFillLoader(context, constructVao) {
     }, {});
 
     const indices = initIndices({ data: buffers.indices });
+    const count = buffers.indices.length;
 
     const vao = constructVao({ attributes, indices });
-    return { vao, indices };
+    return { vao, indices, count };
   };
 }

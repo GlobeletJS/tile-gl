@@ -1,7 +1,7 @@
 export function initLineLoader(context, constructVao) {
   const { initQuad, createBuffer, initAttribute } = context;
 
-  const quadPos = initQuad({ x0: 0.0, y0: -0.5 });
+  const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
 
   const attrInfo = {
     tileCoords: { numComponents: 3 },
@@ -40,6 +40,6 @@ export function initLineLoader(context, constructVao) {
 
     const vao = constructVao({ attributes });
 
-    return { vao, numInstances: lines.length / numComponents - 3 };
+    return { vao, instanceCount: lines.length / numComponents - 3 };
   };
 }

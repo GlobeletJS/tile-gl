@@ -12,7 +12,7 @@ export function initAttributeMethods(gl) {
     // Set defaults for unsupplied values
     const {
       buffer = createBuffer(options.data),
-      numComponents = 2,
+      numComponents = 3,
       type = gl.FLOAT,
       normalize = false,
       stride = 0,
@@ -31,16 +31,16 @@ export function initAttributeMethods(gl) {
       offset = 0,
     } = options;
 
-    return { buffer, type, offset, vertexCount: options.data.length };
+    return { buffer, type, offset };
   }
 
-  function initQuad({ x0, y0, w = 1.0, h = 1.0 }) {
+  function initQuad({ x0 = -1.0, y0 = -1.0, x1 = 1.0, y1 = 1.0 } = {}) {
     // Create a buffer with the position of the vertices within one instance
-    const triangles = new Float32Array([
-      x0, y0,  x0 + w, y0,  x0 + w, y0 + h,
-      x0, y0,  x0 + w, y0 + h,  x0, y0 + h,
+    const data = new Float32Array([
+      x0, y0,  x1, y0,  x1, y1,
+      x0, y0,  x1, y1,  x0, y1,
     ]);
 
-    return initAttribute({ data: triangles, divisor: 0 });
+    return initAttribute({ data, numComponents: 2, divisor: 0 });
   }
 }

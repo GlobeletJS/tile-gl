@@ -35,14 +35,14 @@ export function initContext(gl) {
     gl.scissor(...roundedArgs);
   }
 
-  function draw({ vao, indices, numInstances }) {
+  function draw({ vao, indices, count = 6, instanceCount = 1 }) {
+    const mode = gl.TRIANGLES;
     gl.bindVertexArray(vao);
     if (indices) {
-      let { vertexCount, type, offset } = indices;
-      gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+      let { type, offset } = indices;
+      gl.drawElementsInstanced(mode, count, type, offset, instanceCount);
     } else {
-      // Assume quad instances
-      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
+      gl.drawArraysInstanced(mode, 0, count, instanceCount);
     }
     gl.bindVertexArray(null);
   }

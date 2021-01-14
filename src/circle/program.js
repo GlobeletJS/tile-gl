@@ -11,10 +11,10 @@ export function initCircle(context, framebufferSize, preamble) {
 
   const grid = initGrid(framebufferSize, use, uniformSetters);
 
-  const quadPos = initQuad({ x0: -0.5, y0: -0.5 });
+  const quadPos = initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
 
   const attrInfo = {
-    circlePos: {},
+    circlePos: { numComponents: 2 },
     tileCoords: { numComponents: 3 },
     radius: { numComponents: 1 },
     color: { numComponents: 4 },
@@ -29,7 +29,7 @@ export function initCircle(context, framebufferSize, preamble) {
     }, { quadPos });
 
     const vao = constructVao({ attributes });
-    return { vao, numInstances: buffers.circlePos.length / 2 };
+    return { vao, instanceCount: buffers.circlePos.length / 2 };
   }
 
   function initPainter(style) {

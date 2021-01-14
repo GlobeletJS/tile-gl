@@ -222,7 +222,7 @@ function initAttributeMethods(gl) {
     // Set defaults for unsupplied values
     const {
       buffer = createBuffer(options.data),
-      numComponents = 2,
+      numComponents = 3,
       type = gl.FLOAT,
       normalize = false,
       stride = 0,
@@ -241,17 +241,17 @@ function initAttributeMethods(gl) {
       offset = 0,
     } = options;
 
-    return { buffer, type, offset, vertexCount: options.data.length };
+    return { buffer, type, offset };
   }
 
-  function initQuad({ x0, y0, w = 1.0, h = 1.0 }) {
+  function initQuad({ x0 = -1.0, y0 = -1.0, x1 = 1.0, y1 = 1.0 } = {}) {
     // Create a buffer with the position of the vertices within one instance
-    const triangles = new Float32Array([
-      x0, y0,  x0 + w, y0,  x0 + w, y0 + h,
-      x0, y0,  x0 + w, y0 + h,  x0, y0 + h,
+    const data = new Float32Array([
+      x0, y0,  x1, y0,  x1, y1,
+      x0, y0,  x1, y1,  x0, y1,
     ]);
 
-    return initAttribute({ data: triangles, divisor: 0 });
+    return initAttribute({ data, numComponents: 2, divisor: 0 });
   }
 }
 
@@ -289,14 +289,14 @@ function initContext(gl) {
     gl.scissor(...roundedArgs);
   }
 
-  function draw({ vao, indices, numInstances }) {
+  function draw({ vao, indices, count = 6, instanceCount = 1 }) {
+    const mode = gl.TRIANGLES;
     gl.bindVertexArray(vao);
     if (indices) {
-      let { vertexCount, type, offset } = indices;
-      gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+      let { type, offset } = indices;
+      gl.drawElementsInstanced(mode, count, type, offset, instanceCount);
     } else {
-      // Assume quad instances
-      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numInstances);
+      gl.drawArraysInstanced(mode, 0, count, instanceCount);
     }
     gl.bindVertexArray(null);
   }
@@ -478,10 +478,10 @@ function initCircle(context, framebufferSize, preamble) {
 
   const grid = initGrid(framebufferSize, use, uniformSetters);
 
-  const quadPos = initQuad({ x0: -0.5, y0: -0.5 });
+  const quadPos = initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
 
   const attrInfo = {
-    circlePos: {},
+    circlePos: { numComponents: 2 },
     tileCoords: { numComponents: 3 },
     radius: { numComponents: 1 },
     color: { numComponents: 4 },
@@ -496,7 +496,7 @@ function initCircle(context, framebufferSize, preamble) {
     }, { quadPos });
 
     const vao = constructVao({ attributes });
-    return { vao, numInstances: buffers.circlePos.length / 2 };
+    return { vao, instanceCount: buffers.circlePos.length / 2 };
   }
 
   function initPainter(style) {
@@ -627,7 +627,7 @@ void main() {
 function initLineLoader(context, constructVao) {
   const { initQuad, createBuffer, initAttribute } = context;
 
-  const quadPos = initQuad({ x0: 0.0, y0: -0.5 });
+  const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
 
   const attrInfo = {
     tileCoords: { numComponents: 3 },
@@ -666,7 +666,7 @@ function initLineLoader(context, constructVao) {
 
     const vao = constructVao({ attributes });
 
-    return { vao, numInstances: lines.length / numComponents - 3 };
+    return { vao, instanceCount: lines.length / numComponents - 3 };
   };
 }
 
@@ -731,7 +731,7 @@ function initFillLoader(context, constructVao) {
   const { initAttribute, initIndices } = context;
 
   const attrInfo = {
-    position: { divisor: 0 },
+    position: { numComponents: 2, divisor: 0 },
     tileCoords: { numComponents: 3, divisor: 0 },
     color: { numComponents: 4, divisor: 0 },
     opacity: { numComponents: 1, divisor: 0 },
@@ -745,9 +745,10 @@ function initFillLoader(context, constructVao) {
     }, {});
 
     const indices = initIndices({ data: buffers.indices });
+    const count = buffers.indices.length;
 
     const vao = constructVao({ attributes, indices });
-    return { vao, indices };
+    return { vao, indices, count };
   };
 }
 
@@ -820,10 +821,10 @@ void main() {
 function initTextLoader(context, constructVao) {
   const { initQuad, initAttribute } = context;
 
-  const quadPos = initQuad({ x0: 0.0, y0: 0.0 });
+  const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
   const attrInfo = {
-    labelPos: {},
+    labelPos: { numComponents: 2 },
     charPos: { numComponents: 3 },
     sdfRect: { numComponents: 4 },
     tileCoords: { numComponents: 3 },
@@ -840,7 +841,7 @@ function initTextLoader(context, constructVao) {
 
     const vao = constructVao({ attributes });
 
-    return { vao, numInstances: buffers.labelPos.length / 2 };
+    return { vao, instanceCount: buffers.labelPos.length / 2 };
   };
 }
 
