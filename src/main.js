@@ -1,4 +1,4 @@
-import { initContext } from "./context.js";
+import { initContext } from 'yawgl';
 import { initBackground } from "./background/program.js";
 import preamble from "./preamble.glsl";
 import { initCircle } from "./circle/program.js";
@@ -50,7 +50,7 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
     bindFramebufferAndSetViewport,
     clear: context.clear,
     loadBuffers,
-    loadAtlas: initAtlasLoader(gl),
+    loadAtlas: initAtlasLoader(context.gl),
     initPainter,
   };
 }

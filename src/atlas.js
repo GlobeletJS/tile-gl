@@ -1,15 +1,15 @@
 export function initAtlasLoader(gl) {
+  const target = gl.TEXTURE_2D;
+  const level = 0;
+  const format = gl.ALPHA;
+  const border = 0;
+  const type = gl.UNSIGNED_BYTE;
+
   return function(atlas) {
     const { width, height, data } = atlas;
 
-    const target = gl.TEXTURE_2D;
     const texture = gl.createTexture();
     gl.bindTexture(target, texture);
-
-    const level = 0;
-    const format = gl.ALPHA;
-    const border = 0;
-    const type = gl.UNSIGNED_BYTE;
 
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 

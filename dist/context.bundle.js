@@ -47,7 +47,7 @@ function createUniformSetter(gl, program, info, textureUnit) {
   }
 
   function getTextureSetter(bindPoint) {
-    return (size > 1)
+    return (isArray)
       ? buildTextureArraySetter(bindPoint)
       : buildTextureSetter(bindPoint);
   }
@@ -272,7 +272,8 @@ function initContext(gl) {
 
   return Object.assign(api, initAttributeMethods(gl));
 
-  function bindFramebufferAndSetViewport(framebuffer, { width, height }) {
+  function bindFramebufferAndSetViewport(framebuffer, size = gl.canvas) {
+    let { width, height } = size;
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     gl.viewport(0, 0, width, height);
   }
@@ -875,17 +876,17 @@ function initText(context, framebufferSize, preamble) {
 }
 
 function initAtlasLoader(gl) {
+  const target = gl.TEXTURE_2D;
+  const level = 0;
+  const format = gl.ALPHA;
+  const border = 0;
+  const type = gl.UNSIGNED_BYTE;
+
   return function(atlas) {
     const { width, height, data } = atlas;
 
-    const target = gl.TEXTURE_2D;
     const texture = gl.createTexture();
     gl.bindTexture(target, texture);
-
-    const level = 0;
-    const format = gl.ALPHA;
-    const border = 0;
-    const type = gl.UNSIGNED_BYTE;
 
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 
@@ -943,7 +944,7 @@ function initGLpaint(gl, framebuffer, framebufferSize) {
     bindFramebufferAndSetViewport,
     clear: context.clear,
     loadBuffers,
-    loadAtlas: initAtlasLoader(gl),
+    loadAtlas: initAtlasLoader(context.gl),
     initPainter,
   };
 }
