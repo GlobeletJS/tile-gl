@@ -1,22 +1,23 @@
-import { initContext } from 'yawgl';
 import { initBackground } from "./background/program.js";
 import preamble from "./preamble.glsl";
 import { initCircle } from "./circle/program.js";
 import { initLine } from "./line/program.js";
 import { initFill } from "./fill/program.js";
 import { initText } from "./text/program.js";
-import { initAtlasLoader } from "./atlas.js";
 
-export function initGLpaint(gl, framebuffer, framebufferSize) {
-  const context = initContext(gl);
-
+export function initGLpaint(context, framebuffer) {
   const programs = {
     "background": initBackground(context),
-    "circle": initCircle(context, framebufferSize, preamble),
-    "line":   initLine(context, framebufferSize, preamble),
-    "fill":   initFill(context, framebufferSize, preamble),
-    "symbol": initText(context, framebufferSize, preamble),
+    "circle": initCircle(context, framebuffer.size, preamble),
+    "line":   initLine(context, framebuffer.size, preamble),
+    "fill":   initFill(context, framebuffer.size, preamble),
+    "symbol": initText(context, framebuffer.size, preamble),
   };
+
+  function prep() {
+    context.bindFramebufferAndSetViewport(framebuffer);
+    return context.clear();
+  }
 
   function loadBuffers(buffers) {
     if (buffers.indices) {
@@ -32,8 +33,14 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
     }
   }
 
-  function bindFramebufferAndSetViewport() {
-    return context.bindFramebufferAndSetViewport(framebuffer, framebufferSize);
+  function loadAtlas(atlas) {
+    const format = context.gl.ALPHA;
+    const mips = false;
+
+    const { width, height, data } = atlas;
+    const sampler = context.initTexture({ format, width, height, data, mips });
+
+    return { width, height, sampler };
   }
 
   function initPainter(style) {
@@ -46,11 +53,5 @@ export function initGLpaint(gl, framebuffer, framebufferSize) {
     return Object.assign(painter, { id, type, source, minzoom, maxzoom });
   }
 
-  return {
-    bindFramebufferAndSetViewport,
-    clear: context.clear,
-    loadBuffers,
-    loadAtlas: initAtlasLoader(context.gl),
-    initPainter,
-  };
+  return { prep, loadBuffers, loadAtlas, initPainter };
 }
