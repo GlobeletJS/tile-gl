@@ -1,6 +1,6 @@
 {
   "name": "tile-gl",
-  "version": "0.0.7",
+  "version": "0.1.0",
   "description": "2D context emulator in WebGL for vector tiles",
   "module": "dist/index.js",
   "files": [
