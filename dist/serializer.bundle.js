@@ -108,8 +108,10 @@ function flattenLinearRing(ring) {
   ];
 }
 
-var earcut_1 = earcut;
-var default_1 = earcut;
+var earcut$2 = {exports: {}};
+
+earcut$2.exports = earcut;
+earcut$2.exports.default = earcut;
 
 function earcut(data, holeIndices, dim) {
 
@@ -785,7 +787,8 @@ earcut.flatten = function (data) {
     }
     return result;
 };
-earcut_1.default = default_1;
+
+var earcut$1 = earcut$2.exports;
 
 function initFillParsing(style) {
   const { paint } = style;
@@ -835,8 +838,8 @@ function triangulate(geometry) {
 }
 
 function indexPolygon(coords) {
-  let { vertices, holes, dimensions } = earcut_1.flatten(coords);
-  let indices = earcut_1(vertices, holes, dimensions);
+  let { vertices, holes, dimensions } = earcut$1.flatten(coords);
+  let indices = earcut$1(vertices, holes, dimensions);
   return { vertices, indices };
 }
 

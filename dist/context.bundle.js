@@ -44,7 +44,7 @@ vec4 mapToClip(vec2 mapPos, float z) {
 }
 `;
 
-var vert = `attribute vec2 quadPos; // Vertices of the quad instance
+var vert$3 = `attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
 attribute float radius;
 attribute vec4 color;
@@ -69,7 +69,7 @@ void main() {
 }
 `;
 
-var frag = `precision mediump float;
+var frag$3 = `precision mediump float;
 
 varying vec2 delta;
 varying vec4 strokeStyle;
@@ -169,7 +169,7 @@ function initVectorTilePainter(context, framebufferSize, layerId, setAtlas) {
 function initCircle(context, framebufferSize, preamble) {
   const { initProgram, initQuad, initAttribute } = context;
 
-  const program = initProgram(preamble + vert, frag);
+  const program = initProgram(preamble + vert$3, frag$3);
   const { use, uniformSetters, constructVao } = program;
 
   const grid = initGrid(framebufferSize, use, uniformSetters);
@@ -210,7 +210,7 @@ function initCircle(context, framebufferSize, preamble) {
   return { load, initPainter };
 }
 
-var vert$1 = `attribute vec2 quadPos;
+var vert$2 = `attribute vec2 quadPos;
 attribute vec3 pointA, pointB, pointC, pointD;
 attribute vec4 color;
 attribute float opacity;
@@ -288,7 +288,7 @@ void main() {
 }
 `;
 
-var frag$1 = `precision highp float;
+var frag$2 = `precision highp float;
 
 uniform float lineWidth;
 
@@ -367,7 +367,7 @@ function initLineLoader(context, constructVao) {
 }
 
 function initLine(context, framebufferSize, preamble) {
-  const program = context.initProgram(preamble + vert$1, frag$1);
+  const program = context.initProgram(preamble + vert$2, frag$2);
   const { use, uniformSetters, constructVao } = program;
 
   const grid = initGrid(framebufferSize, use, uniformSetters);
@@ -397,7 +397,7 @@ function initLine(context, framebufferSize, preamble) {
   return { load, initPainter };
 }
 
-var vert$2 = `attribute vec2 position;
+var vert$1 = `attribute vec2 position;
 attribute vec4 color;
 attribute float opacity;
 
@@ -414,7 +414,7 @@ void main() {
 }
 `;
 
-var frag$2 = `precision mediump float;
+var frag$1 = `precision mediump float;
 
 varying vec4 fillStyle;
 
@@ -449,7 +449,7 @@ function initFillLoader(context, constructVao) {
 }
 
 function initFill(context, framebufferSize, preamble) {
-  const program = context.initProgram(preamble + vert$2, frag$2);
+  const program = context.initProgram(preamble + vert$1, frag$1);
   const { use, uniformSetters, constructVao } = program;
   const grid = initGrid(framebufferSize, use, uniformSetters);
 
@@ -470,7 +470,7 @@ function initFill(context, framebufferSize, preamble) {
   return { load, initPainter };
 }
 
-var vert$3 = `attribute vec2 quadPos;  // Vertices of the quad instance
+var vert = `attribute vec2 quadPos;  // Vertices of the quad instance
 attribute vec2 labelPos; // x, y
 attribute vec3 charPos;  // dx, dy, scale (relative to labelPos)
 attribute vec4 sdfRect;  // x, y, w, h
@@ -494,7 +494,7 @@ void main() {
 }
 `;
 
-var frag$3 = `precision highp float;
+var frag = `precision highp float;
 
 uniform sampler2D sdf;
 uniform vec2 sdfDim;
@@ -542,7 +542,7 @@ function initTextLoader(context, constructVao) {
 }
 
 function initText(context, framebufferSize, preamble) {
-  const program = context.initProgram(preamble + vert$3, frag$3);
+  const program = context.initProgram(preamble + vert, frag);
   const { use, uniformSetters, constructVao } = program;
   const grid = initGrid(framebufferSize, use, uniformSetters);
 
