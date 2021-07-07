@@ -5,7 +5,7 @@ export function initLineParsing(style) {
   const dataFuncs = [
     [paint["line-color"], "color"],
     [paint["line-opacity"], "opacity"],
-  ].filter(([get, key]) => get.type === "property");
+  ].filter(([get]) => get.type === "property");
 
   return function(feature, { z, x, y }) {
     const lines = flattenLines(feature.geometry);
@@ -15,12 +15,12 @@ export function initLineParsing(style) {
 
     const buffers = {
       lines,
-      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
+      tileCoords: Array.from({ length }).flatMap(() => [x, y, z]),
     };
 
     dataFuncs.forEach(([get, key]) => {
       let val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(v => val);
+      buffers[key] = Array.from({ length }).flatMap(() => val);
     });
 
     return buffers;

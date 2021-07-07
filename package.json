@@ -7,8 +7,9 @@
     "dist"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint src",
     "build": "rollup -c build/rollup.config.js",
+    "test": "npm run lint",
     "postversion": "git push && git push --tags"
   },
   "repository": {
@@ -31,11 +32,13 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^19.0.0",
     "@rollup/plugin-node-resolve": "^13.0.0",
+    "eslint": "^7.30.0",
+    "eslint-config-globeletjs": "^0.0.3",
     "rollup": "^2.52.7"
   },
   "dependencies": {
     "earcut": "^2.2.2",
-    "tile-labeler": "^0.2.0"
+    "tile-labeler": "^0.2.2"
   },
   "sideEffects": false
 }

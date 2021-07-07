@@ -5,7 +5,7 @@ export function initGrid(framebufferSize, useProgram, setters) {
     useProgram();
 
     const { width, height } = framebufferSize;
-    screenScale([ 2 / width, -2 / height, pixRatio ]);
+    screenScale([2 / width, -2 / height, pixRatio]);
 
     const { x, y, z } = tileset[0];
     const numTiles = 1 << z;

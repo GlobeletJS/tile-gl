@@ -17,8 +17,8 @@ export function initLine(context, framebufferSize, preamble) {
 
     const zoomFuncs = initSetters([
       // TODO: move these to serialization step??
-      //[layout["line-cap"],      "lineCap"],
-      //[layout["line-join"],     "lineJoin"],
+      // [layout["line-cap"],      "lineCap"],
+      // [layout["line-join"],     "lineJoin"],
       [layout["line-miter-limit"], "miterLimit"],
 
       [paint["line-width"],     "lineWidth"],
@@ -31,7 +31,7 @@ export function initLine(context, framebufferSize, preamble) {
 
     const paintTile = initVectorTilePainter(context, framebufferSize, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
-  };
+  }
 
   return { load, initPainter };
 }

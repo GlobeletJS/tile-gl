@@ -9,8 +9,8 @@ export function initGLpaint(context, framebuffer) {
   const programs = {
     "background": initBackground(context),
     "circle": initCircle(context, framebuffer.size, preamble),
-    "line":   initLine(context, framebuffer.size, preamble),
-    "fill":   initFill(context, framebuffer.size, preamble),
+    "line": initLine(context, framebuffer.size, preamble),
+    "fill": initFill(context, framebuffer.size, preamble),
     "symbol": initText(context, framebuffer.size, preamble),
   };
 
@@ -29,7 +29,7 @@ export function initGLpaint(context, framebuffer) {
     } else if (buffers.labelPos) {
       return programs.symbol.load(buffers);
     } else {
-      throw("loadBuffers: unknown buffers structure!");
+      throw "loadBuffers: unknown buffers structure!";
     }
   }
 

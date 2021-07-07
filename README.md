@@ -2,6 +2,8 @@
 
 2D context emulator in WebGL for vector tiles
 
+![tests](https://github.com/GlobeletJS/tile-gl/actions/workflows/node.js.yml/badge.svg)
+
 ## Installation
 tile-gl is provided as an ESM import
 ```javascript

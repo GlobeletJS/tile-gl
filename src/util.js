@@ -7,7 +7,9 @@ export function initSetters(pairs, uniformSetters) {
     });
 }
 
-export function initVectorTilePainter(context, framebufferSize, layerId, setAtlas) {
+export function initVectorTilePainter(
+  context, framebufferSize, layerId, setAtlas
+) {
   return function(tileBox, translate, scale) {
     const { x, y, tile } = tileBox;
     const { layers, atlas } = tile.data;

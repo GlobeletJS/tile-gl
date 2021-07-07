@@ -91,7 +91,7 @@ function initGrid(framebufferSize, useProgram, setters) {
     useProgram();
 
     const { width, height } = framebufferSize;
-    screenScale([ 2 / width, -2 / height, pixRatio ]);
+    screenScale([2 / width, -2 / height, pixRatio]);
 
     const { x, y, z } = tileset[0];
     const numTiles = 1 << z;
@@ -148,7 +148,9 @@ function initSetters(pairs, uniformSetters) {
     });
 }
 
-function initVectorTilePainter(context, framebufferSize, layerId, setAtlas) {
+function initVectorTilePainter(
+  context, framebufferSize, layerId, setAtlas
+) {
   return function(tileBox, translate, scale) {
     const { x, y, tile } = tileBox;
     const { layers, atlas } = tile.data;
@@ -207,6 +209,7 @@ function initCircle(context, framebufferSize, preamble) {
     const paintTile = initVectorTilePainter(context, framebufferSize, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
+
   return { load, initPainter };
 }
 
@@ -379,8 +382,8 @@ function initLine(context, framebufferSize, preamble) {
 
     const zoomFuncs = initSetters([
       // TODO: move these to serialization step??
-      //[layout["line-cap"],      "lineCap"],
-      //[layout["line-join"],     "lineJoin"],
+      // [layout["line-cap"],      "lineCap"],
+      // [layout["line-join"],     "lineJoin"],
       [layout["line-miter-limit"], "miterLimit"],
 
       [paint["line-width"],     "lineWidth"],
@@ -394,6 +397,7 @@ function initLine(context, framebufferSize, preamble) {
     const paintTile = initVectorTilePainter(context, framebufferSize, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
+
   return { load, initPainter };
 }
 
@@ -467,6 +471,7 @@ function initFill(context, framebufferSize, preamble) {
     const paintTile = initVectorTilePainter(context, framebufferSize, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
+
   return { load, initPainter };
 }
 
@@ -564,9 +569,12 @@ function initText(context, framebufferSize, preamble) {
       // TODO: sprites
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, framebufferSize, id, setAtlas);
+    const paintTile = initVectorTilePainter(
+      context, framebufferSize, id, setAtlas
+    );
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
+
   return { load, initPainter };
 }
 
@@ -574,8 +582,8 @@ function initGLpaint(context, framebuffer) {
   const programs = {
     "background": initBackground(context),
     "circle": initCircle(context, framebuffer.size, preamble),
-    "line":   initLine(context, framebuffer.size, preamble),
-    "fill":   initFill(context, framebuffer.size, preamble),
+    "line": initLine(context, framebuffer.size, preamble),
+    "fill": initFill(context, framebuffer.size, preamble),
     "symbol": initText(context, framebuffer.size, preamble),
   };
 
@@ -594,7 +602,7 @@ function initGLpaint(context, framebuffer) {
     } else if (buffers.labelPos) {
       return programs.symbol.load(buffers);
     } else {
-      throw("loadBuffers: unknown buffers structure!");
+      throw "loadBuffers: unknown buffers structure!";
     }
   }
 

@@ -22,7 +22,7 @@ export function initFill(context, framebufferSize, preamble) {
 
     const paintTile = initVectorTilePainter(context, framebufferSize, id);
     return initTilesetPainter(grid, zoomFuncs, paintTile);
-  };
+  }
 
   return { load, initPainter };
 }

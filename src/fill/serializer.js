@@ -1,12 +1,12 @@
-import earcut from 'earcut';
+import earcut from "earcut";
 
 export function initFillParsing(style) {
   const { paint } = style;
 
   const dataFuncs = [
-    [paint["fill-color"],   "color"],
+    [paint["fill-color"], "color"],
     [paint["fill-opacity"], "opacity"],
-  ].filter(([get, key]) => get.type === "property");
+  ].filter(([get]) => get.type === "property");
 
   return function(feature, { z, x, y }) {
     const triangles = triangulate(feature.geometry);
@@ -17,12 +17,12 @@ export function initFillParsing(style) {
     const buffers = {
       position: triangles.vertices,
       indices: triangles.indices,
-      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
+      tileCoords: Array.from({ length }).flatMap(() => [x, y, z]),
     };
 
     dataFuncs.forEach(([get, key]) => {
       let val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(v => val);
+      buffers[key] = Array.from({ length }).flatMap(() => val);
     });
 
     return buffers;

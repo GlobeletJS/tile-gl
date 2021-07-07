@@ -27,9 +27,11 @@ export function initText(context, framebufferSize, preamble) {
       // TODO: sprites
     ], uniformSetters);
 
-    const paintTile = initVectorTilePainter(context, framebufferSize, id, setAtlas);
+    const paintTile = initVectorTilePainter(
+      context, framebufferSize, id, setAtlas
+    );
     return initTilesetPainter(grid, zoomFuncs, paintTile);
-  };
+  }
 
   return { load, initPainter };
 }

@@ -5,22 +5,22 @@ function initCircleParsing(style) {
     [paint["circle-radius"],  "radius"],
     [paint["circle-color"],   "color"],
     [paint["circle-opacity"], "opacity"],
-  ].filter(([get, key]) => get.type === "property");
+  ].filter(([get]) => get.type === "property");
 
   return function(feature, { z, x, y }) {
     const circlePos = flattenPoints(feature.geometry);
     if (!circlePos) return;
 
     const length = circlePos.length / 2;
-    
-    const buffers = { 
+
+    const buffers = {
       circlePos,
-      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
+      tileCoords: Array.from({ length }).flatMap(() => [x, y, z]),
     };
 
     dataFuncs.forEach(([get, key]) => {
       let val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(v => val);
+      buffers[key] = Array.from({ length }).flatMap(() => val);
     });
 
     return buffers;
@@ -47,7 +47,7 @@ function initLineParsing(style) {
   const dataFuncs = [
     [paint["line-color"], "color"],
     [paint["line-opacity"], "opacity"],
-  ].filter(([get, key]) => get.type === "property");
+  ].filter(([get]) => get.type === "property");
 
   return function(feature, { z, x, y }) {
     const lines = flattenLines(feature.geometry);
@@ -57,12 +57,12 @@ function initLineParsing(style) {
 
     const buffers = {
       lines,
-      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
+      tileCoords: Array.from({ length }).flatMap(() => [x, y, z]),
     };
 
     dataFuncs.forEach(([get, key]) => {
       let val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(v => val);
+      buffers[key] = Array.from({ length }).flatMap(() => val);
     });
 
     return buffers;
@@ -794,9 +794,9 @@ function initFillParsing(style) {
   const { paint } = style;
 
   const dataFuncs = [
-    [paint["fill-color"],   "color"],
+    [paint["fill-color"], "color"],
     [paint["fill-opacity"], "opacity"],
-  ].filter(([get, key]) => get.type === "property");
+  ].filter(([get]) => get.type === "property");
 
   return function(feature, { z, x, y }) {
     const triangles = triangulate(feature.geometry);
@@ -807,12 +807,12 @@ function initFillParsing(style) {
     const buffers = {
       position: triangles.vertices,
       indices: triangles.indices,
-      tileCoords: Array.from({ length }).flatMap(v => [x, y, z]),
+      tileCoords: Array.from({ length }).flatMap(() => [x, y, z]),
     };
 
     dataFuncs.forEach(([get, key]) => {
       let val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(v => val);
+      buffers[key] = Array.from({ length }).flatMap(() => val);
     });
 
     return buffers;
@@ -887,19 +887,19 @@ function getTextBoxShift(anchor) {
   // by the returned value * bounding box dimensions
   switch (anchor) {
     case "top-left":
-      return [ 0.0,  0.0];
+      return [0.0, 0.0];
     case "top-right":
-      return [-1.0,  0.0];
+      return [-1.0, 0.0];
     case "top":
-      return [-0.5,  0.0];
+      return [-0.5, 0.0];
     case "bottom-left":
-      return [ 0.0, -1.0];
+      return [0.0, -1.0];
     case "bottom-right":
       return [-1.0, -1.0];
     case "bottom":
       return [-0.5, -1.0];
     case "left":
-      return [ 0.0, -0.5];
+      return [0.0, -0.5];
     case "right":
       return [-1.0, -0.5];
     case "center":
@@ -925,7 +925,7 @@ function getLineShift(justify, boxShiftX) {
 }
 
 const whitespace = {
-  // From mapbox-gl-js/src/symbol/shaping.js
+  // From maplibre-gl-js/src/symbol/shaping.js
   [0x09]: true, // tab
   [0x0a]: true, // newline
   [0x0b]: true, // vertical tab
@@ -935,17 +935,17 @@ const whitespace = {
 };
 
 const breakable = {
-  // From mapbox-gl-js/src/symbol/shaping.js
-  [0x0a]:   true, // newline
-  [0x20]:   true, // space
-  [0x26]:   true, // ampersand
-  [0x28]:   true, // left parenthesis
-  [0x29]:   true, // right parenthesis
-  [0x2b]:   true, // plus sign
-  [0x2d]:   true, // hyphen-minus
-  [0x2f]:   true, // solidus
-  [0xad]:   true, // soft hyphen
-  [0xb7]:   true, // middle dot
+  // From maplibre-gl-js/src/symbol/shaping.js
+  [0x0a]: true, // newline
+  [0x20]: true, // space
+  [0x26]: true, // ampersand
+  [0x28]: true, // left parenthesis
+  [0x29]: true, // right parenthesis
+  [0x2b]: true, // plus sign
+  [0x2d]: true, // hyphen-minus
+  [0x2f]: true, // solidus
+  [0xad]: true, // soft hyphen
+  [0xb7]: true, // middle dot
   [0x200b]: true, // zero-width space
   [0x2010]: true, // hyphen
   [0x2013]: true, // en dash
@@ -962,9 +962,8 @@ function getBreakPoints(glyphs, spacing, targetWidth) {
     if (!whitespace[code]) cursor += advance + spacing;
 
     if (i == last) return;
-    if (!breakable[code] 
-      //&& !charAllowsIdeographicBreaking(code)
-    ) return;
+    // if (!breakable[code]&& !charAllowsIdeographicBreaking(code)) return;
+    if (!breakable[code]) return;
 
     let breakInfo = evaluateBreak(
       i + 1,
@@ -1045,7 +1044,7 @@ function splitLines(glyphs, spacing, maxWidth) {
 
   const lineCount = Math.ceil(totalWidth / maxWidth);
   if (lineCount < 1) return [];
-  
+
   const targetWidth = totalWidth / lineCount;
   const breakPoints = getBreakPoints(glyphs, spacing, targetWidth);
 
@@ -1126,7 +1125,7 @@ function initShaper(layout) {
     // 6. Fill in label origins for each glyph. TODO: assumes Point geometry
     const origin = feature.geometry.coordinates.slice();
     const labelPos = lines.flat()
-      .flatMap(g => origin);
+      .flatMap(() => origin);
 
     // 7. Collect all the glyph rects
     const sdfRect = lines.flat()
@@ -1142,7 +1141,7 @@ function initShaper(layout) {
     ];
 
     return { labelPos, charPos, sdfRect, bbox };
-  }
+  };
 }
 
 function initShaping(style) {
@@ -1153,7 +1152,7 @@ function initShaping(style) {
   const dataFuncs = [
     [paint["text-color"],   "color"],
     [paint["text-opacity"], "opacity"],
-  ].filter(([get, key]) => get.type === "property");
+  ].filter(([get]) => get.type === "property");
 
   return function(feature, tileCoords, atlas, tree) {
     // tree is an RBush from the 'rbush' module. NOTE: will be updated!
@@ -1174,11 +1173,11 @@ function initShaping(style) {
     tree.insert(box);
 
     const length = buffers.labelPos.length / 2;
-    buffers.tileCoords = Array.from({ length }).flatMap(v => [x, y, z]);
+    buffers.tileCoords = Array.from({ length }).flatMap(() => [x, y, z]);
 
     dataFuncs.forEach(([get, key]) => {
       let val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(v => val);
+      buffers[key] = Array.from({ length }).flatMap(() => val);
     });
 
     // TODO: drop if outside tile?

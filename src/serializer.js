@@ -1,7 +1,7 @@
 import { initCircleParsing } from "./circle/serializer.js";
 import { initLineParsing } from "./line/serializer.js";
 import { initFillParsing } from "./fill/serializer.js";
-import { initShaping } from 'tile-labeler';
+import { initShaping } from "tile-labeler";
 
 export function initSerializer(style) {
   switch (style.type) {
