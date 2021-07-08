@@ -24,13 +24,13 @@ export function initGrid(framebufferSize, useProgram, setters) {
     [0, 1, 2].forEach(addSubset);
 
     function addSubset(repeat) {
-      let shift = repeat * numTiles;
-      let tiles = tileset.filter(tile => {
-        let delta = tile.x - x;
+      const shift = repeat * numTiles;
+      const tiles = tileset.filter(tile => {
+        const delta = tile.x - x;
         return (delta >= shift && delta < shift + numTiles);
       });
       if (!tiles.length) return;
-      let setter = () => mapShift([dx + shift * pixScale, dy, pixScale]);
+      const setter = () => mapShift([dx + shift * pixScale, dy, pixScale]);
       subsets.push({ tiles, setter });
     }
 

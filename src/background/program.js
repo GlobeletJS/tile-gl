@@ -3,8 +3,8 @@ export function initBackground(context) {
     const { paint } = style;
 
     return function({ zoom }) {
-      let opacity = paint["background-opacity"](zoom);
-      let color = paint["background-color"](zoom);
+      const opacity = paint["background-opacity"](zoom);
+      const color = paint["background-color"](zoom);
       context.clear(color.map(c => c * opacity));
     };
   }

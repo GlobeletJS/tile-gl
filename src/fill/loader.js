@@ -10,7 +10,7 @@ export function initFillLoader(context, constructVao) {
 
   return function(buffers) {
     const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      let data = buffers[key];
+      const data = buffers[key];
       if (data) d[key] = initAttribute(Object.assign({ data }, info));
       return d;
     }, {});

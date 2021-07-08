@@ -19,7 +19,7 @@ export function initLineParsing(style) {
     };
 
     dataFuncs.forEach(([get, key]) => {
-      let val = get(null, feature);
+      const val = get(null, feature);
       buffers[key] = Array.from({ length }).flatMap(() => val);
     });
 
@@ -28,7 +28,7 @@ export function initLineParsing(style) {
 }
 
 function flattenLines(geometry) {
-  let { type, coordinates } = geometry;
+  const { type, coordinates } = geometry;
 
   switch (type) {
     case "LineString":

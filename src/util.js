@@ -2,7 +2,7 @@ export function initSetters(pairs, uniformSetters) {
   return pairs
     .filter(([get]) => get.type !== "property")
     .map(([get, key]) => {
-      let set = uniformSetters[key];
+      const set = uniformSetters[key];
       return (z, f) => set(get(z, f));
     });
 }
