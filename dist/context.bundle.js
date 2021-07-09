@@ -3,8 +3,8 @@ function initBackground(context) {
     const { paint } = style;
 
     return function({ zoom }) {
-      let opacity = paint["background-opacity"](zoom);
-      let color = paint["background-color"](zoom);
+      const opacity = paint["background-opacity"](zoom);
+      const color = paint["background-color"](zoom);
       context.clear(color.map(c => c * opacity));
     };
   }
@@ -110,13 +110,13 @@ function initGrid(framebufferSize, useProgram, setters) {
     [0, 1, 2].forEach(addSubset);
 
     function addSubset(repeat) {
-      let shift = repeat * numTiles;
-      let tiles = tileset.filter(tile => {
-        let delta = tile.x - x;
+      const shift = repeat * numTiles;
+      const tiles = tileset.filter(tile => {
+        const delta = tile.x - x;
         return (delta >= shift && delta < shift + numTiles);
       });
       if (!tiles.length) return;
-      let setter = () => mapShift([dx + shift * pixScale, dy, pixScale]);
+      const setter = () => mapShift([dx + shift * pixScale, dy, pixScale]);
       subsets.push({ tiles, setter });
     }
 
@@ -143,7 +143,7 @@ function initSetters(pairs, uniformSetters) {
   return pairs
     .filter(([get]) => get.type !== "property")
     .map(([get, key]) => {
-      let set = uniformSetters[key];
+      const set = uniformSetters[key];
       return (z, f) => set(get(z, f));
     });
 }
@@ -188,7 +188,7 @@ function initCircle(context, framebufferSize, preamble) {
 
   function load(buffers) {
     const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      let data = buffers[key];
+      const data = buffers[key];
       if (data) d[key] = initAttribute(Object.assign({ data }, info));
       return d;
     }, { quadPos });
@@ -358,7 +358,7 @@ function initLineLoader(context, constructVao) {
     }
 
     const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      let data = buffers[key];
+      const data = buffers[key];
       if (data) d[key] = initAttribute(Object.assign({ data }, info));
       return d;
     }, geometryAttributes);
@@ -439,7 +439,7 @@ function initFillLoader(context, constructVao) {
 
   return function(buffers) {
     const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      let data = buffers[key];
+      const data = buffers[key];
       if (data) d[key] = initAttribute(Object.assign({ data }, info));
       return d;
     }, {});
@@ -535,7 +535,7 @@ function initTextLoader(context, constructVao) {
 
   return function(buffers) {
     const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      let data = buffers[key];
+      const data = buffers[key];
       if (data) d[key] = initAttribute(Object.assign({ data }, info));
       return d;
     }, { quadPos });

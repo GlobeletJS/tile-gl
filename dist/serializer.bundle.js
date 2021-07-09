@@ -19,7 +19,7 @@ function initCircleParsing(style) {
     };
 
     dataFuncs.forEach(([get, key]) => {
-      let val = get(null, feature);
+      const val = get(null, feature);
       buffers[key] = Array.from({ length }).flatMap(() => val);
     });
 
@@ -61,7 +61,7 @@ function initLineParsing(style) {
     };
 
     dataFuncs.forEach(([get, key]) => {
-      let val = get(null, feature);
+      const val = get(null, feature);
       buffers[key] = Array.from({ length }).flatMap(() => val);
     });
 
@@ -70,7 +70,7 @@ function initLineParsing(style) {
 }
 
 function flattenLines(geometry) {
-  let { type, coordinates } = geometry;
+  const { type, coordinates } = geometry;
 
   switch (type) {
     case "LineString":
@@ -811,7 +811,7 @@ function initFillParsing(style) {
     };
 
     dataFuncs.forEach(([get, key]) => {
-      let val = get(null, feature);
+      const val = get(null, feature);
       buffers[key] = Array.from({ length }).flatMap(() => val);
     });
 
@@ -827,7 +827,7 @@ function triangulate(geometry) {
       return indexPolygon(coordinates);
     case "MultiPolygon":
       return coordinates.map(indexPolygon).reduce((acc, cur) => {
-        let indexShift = acc.vertices.length / 2;
+        const indexShift = acc.vertices.length / 2;
         acc.vertices.push(...cur.vertices);
         acc.indices.push(...cur.indices.map(h => h + indexShift));
         return acc;
@@ -838,8 +838,8 @@ function triangulate(geometry) {
 }
 
 function indexPolygon(coords) {
-  let { vertices, holes, dimensions } = earcut$1.flatten(coords);
-  let indices = earcut$1(vertices, holes, dimensions);
+  const { vertices, holes, dimensions } = earcut$1.flatten(coords);
+  const indices = earcut$1(vertices, holes, dimensions);
   return { vertices, indices };
 }
 
