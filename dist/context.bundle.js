@@ -14,6 +14,8 @@ function initBackground(context) {
 
 var preamble = `precision highp float;
 
+const float TWOPI = 6.28318530718;
+
 attribute vec3 tileCoords;
 
 uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
@@ -25,7 +27,7 @@ vec2 tileToMap(vec2 tilePos) {
   // Find distance of this tile from top left tile, in tile units
   float zoomFac = exp2(mapCoords.z - tileCoords.z);
   vec2 dTile = zoomFac * tileCoords.xy - mapCoords.xy;
-  // tileCoords.x and mapCoords.x are both wrapped to the range [0..exp(z)]
+  // tileCoords.x and mapCoords.x are both wrapped to the range [0..exp2(z)]
   // If the right edge of the tile is left of the map, we need to unwrap dTile
   dTile.x += (dTile.x + zoomFac <= 0.0) ? exp2(mapCoords.z) : 0.0;
 
@@ -36,6 +38,25 @@ vec2 tileToMap(vec2 tilePos) {
   float tileScale = zoomFac * mapShift.z / mapCoords.w;
 
   return tilePos * tileScale + tileTranslate;
+}
+
+float mercatorScale(float yWeb) {
+  // Convert Web Mercator Y to standard Mercator Y
+  float yMerc = TWOPI * (0.5 - yWeb);
+  return 0.5 * (exp(yMerc) + exp(-yMerc)); // == cosh(y)
+}
+
+float cameraY() {
+  // Find the distance (in tile units) between the screen center and 
+  //  the top of the tileset
+  float dTileY = (-1.0 / screenScale.y - mapShift.y) / mapShift.z;
+  // Convert to Web Mercator Y
+  return (dTileY + mapCoords.y) / exp2(mapCoords.z);
+}
+
+float projectionScale(vec2 tilePos) {
+  float y = (tileCoords.y + tilePos.y / mapCoords.w) / exp2(tileCoords.z);
+  return mercatorScale(y) / mercatorScale(cameraY());
 }
 
 vec4 mapToClip(vec2 mapPos, float z) {
@@ -59,7 +80,7 @@ void main() {
 
   // Shift to the appropriate corner of the current instance quad
   delta = 2.0 * quadPos * (radius + 1.0);
-  vec2 dPos = delta * screenScale.z;
+  vec2 dPos = delta * screenScale.z * projectionScale(circlePos);
 
   strokeStyle = color * opacity;
   // TODO: normalize delta? Then can drop one varying
@@ -493,7 +514,8 @@ void main() {
   vec2 mapPos = tileToMap(labelPos);
 
   // Shift to the appropriate corner of the current instance quad
-  vec2 dPos = (charPos.xy + sdfRect.zw * quadPos) * charPos.z * screenScale.z;
+  float projScale = screenScale.z * projectionScale(labelPos);
+  vec2 dPos = (charPos.xy + sdfRect.zw * quadPos) * charPos.z * projScale;
 
   gl_Position = mapToClip(mapPos + dPos, 0.0);
 }
