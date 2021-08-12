@@ -1,18 +1,7 @@
-import { initBackground } from "./background/program.js";
-import preamble from "./preamble.glsl";
-import { initCircle } from "./circle/program.js";
-import { initLine } from "./line/program.js";
-import { initFill } from "./fill/program.js";
-import { initText } from "./text/program.js";
+import { initPrograms } from "./programs.js";
 
 export function initGLpaint(context, framebuffer) {
-  const programs = {
-    "background": initBackground(context),
-    "circle": initCircle(context, framebuffer.size, preamble),
-    "line": initLine(context, framebuffer.size, preamble),
-    "fill": initFill(context, framebuffer.size, preamble),
-    "symbol": initText(context, framebuffer.size, preamble),
-  };
+  const programs = initPrograms(context, framebuffer);
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);

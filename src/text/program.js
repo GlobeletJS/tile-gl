@@ -4,7 +4,7 @@ import { initGrid, initTilesetPainter } from "../grid.js";
 import { initSetters, initVectorTilePainter } from "../util.js";
 
 export function initText(context, framebufferSize, preamble) {
-  const { initProgram, initQuad, initAttribute } = context;
+  const { initProgram, initQuad, initAttributes } = context;
 
   const program = initProgram(preamble + vert, frag);
   const { use, uniformSetters, constructVao } = program;
@@ -23,12 +23,7 @@ export function initText(context, framebufferSize, preamble) {
   };
 
   function load(buffers) {
-    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      const data = buffers[key];
-      if (data) d[key] = initAttribute(Object.assign({ data }, info));
-      return d;
-    }, { quadPos });
-
+    const attributes = initAttributes(attrInfo, buffers, { quadPos });
     const vao = constructVao({ attributes });
     return { vao, instanceCount: buffers.labelPos.length / 3 };
   }

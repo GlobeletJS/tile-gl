@@ -1,17 +1,3 @@
-function initBackground(context) {
-  function initPainter(style) {
-    const { paint } = style;
-
-    return function({ zoom }) {
-      const opacity = paint["background-opacity"](zoom);
-      const color = paint["background-color"](zoom);
-      context.clear(color.map(c => c * opacity));
-    };
-  }
-
-  return { initPainter };
-}
-
 var preamble = `precision highp float;
 
 const float TWOPI = 6.28318530718;
@@ -64,6 +50,20 @@ vec4 mapToClip(vec2 mapPos, float z) {
   return vec4(projected, z, 1);
 }
 `;
+
+function initBackground(context) {
+  function initPainter(style) {
+    const { paint } = style;
+
+    return function({ zoom }) {
+      const opacity = paint["background-opacity"](zoom);
+      const color = paint["background-color"](zoom);
+      context.clear(color.map(c => c * opacity));
+    };
+  }
+
+  return { initPainter };
+}
 
 var vert$3 = `attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
@@ -190,7 +190,7 @@ function initVectorTilePainter(
 }
 
 function initCircle(context, framebufferSize, preamble) {
-  const { initProgram, initQuad, initAttribute } = context;
+  const { initProgram, initQuad, initAttributes } = context;
 
   const program = initProgram(preamble + vert$3, frag$3);
   const { use, uniformSetters, constructVao } = program;
@@ -208,12 +208,7 @@ function initCircle(context, framebufferSize, preamble) {
   };
 
   function load(buffers) {
-    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      const data = buffers[key];
-      if (data) d[key] = initAttribute(Object.assign({ data }, info));
-      return d;
-    }, { quadPos });
-
+    const attributes = initAttributes(attrInfo, buffers, { quadPos });
     const vao = constructVao({ attributes });
     return { vao, instanceCount: buffers.circlePos.length / 2 };
   }
@@ -345,7 +340,7 @@ void main() {
 `;
 
 function initLineLoader(context, constructVao) {
-  const { initQuad, createBuffer, initAttribute } = context;
+  const { initQuad, createBuffer, initAttribute, initAttributes } = context;
 
   const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
 
@@ -378,12 +373,7 @@ function initLineLoader(context, constructVao) {
       return initAttribute({ buffer, numComponents, stride, offset });
     }
 
-    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      const data = buffers[key];
-      if (data) d[key] = initAttribute(Object.assign({ data }, info));
-      return d;
-    }, geometryAttributes);
-
+    const attributes = initAttributes(attrInfo, buffers, geometryAttributes);
     const vao = constructVao({ attributes });
 
     return { vao, instanceCount: lines.length / numComponents - 3 };
@@ -448,8 +438,13 @@ void main() {
 }
 `;
 
-function initFillLoader(context, constructVao) {
-  const { initAttribute, initIndices } = context;
+function initFill(context, framebufferSize, preamble) {
+  const { initProgram, initAttributes, initIndices } = context;
+
+  const program = context.initProgram(preamble + vert$1, frag$1);
+  const { use, uniformSetters, constructVao } = program;
+
+  const grid = initGrid(framebufferSize, use, uniformSetters);
 
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
@@ -458,28 +453,12 @@ function initFillLoader(context, constructVao) {
     opacity: { numComponents: 1, divisor: 0 },
   };
 
-  return function(buffers) {
-    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      const data = buffers[key];
-      if (data) d[key] = initAttribute(Object.assign({ data }, info));
-      return d;
-    }, {});
-
+  function load(buffers) {
+    const attributes = initAttributes(attrInfo, buffers);
     const indices = initIndices({ data: buffers.indices });
-    const count = buffers.indices.length;
-
     const vao = constructVao({ attributes, indices });
-    return { vao, indices, count };
-  };
-}
-
-function initFill(context, framebufferSize, preamble) {
-  const program = context.initProgram(preamble + vert$1, frag$1);
-  const { use, uniformSetters, constructVao } = program;
-  const grid = initGrid(framebufferSize, use, uniformSetters);
-
-  const load = initFillLoader(context, constructVao);
-
+    return { vao, indices, count: buffers.indices.length };
+  }
   function initPainter(style) {
     const { id, paint } = style;
 
@@ -540,7 +519,7 @@ void main() {
 `;
 
 function initText(context, framebufferSize, preamble) {
-  const { initProgram, initQuad, initAttribute } = context;
+  const { initProgram, initQuad, initAttributes } = context;
 
   const program = initProgram(preamble + vert, frag);
   const { use, uniformSetters, constructVao } = program;
@@ -559,12 +538,7 @@ function initText(context, framebufferSize, preamble) {
   };
 
   function load(buffers) {
-    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      const data = buffers[key];
-      if (data) d[key] = initAttribute(Object.assign({ data }, info));
-      return d;
-    }, { quadPos });
-
+    const attributes = initAttributes(attrInfo, buffers, { quadPos });
     const vao = constructVao({ attributes });
     return { vao, instanceCount: buffers.labelPos.length / 3 };
   }
@@ -589,14 +563,28 @@ function initText(context, framebufferSize, preamble) {
   return { load, initPainter };
 }
 
-function initGLpaint(context, framebuffer) {
-  const programs = {
+function initPrograms(context, framebuffer) {
+  const { initAttribute } = context;
+
+  context.initAttributes = function(attrInfo, buffers, preInitialized = {}) {
+    return Object.entries(attrInfo).reduce((d, [key, info]) => {
+      const data = buffers[key];
+      if (data) d[key] = initAttribute(Object.assign({ data }, info));
+      return d;
+    }, preInitialized);
+  };
+
+  return {
     "background": initBackground(context),
     "circle": initCircle(context, framebuffer.size, preamble),
     "line": initLine(context, framebuffer.size, preamble),
     "fill": initFill(context, framebuffer.size, preamble),
     "symbol": initText(context, framebuffer.size, preamble),
   };
+}
+
+function initGLpaint(context, framebuffer) {
+  const programs = initPrograms(context, framebuffer);
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);
