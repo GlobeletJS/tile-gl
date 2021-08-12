@@ -1,7 +1,7 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
-import { initGrid, initTilesetPainter } from "../grid.js";
-import { initSetters, initVectorTilePainter } from "../util.js";
+import { initGrid } from "../grid.js";
+import { initVectorTilePainter } from "../util.js";
 
 export function initText(context, framebufferSize, preamble) {
   const { initProgram, initQuad, initAttributes } = context;
@@ -9,7 +9,7 @@ export function initText(context, framebufferSize, preamble) {
   const program = initProgram(preamble + vert, frag);
   const { use, uniformSetters, constructVao } = program;
 
-  const grid = initGrid(framebufferSize, use, uniformSetters);
+  const initTilesetPainter = initGrid(framebufferSize, use, uniformSetters);
 
   const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
@@ -31,18 +31,18 @@ export function initText(context, framebufferSize, preamble) {
   function initPainter(style) {
     const { id, paint } = style;
 
-    const zoomFuncs = initSetters([
+    const zoomFuncs = [
       [paint["text-color"],   "color"],
       [paint["text-opacity"], "opacity"],
 
       // text-halo-color
       // TODO: sprites
-    ], uniformSetters);
+    ];
 
     const paintTile = initVectorTilePainter(
       context, framebufferSize, id, uniformSetters.sdf
     );
-    return initTilesetPainter(grid, zoomFuncs, paintTile);
+    return initTilesetPainter(zoomFuncs, paintTile);
   }
 
   return { load, initPainter };

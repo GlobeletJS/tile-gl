@@ -1,9 +1,9 @@
+import { initSetters } from "./util.js";
+
 export function initGrid(framebufferSize, useProgram, setters) {
   const { screenScale, mapCoords, mapShift } = setters;
 
-  return function(tileset, pixRatio = 1) {
-    useProgram();
-
+  function setGrid(tileset, pixRatio = 1) {
     const { width, height } = framebufferSize;
     screenScale([2 / width, -2 / height, pixRatio]);
 
@@ -20,35 +20,36 @@ export function initGrid(framebufferSize, useProgram, setters) {
     // At low zooms, some tiles may be repeated on opposite ends of the map
     // We split them into subsets, with different values of mapShift
     // NOTE: Only accounts for repetition across X!
-    const subsets = [];
-    [0, 1, 2].forEach(addSubset);
-
-    function addSubset(repeat) {
+    const subsets = [0, 1, 2].map(repeat => {
       const shift = repeat * numTiles;
       const tiles = tileset.filter(tile => {
         const delta = tile.x - x;
         return (delta >= shift && delta < shift + numTiles);
       });
-      if (!tiles.length) return;
       const setter = () => mapShift([dx + shift * pixScale, dy, pixScale]);
-      subsets.push({ tiles, setter });
-    }
+      return { tiles, setter };
+    }).filter(set => set.tiles.length);
 
     return { translate, scale: pixScale, subsets };
-  };
-}
+  }
 
-export function initTilesetPainter(setGrid, zoomFuncs, paintTile) {
-  return function({ tileset, zoom, pixRatio = 1 }) {
-    if (!tileset || !tileset.length) return;
+  function initTilesetPainter(styleMap, paintTile) {
+    const zoomFuncs = initSetters(styleMap);
 
-    const { translate, scale, subsets } = setGrid(tileset, pixRatio);
+    return function({ tileset, zoom, pixRatio = 1 }) {
+      if (!tileset || !tileset.length) return;
 
-    zoomFuncs.forEach(f => f(zoom));
+      useProgram();
+      const { translate, scale, subsets } = setGrid(tileset, pixRatio);
 
-    subsets.forEach(({ setter, tiles }) => {
-      setter();
-      tiles.forEach(box => paintTile(box, translate, scale));
-    });
-  };
+      zoomFuncs.forEach(f => f(zoom));
+
+      subsets.forEach(({ setter, tiles }) => {
+        setter();
+        tiles.forEach(box => paintTile(box, translate, scale));
+      });
+    };
+  }
+
+  return initTilesetPainter;
 }
