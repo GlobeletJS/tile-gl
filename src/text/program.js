@@ -6,9 +6,9 @@ export function initText(context, framebufferSize, preamble) {
   const { initProgram, initQuad, initAttributes } = context;
 
   const program = initProgram(preamble + vert, frag);
-  const { use, uniformSetters, constructVao } = program;
+  const { uniformSetters, constructVao } = program;
 
-  const initTilesetPainter = initGrid(framebufferSize, use, uniformSetters);
+  const initTilesetPainter = initGrid(framebufferSize, program);
 
   const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 

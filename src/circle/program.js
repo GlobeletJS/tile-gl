@@ -6,9 +6,8 @@ export function initCircle(context, framebufferSize, preamble) {
   const { initProgram, initQuad, initAttributes } = context;
 
   const program = initProgram(preamble + vert, frag);
-  const { use, uniformSetters, constructVao } = program;
 
-  const initTilesetPainter = initGrid(framebufferSize, use, uniformSetters);
+  const initTilesetPainter = initGrid(framebufferSize, program);
 
   const quadPos = initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
 
@@ -22,7 +21,7 @@ export function initCircle(context, framebufferSize, preamble) {
 
   function load(buffers) {
     const attributes = initAttributes(attrInfo, buffers, { quadPos });
-    const vao = constructVao({ attributes });
+    const vao = program.constructVao({ attributes });
     return { vao, instanceCount: buffers.circlePos.length / 2 };
   }
 

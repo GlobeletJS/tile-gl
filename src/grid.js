@@ -1,12 +1,10 @@
 import { initSetters, initVectorTilePainter } from "./util.js";
 
-export function initGrid(framebufferSize, useProgram, setters) {
-  const { screenScale, mapCoords, mapShift } = setters;
+export function initGrid(framebufferSize, program) {
+  const { use, uniformSetters } = program;
+  const { screenScale, mapCoords, mapShift } = uniformSetters;
 
   function setGrid(tileset, pixRatio = 1) {
-    const { width, height } = framebufferSize;
-    screenScale([2 / width, -2 / height, pixRatio]);
-
     const { x, y, z } = tileset[0];
     const numTiles = 1 << z;
     const xw = x - Math.floor(x / numTiles) * numTiles;
@@ -34,23 +32,22 @@ export function initGrid(framebufferSize, useProgram, setters) {
   }
 
   function initTilesetPainter(context, id, styleMap, setAtlas) {
-    const paintTile = initVectorTilePainter(
-      context, framebufferSize, id, setAtlas
-    );
-
-    const zoomFuncs = initSetters(styleMap, setters);
+    const zoomFuncs = initSetters(styleMap, uniformSetters);
+    const paintTile = initVectorTilePainter(context, id, setAtlas);
 
     return function({ tileset, zoom, pixRatio = 1 }) {
       if (!tileset || !tileset.length) return;
 
-      useProgram();
+      use();
+      const { width, height } = framebufferSize;
+      screenScale([2 / width, -2 / height, pixRatio]);
       const { translate, scale, subsets } = setGrid(tileset, pixRatio);
 
       zoomFuncs.forEach(f => f(zoom));
 
       subsets.forEach(({ setter, tiles }) => {
         setter();
-        tiles.forEach(box => paintTile(box, translate, scale));
+        tiles.forEach(box => paintTile(box, translate, scale, height));
       });
     };
   }

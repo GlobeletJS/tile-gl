@@ -5,11 +5,10 @@ import { initGrid } from "../grid.js";
 
 export function initLine(context, framebufferSize, preamble) {
   const program = context.initProgram(preamble + vert, frag);
-  const { use, uniformSetters, constructVao } = program;
 
-  const initTilesetPainter = initGrid(framebufferSize, use, uniformSetters);
+  const initTilesetPainter = initGrid(framebufferSize, program);
 
-  const load = initLineLoader(context, constructVao);
+  const load = initLineLoader(context, program.constructVao);
 
   function initPainter(style) {
     const { id, layout, paint } = style;

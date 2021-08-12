@@ -6,9 +6,8 @@ export function initFill(context, framebufferSize, preamble) {
   const { initProgram, initAttributes, initIndices } = context;
 
   const program = initProgram(preamble + vert, frag);
-  const { use, uniformSetters, constructVao } = program;
 
-  const initTilesetPainter = initGrid(framebufferSize, use, uniformSetters);
+  const initTilesetPainter = initGrid(framebufferSize, program);
 
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
@@ -20,7 +19,7 @@ export function initFill(context, framebufferSize, preamble) {
   function load(buffers) {
     const attributes = initAttributes(attrInfo, buffers);
     const indices = initIndices({ data: buffers.indices });
-    const vao = constructVao({ attributes, indices });
+    const vao = program.constructVao({ attributes, indices });
     return { vao, indices, count: buffers.indices.length };
   }
 

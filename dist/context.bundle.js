@@ -114,10 +114,8 @@ function initSetters(pairs, uniformSetters) {
     });
 }
 
-function initVectorTilePainter(
-  context, framebufferSize, layerId, setAtlas
-) {
-  return function(tileBox, translate, scale) {
+function initVectorTilePainter(context, layerId, setAtlas) {
+  return function(tileBox, translate, scale, framebufferHeight) {
     const { x, y, tile } = tileBox;
     const { layers, atlas } = tile.data;
 
@@ -125,7 +123,7 @@ function initVectorTilePainter(
     if (!data) return;
 
     const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    const yflip = framebufferSize.height - y0 - scale;
+    const yflip = framebufferHeight - y0 - scale;
     context.clipRect(x0, yflip, scale, scale);
 
     if (setAtlas && atlas) setAtlas(atlas);
@@ -134,13 +132,11 @@ function initVectorTilePainter(
   };
 }
 
-function initGrid(framebufferSize, useProgram, setters) {
-  const { screenScale, mapCoords, mapShift } = setters;
+function initGrid(framebufferSize, program) {
+  const { use, uniformSetters } = program;
+  const { screenScale, mapCoords, mapShift } = uniformSetters;
 
   function setGrid(tileset, pixRatio = 1) {
-    const { width, height } = framebufferSize;
-    screenScale([2 / width, -2 / height, pixRatio]);
-
     const { x, y, z } = tileset[0];
     const numTiles = 1 << z;
     const xw = x - Math.floor(x / numTiles) * numTiles;
@@ -168,23 +164,22 @@ function initGrid(framebufferSize, useProgram, setters) {
   }
 
   function initTilesetPainter(context, id, styleMap, setAtlas) {
-    const paintTile = initVectorTilePainter(
-      context, framebufferSize, id, setAtlas
-    );
-
-    const zoomFuncs = initSetters(styleMap, setters);
+    const zoomFuncs = initSetters(styleMap, uniformSetters);
+    const paintTile = initVectorTilePainter(context, id, setAtlas);
 
     return function({ tileset, zoom, pixRatio = 1 }) {
       if (!tileset || !tileset.length) return;
 
-      useProgram();
+      use();
+      const { width, height } = framebufferSize;
+      screenScale([2 / width, -2 / height, pixRatio]);
       const { translate, scale, subsets } = setGrid(tileset, pixRatio);
 
       zoomFuncs.forEach(f => f(zoom));
 
       subsets.forEach(({ setter, tiles }) => {
         setter();
-        tiles.forEach(box => paintTile(box, translate, scale));
+        tiles.forEach(box => paintTile(box, translate, scale, height));
       });
     };
   }
@@ -196,9 +191,8 @@ function initCircle(context, framebufferSize, preamble) {
   const { initProgram, initQuad, initAttributes } = context;
 
   const program = initProgram(preamble + vert$3, frag$3);
-  const { use, uniformSetters, constructVao } = program;
 
-  const initTilesetPainter = initGrid(framebufferSize, use, uniformSetters);
+  const initTilesetPainter = initGrid(framebufferSize, program);
 
   const quadPos = initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
 
@@ -212,7 +206,7 @@ function initCircle(context, framebufferSize, preamble) {
 
   function load(buffers) {
     const attributes = initAttributes(attrInfo, buffers, { quadPos });
-    const vao = constructVao({ attributes });
+    const vao = program.constructVao({ attributes });
     return { vao, instanceCount: buffers.circlePos.length / 2 };
   }
 
@@ -384,11 +378,10 @@ function initLineLoader(context, constructVao) {
 
 function initLine(context, framebufferSize, preamble) {
   const program = context.initProgram(preamble + vert$2, frag$2);
-  const { use, uniformSetters, constructVao } = program;
 
-  const initTilesetPainter = initGrid(framebufferSize, use, uniformSetters);
+  const initTilesetPainter = initGrid(framebufferSize, program);
 
-  const load = initLineLoader(context, constructVao);
+  const load = initLineLoader(context, program.constructVao);
 
   function initPainter(style) {
     const { id, layout, paint } = style;
@@ -443,9 +436,8 @@ function initFill(context, framebufferSize, preamble) {
   const { initProgram, initAttributes, initIndices } = context;
 
   const program = initProgram(preamble + vert$1, frag$1);
-  const { use, uniformSetters, constructVao } = program;
 
-  const initTilesetPainter = initGrid(framebufferSize, use, uniformSetters);
+  const initTilesetPainter = initGrid(framebufferSize, program);
 
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
@@ -457,7 +449,7 @@ function initFill(context, framebufferSize, preamble) {
   function load(buffers) {
     const attributes = initAttributes(attrInfo, buffers);
     const indices = initIndices({ data: buffers.indices });
-    const vao = constructVao({ attributes, indices });
+    const vao = program.constructVao({ attributes, indices });
     return { vao, indices, count: buffers.indices.length };
   }
 
@@ -523,9 +515,9 @@ function initText(context, framebufferSize, preamble) {
   const { initProgram, initQuad, initAttributes } = context;
 
   const program = initProgram(preamble + vert, frag);
-  const { use, uniformSetters, constructVao } = program;
+  const { uniformSetters, constructVao } = program;
 
-  const initTilesetPainter = initGrid(framebufferSize, use, uniformSetters);
+  const initTilesetPainter = initGrid(framebufferSize, program);
 
   const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
