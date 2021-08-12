@@ -1,14 +1,11 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
-import { initGrid } from "../grid.js";
 
-export function initText(context, framebufferSize, preamble) {
-  const { initProgram, initQuad, initAttributes } = context;
+export function initText(context) {
+  const { initPaintProgram, initQuad, initAttributes } = context;
 
-  const program = initProgram(preamble + vert, frag);
-  const { uniformSetters, constructVao } = program;
-
-  const initTilesetPainter = initGrid(framebufferSize, program);
+  const program = initPaintProgram(vert, frag);
+  const { uniformSetters, constructVao, initTilesetPainter } = program;
 
   const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
@@ -38,7 +35,7 @@ export function initText(context, framebufferSize, preamble) {
       // TODO: sprites
     ];
 
-    return initTilesetPainter(context, id, zoomFuncs, uniformSetters.sdf);
+    return initTilesetPainter(id, zoomFuncs, uniformSetters.sdf);
   }
 
   return { load, initPainter };

@@ -1,6 +1,6 @@
 import { initSetters, initVectorTilePainter } from "./util.js";
 
-export function initGrid(framebufferSize, program) {
+export function initGrid(context, framebufferSize, program) {
   const { use, uniformSetters } = program;
   const { screenScale, mapCoords, mapShift } = uniformSetters;
 
@@ -31,7 +31,7 @@ export function initGrid(framebufferSize, program) {
     return { translate, scale: pixScale, subsets };
   }
 
-  function initTilesetPainter(context, id, styleMap, setAtlas) {
+  function initTilesetPainter(id, styleMap, setAtlas) {
     const zoomFuncs = initSetters(styleMap, uniformSetters);
     const paintTile = initVectorTilePainter(context, id, setAtlas);
 

@@ -1,14 +1,12 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
 import { initLineLoader } from "./loader.js";
-import { initGrid } from "../grid.js";
 
-export function initLine(context, framebufferSize, preamble) {
-  const program = context.initProgram(preamble + vert, frag);
+export function initLine(context) {
+  const program = context.initPaintProgram(vert, frag);
+  const { constructVao, initTilesetPainter } = program;
 
-  const initTilesetPainter = initGrid(framebufferSize, program);
-
-  const load = initLineLoader(context, program.constructVao);
+  const load = initLineLoader(context, constructVao);
 
   function initPainter(style) {
     const { id, layout, paint } = style;
@@ -27,7 +25,7 @@ export function initLine(context, framebufferSize, preamble) {
       // line-offset, line-blur, line-gradient, line-pattern
     ];
 
-    return initTilesetPainter(context, id, zoomFuncs);
+    return initTilesetPainter(id, zoomFuncs);
   }
 
   return { load, initPainter };

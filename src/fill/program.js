@@ -1,13 +1,10 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
-import { initGrid } from "../grid.js";
 
-export function initFill(context, framebufferSize, preamble) {
-  const { initProgram, initAttributes, initIndices } = context;
+export function initFill(context) {
+  const { initPaintProgram, initAttributes, initIndices } = context;
 
-  const program = initProgram(preamble + vert, frag);
-
-  const initTilesetPainter = initGrid(framebufferSize, program);
+  const { constructVao, initTilesetPainter } = initPaintProgram(vert, frag);
 
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
@@ -19,7 +16,7 @@ export function initFill(context, framebufferSize, preamble) {
   function load(buffers) {
     const attributes = initAttributes(attrInfo, buffers);
     const indices = initIndices({ data: buffers.indices });
-    const vao = program.constructVao({ attributes, indices });
+    const vao = constructVao({ attributes, indices });
     return { vao, indices, count: buffers.indices.length };
   }
 
@@ -32,7 +29,7 @@ export function initFill(context, framebufferSize, preamble) {
       [paint["fill-translate"], "translation"],
     ];
 
-    return initTilesetPainter(context, id, zoomFuncs);
+    return initTilesetPainter(id, zoomFuncs);
   }
 
   return { load, initPainter };

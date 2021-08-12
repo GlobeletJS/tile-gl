@@ -51,6 +51,88 @@ vec4 mapToClip(vec2 mapPos, float z) {
 }
 `;
 
+function initSetters(pairs, uniformSetters) {
+  return pairs
+    .filter(([get]) => get.type !== "property")
+    .map(([get, key]) => {
+      const set = uniformSetters[key];
+      return (z, f) => set(get(z, f));
+    });
+}
+
+function initVectorTilePainter(context, layerId, setAtlas) {
+  return function(tileBox, translate, scale, framebufferHeight) {
+    const { x, y, tile } = tileBox;
+    const { layers, atlas } = tile.data;
+
+    const data = layers[layerId];
+    if (!data) return;
+
+    const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
+    const yflip = framebufferHeight - y0 - scale;
+    context.clipRect(x0, yflip, scale, scale);
+
+    if (setAtlas && atlas) setAtlas(atlas);
+
+    context.draw(data.buffers);
+  };
+}
+
+function initGrid(context, framebufferSize, program) {
+  const { use, uniformSetters } = program;
+  const { screenScale, mapCoords, mapShift } = uniformSetters;
+
+  function setGrid(tileset, pixRatio = 1) {
+    const { x, y, z } = tileset[0];
+    const numTiles = 1 << z;
+    const xw = x - Math.floor(x / numTiles) * numTiles;
+    const extent = 512; // TODO: don't assume this!!
+    mapCoords([xw, y, z, extent]);
+
+    const { translate, scale } = tileset;
+    const pixScale = scale * pixRatio;
+    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * pixScale);
+
+    // At low zooms, some tiles may be repeated on opposite ends of the map
+    // We split them into subsets, with different values of mapShift
+    // NOTE: Only accounts for repetition across X!
+    const subsets = [0, 1, 2].map(repeat => {
+      const shift = repeat * numTiles;
+      const tiles = tileset.filter(tile => {
+        const delta = tile.x - x;
+        return (delta >= shift && delta < shift + numTiles);
+      });
+      const setter = () => mapShift([dx + shift * pixScale, dy, pixScale]);
+      return { tiles, setter };
+    }).filter(set => set.tiles.length);
+
+    return { translate, scale: pixScale, subsets };
+  }
+
+  function initTilesetPainter(id, styleMap, setAtlas) {
+    const zoomFuncs = initSetters(styleMap, uniformSetters);
+    const paintTile = initVectorTilePainter(context, id, setAtlas);
+
+    return function({ tileset, zoom, pixRatio = 1 }) {
+      if (!tileset || !tileset.length) return;
+
+      use();
+      const { width, height } = framebufferSize;
+      screenScale([2 / width, -2 / height, pixRatio]);
+      const { translate, scale, subsets } = setGrid(tileset, pixRatio);
+
+      zoomFuncs.forEach(f => f(zoom));
+
+      subsets.forEach(({ setter, tiles }) => {
+        setter();
+        tiles.forEach(box => paintTile(box, translate, scale, height));
+      });
+    };
+  }
+
+  return initTilesetPainter;
+}
+
 function initBackground(context) {
   function initPainter(style) {
     const { paint } = style;
@@ -105,94 +187,10 @@ void main() {
 }
 `;
 
-function initSetters(pairs, uniformSetters) {
-  return pairs
-    .filter(([get]) => get.type !== "property")
-    .map(([get, key]) => {
-      const set = uniformSetters[key];
-      return (z, f) => set(get(z, f));
-    });
-}
+function initCircle(context) {
+  const { initPaintProgram, initQuad, initAttributes } = context;
 
-function initVectorTilePainter(context, layerId, setAtlas) {
-  return function(tileBox, translate, scale, framebufferHeight) {
-    const { x, y, tile } = tileBox;
-    const { layers, atlas } = tile.data;
-
-    const data = layers[layerId];
-    if (!data) return;
-
-    const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    const yflip = framebufferHeight - y0 - scale;
-    context.clipRect(x0, yflip, scale, scale);
-
-    if (setAtlas && atlas) setAtlas(atlas);
-
-    context.draw(data.buffers);
-  };
-}
-
-function initGrid(framebufferSize, program) {
-  const { use, uniformSetters } = program;
-  const { screenScale, mapCoords, mapShift } = uniformSetters;
-
-  function setGrid(tileset, pixRatio = 1) {
-    const { x, y, z } = tileset[0];
-    const numTiles = 1 << z;
-    const xw = x - Math.floor(x / numTiles) * numTiles;
-    const extent = 512; // TODO: don't assume this!!
-    mapCoords([xw, y, z, extent]);
-
-    const { translate, scale } = tileset;
-    const pixScale = scale * pixRatio;
-    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * pixScale);
-
-    // At low zooms, some tiles may be repeated on opposite ends of the map
-    // We split them into subsets, with different values of mapShift
-    // NOTE: Only accounts for repetition across X!
-    const subsets = [0, 1, 2].map(repeat => {
-      const shift = repeat * numTiles;
-      const tiles = tileset.filter(tile => {
-        const delta = tile.x - x;
-        return (delta >= shift && delta < shift + numTiles);
-      });
-      const setter = () => mapShift([dx + shift * pixScale, dy, pixScale]);
-      return { tiles, setter };
-    }).filter(set => set.tiles.length);
-
-    return { translate, scale: pixScale, subsets };
-  }
-
-  function initTilesetPainter(context, id, styleMap, setAtlas) {
-    const zoomFuncs = initSetters(styleMap, uniformSetters);
-    const paintTile = initVectorTilePainter(context, id, setAtlas);
-
-    return function({ tileset, zoom, pixRatio = 1 }) {
-      if (!tileset || !tileset.length) return;
-
-      use();
-      const { width, height } = framebufferSize;
-      screenScale([2 / width, -2 / height, pixRatio]);
-      const { translate, scale, subsets } = setGrid(tileset, pixRatio);
-
-      zoomFuncs.forEach(f => f(zoom));
-
-      subsets.forEach(({ setter, tiles }) => {
-        setter();
-        tiles.forEach(box => paintTile(box, translate, scale, height));
-      });
-    };
-  }
-
-  return initTilesetPainter;
-}
-
-function initCircle(context, framebufferSize, preamble) {
-  const { initProgram, initQuad, initAttributes } = context;
-
-  const program = initProgram(preamble + vert$3, frag$3);
-
-  const initTilesetPainter = initGrid(framebufferSize, program);
+  const { constructVao, initTilesetPainter } = initPaintProgram(vert$3, frag$3);
 
   const quadPos = initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
 
@@ -206,7 +204,7 @@ function initCircle(context, framebufferSize, preamble) {
 
   function load(buffers) {
     const attributes = initAttributes(attrInfo, buffers, { quadPos });
-    const vao = program.constructVao({ attributes });
+    const vao = constructVao({ attributes });
     return { vao, instanceCount: buffers.circlePos.length / 2 };
   }
 
@@ -219,7 +217,7 @@ function initCircle(context, framebufferSize, preamble) {
       [paint["circle-opacity"], "opacity"],
     ];
 
-    return initTilesetPainter(context, id, zoomFuncs);
+    return initTilesetPainter(id, zoomFuncs);
   }
 
   return { load, initPainter };
@@ -376,12 +374,11 @@ function initLineLoader(context, constructVao) {
   };
 }
 
-function initLine(context, framebufferSize, preamble) {
-  const program = context.initProgram(preamble + vert$2, frag$2);
+function initLine(context) {
+  const program = context.initPaintProgram(vert$2, frag$2);
+  const { constructVao, initTilesetPainter } = program;
 
-  const initTilesetPainter = initGrid(framebufferSize, program);
-
-  const load = initLineLoader(context, program.constructVao);
+  const load = initLineLoader(context, constructVao);
 
   function initPainter(style) {
     const { id, layout, paint } = style;
@@ -400,7 +397,7 @@ function initLine(context, framebufferSize, preamble) {
       // line-offset, line-blur, line-gradient, line-pattern
     ];
 
-    return initTilesetPainter(context, id, zoomFuncs);
+    return initTilesetPainter(id, zoomFuncs);
   }
 
   return { load, initPainter };
@@ -432,12 +429,10 @@ void main() {
 }
 `;
 
-function initFill(context, framebufferSize, preamble) {
-  const { initProgram, initAttributes, initIndices } = context;
+function initFill(context) {
+  const { initPaintProgram, initAttributes, initIndices } = context;
 
-  const program = initProgram(preamble + vert$1, frag$1);
-
-  const initTilesetPainter = initGrid(framebufferSize, program);
+  const { constructVao, initTilesetPainter } = initPaintProgram(vert$1, frag$1);
 
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
@@ -449,7 +444,7 @@ function initFill(context, framebufferSize, preamble) {
   function load(buffers) {
     const attributes = initAttributes(attrInfo, buffers);
     const indices = initIndices({ data: buffers.indices });
-    const vao = program.constructVao({ attributes, indices });
+    const vao = constructVao({ attributes, indices });
     return { vao, indices, count: buffers.indices.length };
   }
 
@@ -462,7 +457,7 @@ function initFill(context, framebufferSize, preamble) {
       [paint["fill-translate"], "translation"],
     ];
 
-    return initTilesetPainter(context, id, zoomFuncs);
+    return initTilesetPainter(id, zoomFuncs);
   }
 
   return { load, initPainter };
@@ -511,13 +506,11 @@ void main() {
 }
 `;
 
-function initText(context, framebufferSize, preamble) {
-  const { initProgram, initQuad, initAttributes } = context;
+function initText(context) {
+  const { initPaintProgram, initQuad, initAttributes } = context;
 
-  const program = initProgram(preamble + vert, frag);
-  const { uniformSetters, constructVao } = program;
-
-  const initTilesetPainter = initGrid(framebufferSize, program);
+  const program = initPaintProgram(vert, frag);
+  const { uniformSetters, constructVao, initTilesetPainter } = program;
 
   const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
@@ -547,14 +540,14 @@ function initText(context, framebufferSize, preamble) {
       // TODO: sprites
     ];
 
-    return initTilesetPainter(context, id, zoomFuncs, uniformSetters.sdf);
+    return initTilesetPainter(id, zoomFuncs, uniformSetters.sdf);
   }
 
   return { load, initPainter };
 }
 
 function initPrograms(context, framebuffer) {
-  const { initAttribute } = context;
+  const { initAttribute, initProgram } = context;
 
   context.initAttributes = function(attrInfo, buffers, preInitialized = {}) {
     return Object.entries(attrInfo).reduce((d, [key, info]) => {
@@ -564,12 +557,19 @@ function initPrograms(context, framebuffer) {
     }, preInitialized);
   };
 
+  context.initPaintProgram = function(vert, frag) {
+    const program = initProgram(preamble + vert, frag);
+    const initTilesetPainter = initGrid(context, framebuffer.size, program);
+    const { constructVao, uniformSetters } = program;
+    return { constructVao, uniformSetters, initTilesetPainter };
+  };
+
   return {
     "background": initBackground(context),
-    "circle": initCircle(context, framebuffer.size, preamble),
-    "line": initLine(context, framebuffer.size, preamble),
-    "fill": initFill(context, framebuffer.size, preamble),
-    "symbol": initText(context, framebuffer.size, preamble),
+    "circle": initCircle(context),
+    "line": initLine(context),
+    "fill": initFill(context),
+    "symbol": initText(context),
   };
 }
 

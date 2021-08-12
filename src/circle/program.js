@@ -1,13 +1,10 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
-import { initGrid } from "../grid.js";
 
-export function initCircle(context, framebufferSize, preamble) {
-  const { initProgram, initQuad, initAttributes } = context;
+export function initCircle(context) {
+  const { initPaintProgram, initQuad, initAttributes } = context;
 
-  const program = initProgram(preamble + vert, frag);
-
-  const initTilesetPainter = initGrid(framebufferSize, program);
+  const { constructVao, initTilesetPainter } = initPaintProgram(vert, frag);
 
   const quadPos = initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
 
@@ -21,7 +18,7 @@ export function initCircle(context, framebufferSize, preamble) {
 
   function load(buffers) {
     const attributes = initAttributes(attrInfo, buffers, { quadPos });
-    const vao = program.constructVao({ attributes });
+    const vao = constructVao({ attributes });
     return { vao, instanceCount: buffers.circlePos.length / 2 };
   }
 
@@ -34,7 +31,7 @@ export function initCircle(context, framebufferSize, preamble) {
       [paint["circle-opacity"], "opacity"],
     ];
 
-    return initTilesetPainter(context, id, zoomFuncs);
+    return initTilesetPainter(id, zoomFuncs);
   }
 
   return { load, initPainter };
