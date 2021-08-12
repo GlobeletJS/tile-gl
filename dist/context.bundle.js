@@ -497,25 +497,26 @@ function initFill(context, framebufferSize, preamble) {
 }
 
 var vert = `attribute vec2 quadPos;  // Vertices of the quad instance
-attribute vec2 labelPos; // x, y
-attribute vec3 charPos;  // dx, dy, scale (relative to labelPos)
+attribute vec3 labelPos; // x, y, font size scalar
+attribute vec4 charPos;  // dx, dy (relative to labelPos), w, h
 attribute vec4 sdfRect;  // x, y, w, h
 attribute vec4 color;
 attribute float opacity;
 
+varying float taperWidth;
 varying vec2 texCoord;
 varying vec4 fillStyle;
 
 void main() {
+  taperWidth = labelPos.z * screenScale.z;
+  texCoord = sdfRect.xy + sdfRect.zw * quadPos;
   fillStyle = color * opacity;
 
-  texCoord = sdfRect.xy + sdfRect.zw * quadPos;
-
-  vec2 mapPos = tileToMap(labelPos);
+  vec2 mapPos = tileToMap(labelPos.xy);
 
   // Shift to the appropriate corner of the current instance quad
-  float projScale = screenScale.z * projectionScale(labelPos);
-  vec2 dPos = (charPos.xy + sdfRect.zw * quadPos) * charPos.z * projScale;
+  float projScale = screenScale.z * projectionScale(labelPos.xy);
+  vec2 dPos = (charPos.xy + charPos.zw * quadPos) * projScale;
 
   gl_Position = mapToClip(mapPos + dPos, 0.0);
 }
@@ -524,38 +525,40 @@ void main() {
 var frag = `precision highp float;
 
 uniform sampler2D sdf;
-uniform vec2 sdfDim;
 
 varying vec4 fillStyle;
 varying vec2 texCoord;
+varying float taperWidth;
 
 void main() {
-  float sdfVal = texture2D(sdf, texCoord / sdfDim).a;
-  // Find taper width: ~ dScreenPixels / dTexCoord
-  float screenScale = 1.414 / length(fwidth(texCoord));
-  float screenDist = screenScale * (191.0 - 255.0 * sdfVal) / 32.0;
+  float sdfVal = texture2D(sdf, texCoord).a;
+  float screenDist = taperWidth * (191.0 - 255.0 * sdfVal) / 32.0;
 
-  // TODO: threshold 0.5 looks too pixelated. Why?
-  float alpha = smoothstep(-0.8, 0.8, -screenDist);
+  float alpha = smoothstep(-0.707, 0.707, -screenDist);
   gl_FragColor = fillStyle * alpha;
 }
 `;
 
-function initTextLoader(context, constructVao) {
-  const { initQuad, initAttribute } = context;
+function initText(context, framebufferSize, preamble) {
+  const { initProgram, initQuad, initAttribute } = context;
+
+  const program = initProgram(preamble + vert, frag);
+  const { use, uniformSetters, constructVao } = program;
+
+  const grid = initGrid(framebufferSize, use, uniformSetters);
 
   const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
   const attrInfo = {
-    labelPos: { numComponents: 2 },
-    charPos: { numComponents: 3 },
+    labelPos: { numComponents: 3 },
+    charPos: { numComponents: 4 },
     sdfRect: { numComponents: 4 },
     tileCoords: { numComponents: 3 },
     color: { numComponents: 4 },
     opacity: { numComponents: 1 },
   };
 
-  return function(buffers) {
+  function load(buffers) {
     const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
       const data = buffers[key];
       if (data) d[key] = initAttribute(Object.assign({ data }, info));
@@ -563,21 +566,7 @@ function initTextLoader(context, constructVao) {
     }, { quadPos });
 
     const vao = constructVao({ attributes });
-
-    return { vao, instanceCount: buffers.labelPos.length / 2 };
-  };
-}
-
-function initText(context, framebufferSize, preamble) {
-  const program = context.initProgram(preamble + vert, frag);
-  const { use, uniformSetters, constructVao } = program;
-  const grid = initGrid(framebufferSize, use, uniformSetters);
-
-  const load = initTextLoader(context, constructVao);
-
-  function setAtlas(atlas) {
-    uniformSetters.sdf(atlas.sampler);
-    uniformSetters.sdfDim([atlas.width, atlas.height]);
+    return { vao, instanceCount: buffers.labelPos.length / 3 };
   }
 
   function initPainter(style) {
@@ -592,7 +581,7 @@ function initText(context, framebufferSize, preamble) {
     ], uniformSetters);
 
     const paintTile = initVectorTilePainter(
-      context, framebufferSize, id, setAtlas
+      context, framebufferSize, id, uniformSetters.sdf
     );
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }
@@ -630,12 +619,9 @@ function initGLpaint(context, framebuffer) {
 
   function loadAtlas(atlas) {
     const format = context.gl.ALPHA;
-    const mips = false;
-
     const { width, height, data } = atlas;
-    const sampler = context.initTexture({ format, width, height, data, mips });
-
-    return { width, height, sampler };
+    const mips = false;
+    return context.initTexture({ format, width, height, data, mips });
   }
 
   function initPainter(style) {

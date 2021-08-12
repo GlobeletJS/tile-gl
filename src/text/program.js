@@ -1,19 +1,36 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
-import { initTextLoader } from "./loader.js";
 import { initGrid, initTilesetPainter } from "../grid.js";
 import { initSetters, initVectorTilePainter } from "../util.js";
 
 export function initText(context, framebufferSize, preamble) {
-  const program = context.initProgram(preamble + vert, frag);
+  const { initProgram, initQuad, initAttribute } = context;
+
+  const program = initProgram(preamble + vert, frag);
   const { use, uniformSetters, constructVao } = program;
+
   const grid = initGrid(framebufferSize, use, uniformSetters);
 
-  const load = initTextLoader(context, constructVao);
+  const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
-  function setAtlas(atlas) {
-    uniformSetters.sdf(atlas.sampler);
-    uniformSetters.sdfDim([atlas.width, atlas.height]);
+  const attrInfo = {
+    labelPos: { numComponents: 3 },
+    charPos: { numComponents: 4 },
+    sdfRect: { numComponents: 4 },
+    tileCoords: { numComponents: 3 },
+    color: { numComponents: 4 },
+    opacity: { numComponents: 1 },
+  };
+
+  function load(buffers) {
+    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
+      const data = buffers[key];
+      if (data) d[key] = initAttribute(Object.assign({ data }, info));
+      return d;
+    }, { quadPos });
+
+    const vao = constructVao({ attributes });
+    return { vao, instanceCount: buffers.labelPos.length / 3 };
   }
 
   function initPainter(style) {
@@ -28,7 +45,7 @@ export function initText(context, framebufferSize, preamble) {
     ], uniformSetters);
 
     const paintTile = initVectorTilePainter(
-      context, framebufferSize, id, setAtlas
+      context, framebufferSize, id, uniformSetters.sdf
     );
     return initTilesetPainter(grid, zoomFuncs, paintTile);
   }

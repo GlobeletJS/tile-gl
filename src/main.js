@@ -35,12 +35,9 @@ export function initGLpaint(context, framebuffer) {
 
   function loadAtlas(atlas) {
     const format = context.gl.ALPHA;
-    const mips = false;
-
     const { width, height, data } = atlas;
-    const sampler = context.initTexture({ format, width, height, data, mips });
-
-    return { width, height, sampler };
+    const mips = false;
+    return context.initTexture({ format, width, height, data, mips });
   }
 
   function initPainter(style) {
