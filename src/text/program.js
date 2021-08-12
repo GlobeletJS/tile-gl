@@ -1,7 +1,6 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
 import { initGrid } from "../grid.js";
-import { initVectorTilePainter } from "../util.js";
 
 export function initText(context, framebufferSize, preamble) {
   const { initProgram, initQuad, initAttributes } = context;
@@ -39,10 +38,7 @@ export function initText(context, framebufferSize, preamble) {
       // TODO: sprites
     ];
 
-    const paintTile = initVectorTilePainter(
-      context, framebufferSize, id, uniformSetters.sdf
-    );
-    return initTilesetPainter(zoomFuncs, paintTile);
+    return initTilesetPainter(context, id, zoomFuncs, uniformSetters.sdf);
   }
 
   return { load, initPainter };

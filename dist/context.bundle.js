@@ -167,8 +167,12 @@ function initGrid(framebufferSize, useProgram, setters) {
     return { translate, scale: pixScale, subsets };
   }
 
-  function initTilesetPainter(styleMap, paintTile) {
-    const zoomFuncs = initSetters(styleMap);
+  function initTilesetPainter(context, id, styleMap, setAtlas) {
+    const paintTile = initVectorTilePainter(
+      context, framebufferSize, id, setAtlas
+    );
+
+    const zoomFuncs = initSetters(styleMap, setters);
 
     return function({ tileset, zoom, pixRatio = 1 }) {
       if (!tileset || !tileset.length) return;
@@ -221,8 +225,7 @@ function initCircle(context, framebufferSize, preamble) {
       [paint["circle-opacity"], "opacity"],
     ];
 
-    const paintTile = initVectorTilePainter(context, framebufferSize, id);
-    return initTilesetPainter(zoomFuncs, paintTile);
+    return initTilesetPainter(context, id, zoomFuncs);
   }
 
   return { load, initPainter };
@@ -404,8 +407,7 @@ function initLine(context, framebufferSize, preamble) {
       // line-offset, line-blur, line-gradient, line-pattern
     ];
 
-    const paintTile = initVectorTilePainter(context, framebufferSize, id);
-    return initTilesetPainter(zoomFuncs, paintTile);
+    return initTilesetPainter(context, id, zoomFuncs);
   }
 
   return { load, initPainter };
@@ -440,7 +442,7 @@ void main() {
 function initFill(context, framebufferSize, preamble) {
   const { initProgram, initAttributes, initIndices } = context;
 
-  const program = context.initProgram(preamble + vert$1, frag$1);
+  const program = initProgram(preamble + vert$1, frag$1);
   const { use, uniformSetters, constructVao } = program;
 
   const initTilesetPainter = initGrid(framebufferSize, use, uniformSetters);
@@ -458,6 +460,7 @@ function initFill(context, framebufferSize, preamble) {
     const vao = constructVao({ attributes, indices });
     return { vao, indices, count: buffers.indices.length };
   }
+
   function initPainter(style) {
     const { id, paint } = style;
 
@@ -467,8 +470,7 @@ function initFill(context, framebufferSize, preamble) {
       [paint["fill-translate"], "translation"],
     ];
 
-    const paintTile = initVectorTilePainter(context, framebufferSize, id);
-    return initTilesetPainter(zoomFuncs, paintTile);
+    return initTilesetPainter(context, id, zoomFuncs);
   }
 
   return { load, initPainter };
@@ -553,10 +555,7 @@ function initText(context, framebufferSize, preamble) {
       // TODO: sprites
     ];
 
-    const paintTile = initVectorTilePainter(
-      context, framebufferSize, id, uniformSetters.sdf
-    );
-    return initTilesetPainter(zoomFuncs, paintTile);
+    return initTilesetPainter(context, id, zoomFuncs, uniformSetters.sdf);
   }
 
   return { load, initPainter };

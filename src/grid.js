@@ -1,4 +1,4 @@
-import { initSetters } from "./util.js";
+import { initSetters, initVectorTilePainter } from "./util.js";
 
 export function initGrid(framebufferSize, useProgram, setters) {
   const { screenScale, mapCoords, mapShift } = setters;
@@ -33,8 +33,12 @@ export function initGrid(framebufferSize, useProgram, setters) {
     return { translate, scale: pixScale, subsets };
   }
 
-  function initTilesetPainter(styleMap, paintTile) {
-    const zoomFuncs = initSetters(styleMap);
+  function initTilesetPainter(context, id, styleMap, setAtlas) {
+    const paintTile = initVectorTilePainter(
+      context, framebufferSize, id, setAtlas
+    );
+
+    const zoomFuncs = initSetters(styleMap, setters);
 
     return function({ tileset, zoom, pixRatio = 1 }) {
       if (!tileset || !tileset.length) return;

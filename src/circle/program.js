@@ -1,7 +1,6 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
 import { initGrid } from "../grid.js";
-import { initVectorTilePainter } from "../util.js";
 
 export function initCircle(context, framebufferSize, preamble) {
   const { initProgram, initQuad, initAttributes } = context;
@@ -36,8 +35,7 @@ export function initCircle(context, framebufferSize, preamble) {
       [paint["circle-opacity"], "opacity"],
     ];
 
-    const paintTile = initVectorTilePainter(context, framebufferSize, id);
-    return initTilesetPainter(zoomFuncs, paintTile);
+    return initTilesetPainter(context, id, zoomFuncs);
   }
 
   return { load, initPainter };
