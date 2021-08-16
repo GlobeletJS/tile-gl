@@ -17,8 +17,7 @@ void main() {
   vec2 mapPos = tileToMap(labelPos.xy);
 
   // Shift to the appropriate corner of the current instance quad
-  float projScale = screenScale.z * projectionScale(labelPos.xy);
-  vec2 dPos = (charPos.xy + charPos.zw * quadPos) * projScale;
+  vec2 dPos = (charPos.xy + charPos.zw * quadPos) * styleScale(labelPos.xy);
 
   gl_Position = mapToClip(mapPos + dPos, 0.0);
 }

@@ -35,12 +35,12 @@ export function initGrid(context, framebufferSize, program) {
     const zoomFuncs = initSetters(styleMap, uniformSetters);
     const paintTile = initVectorTilePainter(context, id, setAtlas);
 
-    return function({ tileset, zoom, pixRatio = 1 }) {
+    return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
       if (!tileset || !tileset.length) return;
 
       use();
       const { width, height } = framebufferSize;
-      screenScale([2 / width, -2 / height, pixRatio]);
+      screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
       const { translate, scale, subsets } = setGrid(tileset, pixRatio);
 
       zoomFuncs.forEach(f => f(zoom));

@@ -7,7 +7,7 @@ attribute vec3 tileCoords;
 uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
 uniform vec3 mapShift;    // translate and scale of tileset[0]
 
-uniform vec3 screenScale; // 2 / width, -2 / height, pixRatio
+uniform vec4 screenScale; // 2 / width, -2 / height, pixRatio, cameraScale
 
 vec2 tileToMap(vec2 tilePos) {
   // Find distance of this tile from top left tile, in tile units
@@ -32,17 +32,9 @@ float mercatorScale(float yWeb) {
   return 0.5 * (exp(yMerc) + exp(-yMerc)); // == cosh(y)
 }
 
-float cameraY() {
-  // Find the distance (in tile units) between the screen center and 
-  //  the top of the tileset
-  float dTileY = (-1.0 / screenScale.y - mapShift.y) / mapShift.z;
-  // Convert to Web Mercator Y
-  return (dTileY + mapCoords.y) / exp2(mapCoords.z);
-}
-
-float projectionScale(vec2 tilePos) {
+float styleScale(vec2 tilePos) {
   float y = (tileCoords.y + tilePos.y / mapCoords.w) / exp2(tileCoords.z);
-  return mercatorScale(y) / mercatorScale(cameraY());
+  return screenScale.z * mercatorScale(y) / screenScale.w;
 }
 
 vec4 mapToClip(vec2 mapPos, float z) {
@@ -113,12 +105,12 @@ function initGrid(context, framebufferSize, program) {
     const zoomFuncs = initSetters(styleMap, uniformSetters);
     const paintTile = initVectorTilePainter(context, id, setAtlas);
 
-    return function({ tileset, zoom, pixRatio = 1 }) {
+    return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
       if (!tileset || !tileset.length) return;
 
       use();
       const { width, height } = framebufferSize;
-      screenScale([2 / width, -2 / height, pixRatio]);
+      screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
       const { translate, scale, subsets } = setGrid(tileset, pixRatio);
 
       zoomFuncs.forEach(f => f(zoom));
@@ -162,7 +154,7 @@ void main() {
 
   // Shift to the appropriate corner of the current instance quad
   delta = 2.0 * quadPos * (radius + 1.0);
-  vec2 dPos = delta * screenScale.z * projectionScale(circlePos);
+  vec2 dPos = delta * styleScale(circlePos);
 
   strokeStyle = color * opacity;
   // TODO: normalize delta? Then can drop one varying
@@ -482,8 +474,7 @@ void main() {
   vec2 mapPos = tileToMap(labelPos.xy);
 
   // Shift to the appropriate corner of the current instance quad
-  float projScale = screenScale.z * projectionScale(labelPos.xy);
-  vec2 dPos = (charPos.xy + charPos.zw * quadPos) * projScale;
+  vec2 dPos = (charPos.xy + charPos.zw * quadPos) * styleScale(labelPos.xy);
 
   gl_Position = mapToClip(mapPos + dPos, 0.0);
 }
