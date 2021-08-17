@@ -1,4 +1,6 @@
 import preamble from "./preamble.glsl";
+import simpleScale from "./scale.glsl";
+import mercatorScale from "./merc-scale.glsl";
 import { initGrid } from "./grid.js";
 import { initBackground } from "./background/program.js";
 import { initCircle } from "./circle/program.js";
@@ -6,8 +8,10 @@ import { initLine } from "./line/program.js";
 import { initFill } from "./fill/program.js";
 import { initText } from "./text/program.js";
 
-export function initPrograms(context, framebuffer) {
+export function initPrograms(context, framebuffer, projScale) {
   const { initAttribute, initProgram } = context;
+
+  const scaleCode = (projScale) ? mercatorScale : simpleScale;
 
   context.initAttributes = function(attrInfo, buffers, preInitialized = {}) {
     return Object.entries(attrInfo).reduce((d, [key, info]) => {
@@ -18,7 +22,7 @@ export function initPrograms(context, framebuffer) {
   };
 
   context.initPaintProgram = function(vert, frag) {
-    const program = initProgram(preamble + vert, frag);
+    const program = initProgram(preamble + scaleCode + vert, frag);
     const initTilesetPainter = initGrid(context, framebuffer.size, program);
     const { constructVao, uniformSetters } = program;
     return { constructVao, uniformSetters, initTilesetPainter };

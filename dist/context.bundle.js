@@ -26,7 +26,18 @@ vec2 tileToMap(vec2 tilePos) {
   return tilePos * tileScale + tileTranslate;
 }
 
-float mercatorScale(float yWeb) {
+vec4 mapToClip(vec2 mapPos, float z) {
+  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
+  return vec4(projected, z, 1);
+}
+`;
+
+var simpleScale = `float styleScale(vec2 tilePos) {
+  return screenScale.z;
+}
+`;
+
+var mercatorScale = `float mercatorScale(float yWeb) {
   // Convert Web Mercator Y to standard Mercator Y
   float yMerc = TWOPI * (0.5 - yWeb);
   return 0.5 * (exp(yMerc) + exp(-yMerc)); // == cosh(y)
@@ -35,11 +46,6 @@ float mercatorScale(float yWeb) {
 float styleScale(vec2 tilePos) {
   float y = (tileCoords.y + tilePos.y / mapCoords.w) / exp2(tileCoords.z);
   return screenScale.z * mercatorScale(y) / screenScale.w;
-}
-
-vec4 mapToClip(vec2 mapPos, float z) {
-  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
-  return vec4(projected, z, 1);
 }
 `;
 
@@ -537,8 +543,10 @@ function initText(context) {
   return { load, initPainter };
 }
 
-function initPrograms(context, framebuffer) {
+function initPrograms(context, framebuffer, projScale) {
   const { initAttribute, initProgram } = context;
+
+  const scaleCode = (projScale) ? mercatorScale : simpleScale;
 
   context.initAttributes = function(attrInfo, buffers, preInitialized = {}) {
     return Object.entries(attrInfo).reduce((d, [key, info]) => {
@@ -549,7 +557,7 @@ function initPrograms(context, framebuffer) {
   };
 
   context.initPaintProgram = function(vert, frag) {
-    const program = initProgram(preamble + vert, frag);
+    const program = initProgram(preamble + scaleCode + vert, frag);
     const initTilesetPainter = initGrid(context, framebuffer.size, program);
     const { constructVao, uniformSetters } = program;
     return { constructVao, uniformSetters, initTilesetPainter };
@@ -564,8 +572,8 @@ function initPrograms(context, framebuffer) {
   };
 }
 
-function initGLpaint(context, framebuffer) {
-  const programs = initPrograms(context, framebuffer);
+function initGLpaint({ context, framebuffer, projScale }) {
+  const programs = initPrograms(context, framebuffer, projScale);
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);

@@ -26,17 +26,6 @@ vec2 tileToMap(vec2 tilePos) {
   return tilePos * tileScale + tileTranslate;
 }
 
-float mercatorScale(float yWeb) {
-  // Convert Web Mercator Y to standard Mercator Y
-  float yMerc = TWOPI * (0.5 - yWeb);
-  return 0.5 * (exp(yMerc) + exp(-yMerc)); // == cosh(y)
-}
-
-float styleScale(vec2 tilePos) {
-  float y = (tileCoords.y + tilePos.y / mapCoords.w) / exp2(tileCoords.z);
-  return screenScale.z * mercatorScale(y) / screenScale.w;
-}
-
 vec4 mapToClip(vec2 mapPos, float z) {
   vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
   return vec4(projected, z, 1);

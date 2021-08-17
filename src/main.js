@@ -1,7 +1,7 @@
 import { initPrograms } from "./programs.js";
 
-export function initGLpaint(context, framebuffer) {
-  const programs = initPrograms(context, framebuffer);
+export function initGLpaint({ context, framebuffer, projScale }) {
+  const programs = initPrograms(context, framebuffer, projScale);
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);
