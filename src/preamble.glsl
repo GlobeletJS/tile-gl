@@ -1,17 +1,19 @@
 precision highp float;
 
+const float TWOPI = 6.28318530718;
+
 attribute vec3 tileCoords;
 
 uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
 uniform vec3 mapShift;    // translate and scale of tileset[0]
 
-uniform vec3 screenScale; // 2 / width, -2 / height, pixRatio
+uniform vec4 screenScale; // 2 / width, -2 / height, pixRatio, cameraScale
 
 vec2 tileToMap(vec2 tilePos) {
   // Find distance of this tile from top left tile, in tile units
   float zoomFac = exp2(mapCoords.z - tileCoords.z);
   vec2 dTile = zoomFac * tileCoords.xy - mapCoords.xy;
-  // tileCoords.x and mapCoords.x are both wrapped to the range [0..exp(z)]
+  // tileCoords.x and mapCoords.x are both wrapped to the range [0..exp2(z)]
   // If the right edge of the tile is left of the map, we need to unwrap dTile
   dTile.x += (dTile.x + zoomFac <= 0.0) ? exp2(mapCoords.z) : 0.0;
 

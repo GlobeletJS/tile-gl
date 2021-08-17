@@ -1,5 +1,5 @@
 export function initLineLoader(context, constructVao) {
-  const { initQuad, createBuffer, initAttribute } = context;
+  const { initQuad, createBuffer, initAttribute, initAttributes } = context;
 
   const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
 
@@ -32,12 +32,7 @@ export function initLineLoader(context, constructVao) {
       return initAttribute({ buffer, numComponents, stride, offset });
     }
 
-    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      const data = buffers[key];
-      if (data) d[key] = initAttribute(Object.assign({ data }, info));
-      return d;
-    }, geometryAttributes);
-
+    const attributes = initAttributes(attrInfo, buffers, geometryAttributes);
     const vao = constructVao({ attributes });
 
     return { vao, instanceCount: lines.length / numComponents - 3 };

@@ -861,13 +861,14 @@ function layoutLine(glyphs, origin, spacing, scalar) {
 
   return glyphs.flatMap(g => {
     const { left, top, advance } = g.metrics;
+    const { w, h } = g.rect;
 
     const dx = xCursor + left - RECT_BUFFER;
     const dy = y0 - top - RECT_BUFFER;
 
     xCursor += advance + spacing;
 
-    return [dx, dy, scalar];
+    return [dx, dy, w, h].map(c => c * scalar);
   });
 }
 
@@ -1128,13 +1129,16 @@ function initShaper(layout) {
       .flatMap((l, i) => layoutLine(l, lineOrigins[i], spacing, scalar));
 
     // 6. Fill in label origins for each glyph. TODO: assumes Point geometry
-    const origin = feature.geometry.coordinates.slice();
+    const origin = [...feature.geometry.coordinates, scalar];
     const labelPos = lines.flat()
       .flatMap(() => origin);
 
-    // 7. Collect all the glyph rects
-    const sdfRect = lines.flat()
-      .flatMap(g => Object.values(g.rect));
+    // 7. Collect all the glyph rects, normalizing by atlas dimensions
+    const { width, height } = atlas.image;
+    const sdfRect = lines.flat().flatMap(g => {
+      const { x, y, w, h } = g.rect;
+      return [x / width, y / height, w / width, h / height];
+    });
 
     // 8. Compute bounding box for collision checks
     const textPadding = layout["text-padding"](zoom, feature);

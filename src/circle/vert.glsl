@@ -13,7 +13,7 @@ void main() {
 
   // Shift to the appropriate corner of the current instance quad
   delta = 2.0 * quadPos * (radius + 1.0);
-  vec2 dPos = delta * screenScale.z;
+  vec2 dPos = delta * styleScale(circlePos);
 
   strokeStyle = color * opacity;
   // TODO: normalize delta? Then can drop one varying

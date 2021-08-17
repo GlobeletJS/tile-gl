@@ -1,15 +1,10 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
-import { initGrid, initTilesetPainter } from "../grid.js";
-import { initSetters, initVectorTilePainter } from "../util.js";
 
-export function initCircle(context, framebufferSize, preamble) {
-  const { initProgram, initQuad, initAttribute } = context;
+export function initCircle(context) {
+  const { initPaintProgram, initQuad, initAttributes } = context;
 
-  const program = initProgram(preamble + vert, frag);
-  const { use, uniformSetters, constructVao } = program;
-
-  const grid = initGrid(framebufferSize, use, uniformSetters);
+  const { constructVao, initTilesetPainter } = initPaintProgram(vert, frag);
 
   const quadPos = initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
 
@@ -22,12 +17,7 @@ export function initCircle(context, framebufferSize, preamble) {
   };
 
   function load(buffers) {
-    const attributes = Object.entries(attrInfo).reduce((d, [key, info]) => {
-      const data = buffers[key];
-      if (data) d[key] = initAttribute(Object.assign({ data }, info));
-      return d;
-    }, { quadPos });
-
+    const attributes = initAttributes(attrInfo, buffers, { quadPos });
     const vao = constructVao({ attributes });
     return { vao, instanceCount: buffers.circlePos.length / 2 };
   }
@@ -35,14 +25,13 @@ export function initCircle(context, framebufferSize, preamble) {
   function initPainter(style) {
     const { id, paint } = style;
 
-    const zoomFuncs = initSetters([
+    const zoomFuncs = [
       [paint["circle-radius"],  "radius"],
       [paint["circle-color"],   "color"],
       [paint["circle-opacity"], "opacity"],
-    ], uniformSetters);
+    ];
 
-    const paintTile = initVectorTilePainter(context, framebufferSize, id);
-    return initTilesetPainter(grid, zoomFuncs, paintTile);
+    return initTilesetPainter(id, zoomFuncs);
   }
 
   return { load, initPainter };

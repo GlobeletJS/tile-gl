@@ -1,21 +1,17 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
 import { initLineLoader } from "./loader.js";
-import { initGrid, initTilesetPainter } from "../grid.js";
-import { initSetters, initVectorTilePainter } from "../util.js";
 
-export function initLine(context, framebufferSize, preamble) {
-  const program = context.initProgram(preamble + vert, frag);
-  const { use, uniformSetters, constructVao } = program;
-
-  const grid = initGrid(framebufferSize, use, uniformSetters);
+export function initLine(context) {
+  const program = context.initPaintProgram(vert, frag);
+  const { constructVao, initTilesetPainter } = program;
 
   const load = initLineLoader(context, constructVao);
 
   function initPainter(style) {
     const { id, layout, paint } = style;
 
-    const zoomFuncs = initSetters([
+    const zoomFuncs = [
       // TODO: move these to serialization step??
       // [layout["line-cap"],      "lineCap"],
       // [layout["line-join"],     "lineJoin"],
@@ -27,10 +23,9 @@ export function initLine(context, framebufferSize, preamble) {
       // line-gap-width,
       // line-translate, line-translate-anchor,
       // line-offset, line-blur, line-gradient, line-pattern
-    ], uniformSetters);
+    ];
 
-    const paintTile = initVectorTilePainter(context, framebufferSize, id);
-    return initTilesetPainter(grid, zoomFuncs, paintTile);
+    return initTilesetPainter(id, zoomFuncs);
   }
 
   return { load, initPainter };
