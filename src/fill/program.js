@@ -20,9 +20,7 @@ export function initFill(context) {
     return { vao, indices, count: buffers.indices.length };
   }
 
-  function initPainter(style) {
-    const { id, paint } = style;
-
+  function initPainter(id, paint) {
     const zoomFuncs = [
       [paint["fill-color"],     "color"],
       [paint["fill-opacity"],   "opacity"],

@@ -1,7 +1,5 @@
 precision highp float;
 
-const float TWOPI = 6.28318530718;
-
 attribute vec3 tileCoords;
 
 uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]

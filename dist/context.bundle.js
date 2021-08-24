@@ -1,7 +1,5 @@
 var preamble = `precision highp float;
 
-const float TWOPI = 6.28318530718;
-
 attribute vec3 tileCoords;
 
 uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
@@ -37,7 +35,9 @@ var simpleScale = `float styleScale(vec2 tilePos) {
 }
 `;
 
-var mercatorScale = `float mercatorScale(float yWeb) {
+var mercatorScale = `const float TWOPI = 6.28318530718;
+
+float mercatorScale(float yWeb) {
   // Convert Web Mercator Y to standard Mercator Y
   float yMerc = TWOPI * (0.5 - yWeb);
   return 0.5 * (exp(yMerc) + exp(-yMerc)); // == cosh(y)
@@ -107,9 +107,9 @@ function initGrid(context, framebufferSize, program) {
     return { translate, scale: pixScale, subsets };
   }
 
-  function initTilesetPainter(id, styleMap, setAtlas) {
+  function initTilesetPainter(id, styleMap) {
     const zoomFuncs = initSetters(styleMap, uniformSetters);
-    const paintTile = initVectorTilePainter(context, id, setAtlas);
+    const paintTile = initVectorTilePainter(context, id, uniformSetters.sdf);
 
     return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
       if (!tileset || !tileset.length) return;
@@ -132,9 +132,7 @@ function initGrid(context, framebufferSize, program) {
 }
 
 function initBackground(context) {
-  function initPainter(style) {
-    const { paint } = style;
-
+  function initPainter(id, paint) {
     return function({ zoom }) {
       const opacity = paint["background-opacity"](zoom);
       const color = paint["background-color"](zoom);
@@ -206,9 +204,7 @@ function initCircle(context) {
     return { vao, instanceCount: buffers.circlePos.length / 2 };
   }
 
-  function initPainter(style) {
-    const { id, paint } = style;
-
+  function initPainter(id, paint) {
     const zoomFuncs = [
       [paint["circle-radius"],  "radius"],
       [paint["circle-color"],   "color"],
@@ -378,14 +374,13 @@ function initLine(context) {
 
   const load = initLineLoader(context, constructVao);
 
-  function initPainter(style) {
-    const { id, layout, paint } = style;
-
+  function initPainter(id, paint) {
     const zoomFuncs = [
-      // TODO: move these to serialization step??
       // [layout["line-cap"],      "lineCap"],
       // [layout["line-join"],     "lineJoin"],
-      [layout["line-miter-limit"], "miterLimit"],
+      // NOTE: line-miter-limit is a layout property in the style spec
+      // We copied the function to a paint property in ../main.js
+      [paint["line-miter-limit"], "miterLimit"],
 
       [paint["line-width"],     "lineWidth"],
       [paint["line-color"],     "color"],
@@ -446,9 +441,7 @@ function initFill(context) {
     return { vao, indices, count: buffers.indices.length };
   }
 
-  function initPainter(style) {
-    const { id, paint } = style;
-
+  function initPainter(id, paint) {
     const zoomFuncs = [
       [paint["fill-color"],     "color"],
       [paint["fill-opacity"],   "opacity"],
@@ -506,8 +499,7 @@ void main() {
 function initText(context) {
   const { initPaintProgram, initQuad, initAttributes } = context;
 
-  const program = initPaintProgram(vert, frag);
-  const { uniformSetters, constructVao, initTilesetPainter } = program;
+  const { constructVao, initTilesetPainter } = initPaintProgram(vert, frag);
 
   const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
@@ -526,9 +518,7 @@ function initText(context) {
     return { vao, instanceCount: buffers.labelPos.length / 3 };
   }
 
-  function initPainter(style) {
-    const { id, paint } = style;
-
+  function initPainter(id, paint) {
     const zoomFuncs = [
       [paint["text-color"],   "color"],
       [paint["text-opacity"], "opacity"],
@@ -537,7 +527,7 @@ function initText(context) {
       // TODO: sprites
     ];
 
-    return initTilesetPainter(id, zoomFuncs, uniformSetters.sdf);
+    return initTilesetPainter(id, zoomFuncs);
   }
 
   return { load, initPainter };
@@ -607,7 +597,12 @@ function initGLpaint({ context, framebuffer, projScale }) {
     const program = programs[type];
     if (!program) return () => null;
 
-    const painter = program.initPainter(style);
+    const { layout, paint } = style;
+    if (type === "line") {
+      // We handle line-miter-limit in the paint phase, not layout phase
+      paint["line-miter-limit"] = layout["line-miter-limit"];
+    }
+    const painter = program.initPainter(id, paint);
     return Object.assign(painter, { id, type, source, minzoom, maxzoom });
   }
 

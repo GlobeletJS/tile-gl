@@ -22,9 +22,7 @@ export function initCircle(context) {
     return { vao, instanceCount: buffers.circlePos.length / 2 };
   }
 
-  function initPainter(style) {
-    const { id, paint } = style;
-
+  function initPainter(id, paint) {
     const zoomFuncs = [
       [paint["circle-radius"],  "radius"],
       [paint["circle-color"],   "color"],

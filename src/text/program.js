@@ -4,8 +4,7 @@ import frag from "./frag.glsl";
 export function initText(context) {
   const { initPaintProgram, initQuad, initAttributes } = context;
 
-  const program = initPaintProgram(vert, frag);
-  const { uniformSetters, constructVao, initTilesetPainter } = program;
+  const { constructVao, initTilesetPainter } = initPaintProgram(vert, frag);
 
   const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
@@ -24,9 +23,7 @@ export function initText(context) {
     return { vao, instanceCount: buffers.labelPos.length / 3 };
   }
 
-  function initPainter(style) {
-    const { id, paint } = style;
-
+  function initPainter(id, paint) {
     const zoomFuncs = [
       [paint["text-color"],   "color"],
       [paint["text-opacity"], "opacity"],
@@ -35,7 +32,7 @@ export function initText(context) {
       // TODO: sprites
     ];
 
-    return initTilesetPainter(id, zoomFuncs, uniformSetters.sdf);
+    return initTilesetPainter(id, zoomFuncs);
   }
 
   return { load, initPainter };

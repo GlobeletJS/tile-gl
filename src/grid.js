@@ -31,9 +31,9 @@ export function initGrid(context, framebufferSize, program) {
     return { translate, scale: pixScale, subsets };
   }
 
-  function initTilesetPainter(id, styleMap, setAtlas) {
+  function initTilesetPainter(id, styleMap) {
     const zoomFuncs = initSetters(styleMap, uniformSetters);
-    const paintTile = initVectorTilePainter(context, id, setAtlas);
+    const paintTile = initVectorTilePainter(context, id, uniformSetters.sdf);
 
     return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
       if (!tileset || !tileset.length) return;

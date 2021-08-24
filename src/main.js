@@ -35,7 +35,12 @@ export function initGLpaint({ context, framebuffer, projScale }) {
     const program = programs[type];
     if (!program) return () => null;
 
-    const painter = program.initPainter(style);
+    const { layout, paint } = style;
+    if (type === "line") {
+      // We handle line-miter-limit in the paint phase, not layout phase
+      paint["line-miter-limit"] = layout["line-miter-limit"];
+    }
+    const painter = program.initPainter(id, paint);
     return Object.assign(painter, { id, type, source, minzoom, maxzoom });
   }
 

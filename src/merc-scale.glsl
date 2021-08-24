@@ -1,3 +1,5 @@
+const float TWOPI = 6.28318530718;
+
 float mercatorScale(float yWeb) {
   // Convert Web Mercator Y to standard Mercator Y
   float yMerc = TWOPI * (0.5 - yWeb);
