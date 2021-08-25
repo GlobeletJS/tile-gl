@@ -2,12 +2,6 @@ import vert from "./vert.glsl";
 import frag from "./frag.glsl";
 
 export function initCircle(context) {
-  const { initPaintProgram, initQuad, initAttributes } = context;
-
-  const { constructVao, initTilesetPainter } = initPaintProgram(vert, frag);
-
-  const quadPos = initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
-
   const attrInfo = {
     circlePos: { numComponents: 2 },
     tileCoords: { numComponents: 3 },
@@ -15,22 +9,17 @@ export function initCircle(context) {
     color: { numComponents: 4 },
     opacity: { numComponents: 1 },
   };
+  const quadPos = context.initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
 
-  function load(buffers) {
-    const attributes = initAttributes(attrInfo, buffers, { quadPos });
-    const vao = constructVao({ attributes });
-    return { vao, instanceCount: buffers.circlePos.length / 2 };
-  }
+  const styleMap = [
+    ["circle-radius", "radius"],
+    ["circle-color", "color"],
+    ["circle-opacity", "opacity"],
+  ];
 
-  function initPainter(id, paint) {
-    const zoomFuncs = [
-      [paint["circle-radius"],  "radius"],
-      [paint["circle-color"],   "color"],
-      [paint["circle-opacity"], "opacity"],
-    ];
-
-    return initTilesetPainter(id, zoomFuncs);
-  }
-
-  return { load, initPainter };
+  return {
+    vert, frag, attrInfo, styleMap,
+    getSpecialAttrs: () => ({ quadPos }),
+    countInstances: (buffers) => buffers.circlePos.length / 2,
+  };
 }

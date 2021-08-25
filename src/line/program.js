@@ -1,31 +1,54 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
-import { initLineLoader } from "./loader.js";
 
 export function initLine(context) {
-  const program = context.initPaintProgram(vert, frag);
-  const { constructVao, initTilesetPainter } = program;
+  const { initQuad, createBuffer, initAttribute } = context;
 
-  const load = initLineLoader(context, constructVao);
+  const attrInfo = {
+    tileCoords: { numComponents: 3 },
+    color: { numComponents: 4 },
+    opacity: { numComponents: 1 },
+  };
+  const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
+  const numComponents = 3;
+  const stride = Float32Array.BYTES_PER_ELEMENT * numComponents;
 
-  function initPainter(id, paint) {
-    const zoomFuncs = [
-      // [layout["line-cap"],      "lineCap"],
-      // [layout["line-join"],     "lineJoin"],
-      // NOTE: line-miter-limit is a layout property in the style spec
-      // We copied the function to a paint property in ../main.js
-      [paint["line-miter-limit"], "miterLimit"],
+  function getSpecialAttrs(buffers) {
+    // Create buffer containing the vertex positions
+    const buffer = createBuffer(buffers.lines);
 
-      [paint["line-width"],     "lineWidth"],
-      [paint["line-color"],     "color"],
-      [paint["line-opacity"],   "opacity"],
-      // line-gap-width,
-      // line-translate, line-translate-anchor,
-      // line-offset, line-blur, line-gradient, line-pattern
-    ];
+    // Construct interleaved attributes pointing to different offsets in buffer
+    function setupPoint(shift) {
+      const offset = shift * stride;
+      return initAttribute({ buffer, numComponents, stride, offset });
+    }
 
-    return initTilesetPainter(id, zoomFuncs);
+    return {
+      quadPos,
+      pointA: setupPoint(0),
+      pointB: setupPoint(1),
+      pointC: setupPoint(2),
+      pointD: setupPoint(3),
+    };
   }
 
-  return { load, initPainter };
+  const styleMap = [
+    // [layout["line-cap"],      "lineCap"],
+    // [layout["line-join"],     "lineJoin"],
+    // NOTE: line-miter-limit is a layout property in the style spec
+    // We copied the function to a paint property in ../main.js
+    ["line-miter-limit", "miterLimit"],
+
+    ["line-width",     "lineWidth"],
+    ["line-color",     "color"],
+    ["line-opacity",   "opacity"],
+    // line-gap-width,
+    // line-translate, line-translate-anchor,
+    // line-offset, line-blur, line-gradient, line-pattern
+  ];
+
+  return {
+    vert, frag, attrInfo, styleMap, getSpecialAttrs,
+    countInstances: (buffers) => buffers.lines.length / numComponents - 3,
+  };
 }

@@ -1,7 +1,10 @@
+import { setParams } from "./params.js";
 import { initPrograms } from "./programs.js";
 
-export function initGLpaint({ context, framebuffer, projScale }) {
-  const programs = initPrograms(context, framebuffer, projScale);
+export function initGLpaint(userParams) {
+  const { context, framebuffer, preamble } = setParams(userParams);
+
+  const programs = initPrograms(context, framebuffer, preamble);
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);

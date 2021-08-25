@@ -49,6 +49,18 @@ float styleScale(vec2 tilePos) {
 }
 `;
 
+function setParams(userParams) {
+  const { context, framebuffer, projScale } = userParams;
+
+  const scaleCode = (projScale) ? mercatorScale : simpleScale;
+
+  return {
+    context,
+    framebuffer,
+    preamble: preamble + scaleCode,
+  };
+}
+
 function initSetters(pairs, uniformSetters) {
   return pairs
     .filter(([get]) => get.type !== "property")
@@ -184,12 +196,6 @@ void main() {
 `;
 
 function initCircle(context) {
-  const { initPaintProgram, initQuad, initAttributes } = context;
-
-  const { constructVao, initTilesetPainter } = initPaintProgram(vert$3, frag$3);
-
-  const quadPos = initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
-
   const attrInfo = {
     circlePos: { numComponents: 2 },
     tileCoords: { numComponents: 3 },
@@ -197,24 +203,19 @@ function initCircle(context) {
     color: { numComponents: 4 },
     opacity: { numComponents: 1 },
   };
+  const quadPos = context.initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
 
-  function load(buffers) {
-    const attributes = initAttributes(attrInfo, buffers, { quadPos });
-    const vao = constructVao({ attributes });
-    return { vao, instanceCount: buffers.circlePos.length / 2 };
-  }
+  const styleMap = [
+    ["circle-radius", "radius"],
+    ["circle-color", "color"],
+    ["circle-opacity", "opacity"],
+  ];
 
-  function initPainter(id, paint) {
-    const zoomFuncs = [
-      [paint["circle-radius"],  "radius"],
-      [paint["circle-color"],   "color"],
-      [paint["circle-opacity"], "opacity"],
-    ];
-
-    return initTilesetPainter(id, zoomFuncs);
-  }
-
-  return { load, initPainter };
+  return {
+    vert: vert$3, frag: frag$3, attrInfo, styleMap,
+    getSpecialAttrs: () => ({ quadPos }),
+    countInstances: (buffers) => buffers.circlePos.length / 2,
+  };
 }
 
 var vert$2 = `attribute vec2 quadPos;
@@ -327,73 +328,56 @@ void main() {
 }
 `;
 
-function initLineLoader(context, constructVao) {
-  const { initQuad, createBuffer, initAttribute, initAttributes } = context;
-
-  const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
+function initLine(context) {
+  const { initQuad, createBuffer, initAttribute } = context;
 
   const attrInfo = {
     tileCoords: { numComponents: 3 },
     color: { numComponents: 4 },
     opacity: { numComponents: 1 },
   };
-
+  const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
   const numComponents = 3;
   const stride = Float32Array.BYTES_PER_ELEMENT * numComponents;
 
-  return function(buffers) {
-    const { lines } = buffers;
-
+  function getSpecialAttrs(buffers) {
     // Create buffer containing the vertex positions
-    const buffer = createBuffer(lines);
+    const buffer = createBuffer(buffers.lines);
 
-    // Create interleaved attributes pointing to different offsets in buffer
-    const geometryAttributes = {
+    // Construct interleaved attributes pointing to different offsets in buffer
+    function setupPoint(shift) {
+      const offset = shift * stride;
+      return initAttribute({ buffer, numComponents, stride, offset });
+    }
+
+    return {
       quadPos,
       pointA: setupPoint(0),
       pointB: setupPoint(1),
       pointC: setupPoint(2),
       pointD: setupPoint(3),
     };
-
-    function setupPoint(shift) {
-      const offset = shift * stride;
-      return initAttribute({ buffer, numComponents, stride, offset });
-    }
-
-    const attributes = initAttributes(attrInfo, buffers, geometryAttributes);
-    const vao = constructVao({ attributes });
-
-    return { vao, instanceCount: lines.length / numComponents - 3 };
-  };
-}
-
-function initLine(context) {
-  const program = context.initPaintProgram(vert$2, frag$2);
-  const { constructVao, initTilesetPainter } = program;
-
-  const load = initLineLoader(context, constructVao);
-
-  function initPainter(id, paint) {
-    const zoomFuncs = [
-      // [layout["line-cap"],      "lineCap"],
-      // [layout["line-join"],     "lineJoin"],
-      // NOTE: line-miter-limit is a layout property in the style spec
-      // We copied the function to a paint property in ../main.js
-      [paint["line-miter-limit"], "miterLimit"],
-
-      [paint["line-width"],     "lineWidth"],
-      [paint["line-color"],     "color"],
-      [paint["line-opacity"],   "opacity"],
-      // line-gap-width,
-      // line-translate, line-translate-anchor,
-      // line-offset, line-blur, line-gradient, line-pattern
-    ];
-
-    return initTilesetPainter(id, zoomFuncs);
   }
 
-  return { load, initPainter };
+  const styleMap = [
+    // [layout["line-cap"],      "lineCap"],
+    // [layout["line-join"],     "lineJoin"],
+    // NOTE: line-miter-limit is a layout property in the style spec
+    // We copied the function to a paint property in ../main.js
+    ["line-miter-limit", "miterLimit"],
+
+    ["line-width",     "lineWidth"],
+    ["line-color",     "color"],
+    ["line-opacity",   "opacity"],
+    // line-gap-width,
+    // line-translate, line-translate-anchor,
+    // line-offset, line-blur, line-gradient, line-pattern
+  ];
+
+  return {
+    vert: vert$2, frag: frag$2, attrInfo, styleMap, getSpecialAttrs,
+    countInstances: (buffers) => buffers.lines.length / numComponents - 3,
+  };
 }
 
 var vert$1 = `attribute vec2 position;
@@ -423,10 +407,6 @@ void main() {
 `;
 
 function initFill(context) {
-  const { initPaintProgram, initAttributes, initIndices } = context;
-
-  const { constructVao, initTilesetPainter } = initPaintProgram(vert$1, frag$1);
-
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
     tileCoords: { numComponents: 3, divisor: 0 },
@@ -434,24 +414,16 @@ function initFill(context) {
     opacity: { numComponents: 1, divisor: 0 },
   };
 
-  function load(buffers) {
-    const attributes = initAttributes(attrInfo, buffers);
-    const indices = initIndices({ data: buffers.indices });
-    const vao = constructVao({ attributes, indices });
-    return { vao, indices, count: buffers.indices.length };
-  }
+  const styleMap = [
+    ["fill-color", "color"],
+    ["fill-opacity", "opacity"],
+    ["fill-translate", "translation"],
+  ];
 
-  function initPainter(id, paint) {
-    const zoomFuncs = [
-      [paint["fill-color"],     "color"],
-      [paint["fill-opacity"],   "opacity"],
-      [paint["fill-translate"], "translation"],
-    ];
-
-    return initTilesetPainter(id, zoomFuncs);
-  }
-
-  return { load, initPainter };
+  return {
+    vert: vert$1, frag: frag$1, attrInfo, styleMap,
+    getSpecialAttrs: () => ({}),
+  };
 }
 
 var vert = `attribute vec2 quadPos;  // Vertices of the quad instance
@@ -497,12 +469,6 @@ void main() {
 `;
 
 function initText(context) {
-  const { initPaintProgram, initQuad, initAttributes } = context;
-
-  const { constructVao, initTilesetPainter } = initPaintProgram(vert, frag);
-
-  const quadPos = initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
-
   const attrInfo = {
     labelPos: { numComponents: 3 },
     charPos: { numComponents: 4 },
@@ -511,59 +477,85 @@ function initText(context) {
     color: { numComponents: 4 },
     opacity: { numComponents: 1 },
   };
+  const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
-  function load(buffers) {
-    const attributes = initAttributes(attrInfo, buffers, { quadPos });
-    const vao = constructVao({ attributes });
-    return { vao, instanceCount: buffers.labelPos.length / 3 };
-  }
+  const styleMap = [
+    ["text-color", "color"],
+    ["text-opacity", "opacity"],
 
-  function initPainter(id, paint) {
-    const zoomFuncs = [
-      [paint["text-color"],   "color"],
-      [paint["text-opacity"], "opacity"],
+    // text-halo-color
+    // TODO: sprites
+  ];
 
-      // text-halo-color
-      // TODO: sprites
-    ];
-
-    return initTilesetPainter(id, zoomFuncs);
-  }
-
-  return { load, initPainter };
+  return {
+    vert, frag, attrInfo, styleMap,
+    getSpecialAttrs: () => ({ quadPos }),
+    countInstances: (buffers) => buffers.labelPos.length / 3,
+  };
 }
 
-function initPrograms(context, framebuffer, projScale) {
-  const { initAttribute, initProgram } = context;
-
-  const scaleCode = (projScale) ? mercatorScale : simpleScale;
-
-  context.initAttributes = function(attrInfo, buffers, preInitialized = {}) {
-    return Object.entries(attrInfo).reduce((d, [key, info]) => {
-      const data = buffers[key];
-      if (data) d[key] = initAttribute(Object.assign({ data }, info));
-      return d;
-    }, preInitialized);
-  };
-
-  context.initPaintProgram = function(vert, frag) {
-    const program = initProgram(preamble + scaleCode + vert, frag);
-    const initTilesetPainter = initGrid(context, framebuffer.size, program);
-    const { constructVao, uniformSetters } = program;
-    return { constructVao, uniformSetters, initTilesetPainter };
-  };
+function initPrograms(context, framebuffer, preamble) {
+  const { initProgram, initAttribute, initIndices } = context;
 
   return {
     "background": initBackground(context),
-    "circle": initCircle(context),
-    "line": initLine(context),
-    "fill": initFill(context),
-    "symbol": initText(context),
+    "circle": initPaintProgram(initCircle(context)),
+    "line": initPaintProgram(initLine(context)),
+    "fill": initPaintProgram(initFill()),
+    "symbol": initPaintProgram(initText(context)),
   };
+
+  function initPaintProgram(progInfo) {
+    const { vert, frag, styleMap } = progInfo;
+
+    const program = initProgram(preamble + vert, frag);
+
+    const load = initLoader(progInfo, program.constructVao);
+
+    const initTilesetPainter = initGrid(context, framebuffer.size, program);
+    function initPainter(id, paint) {
+      const zoomFuncs = styleMap
+        .map(([styleKey, shaderVar]) => ([paint[styleKey], shaderVar]));
+      return initTilesetPainter(id, zoomFuncs);
+    }
+
+    return { load, initPainter };
+  }
+
+  function initLoader(progInfo, constructVao) {
+    const { attrInfo, getSpecialAttrs, countInstances } = progInfo;
+
+    function getAttributes(buffers) {
+      return Object.entries(attrInfo).reduce((d, [key, info]) => {
+        const data = buffers[key];
+        if (data) d[key] = initAttribute(Object.assign({ data }, info));
+        return d;
+      }, getSpecialAttrs(buffers));
+    }
+
+    function loadInstanced(buffers) {
+      const attributes = getAttributes(buffers);
+      const vao = constructVao({ attributes });
+      return { vao, instanceCount: countInstances(buffers) };
+    }
+
+    function loadIndexed(buffers) {
+      const attributes = getAttributes(buffers);
+      const indices = initIndices({ data: buffers.indices });
+      const vao = constructVao({ attributes, indices });
+      return { vao, indices, count: buffers.indices.length };
+    }
+
+    return (!!countInstances)
+      ? loadInstanced
+      : loadIndexed;
+  }
 }
 
-function initGLpaint({ context, framebuffer, projScale }) {
-  const programs = initPrograms(context, framebuffer, projScale);
+function initGLpaint(userParams) {
+  const { context, framebuffer, preamble } = setParams(userParams);
+
+  const programs = initPrograms(context, framebuffer, preamble);
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);
