@@ -1,18 +1,24 @@
-export function initSetters(pairs, uniformSetters) {
-  return pairs
+export function initTilePainter(context, style, styleMap, setters) {
+  const { id, paint } = style;
+  const setAtlas = setters.sdf;
+
+  const zoomFuncs = styleMap
+    .map(([styleKey, shaderVar]) => ([paint[styleKey], shaderVar]))
     .filter(([get]) => get.type !== "property")
     .map(([get, key]) => {
-      const set = uniformSetters[key];
+      const set = setters[key];
       return (z, f) => set(get(z, f));
     });
-}
 
-export function initVectorTilePainter(context, layerId, setAtlas) {
-  return function(tileBox, translate, scale, framebufferHeight) {
+  function setStyles(zoom) {
+    zoomFuncs.forEach(f => f(zoom));
+  }
+
+  function paintTile(tileBox, translate, scale, framebufferHeight) {
     const { x, y, tile } = tileBox;
     const { layers, atlas } = tile.data;
 
-    const data = layers[layerId];
+    const data = layers[id];
     if (!data) return;
 
     const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
@@ -22,5 +28,7 @@ export function initVectorTilePainter(context, layerId, setAtlas) {
     if (setAtlas && atlas) setAtlas(atlas);
 
     context.draw(data.buffers);
-  };
+  }
+
+  return { setStyles, paintTile };
 }

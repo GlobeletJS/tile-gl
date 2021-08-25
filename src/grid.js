@@ -1,7 +1,4 @@
-import { initSetters, initVectorTilePainter } from "./util.js";
-
-export function initGrid(context, framebufferSize, program) {
-  const { use, uniformSetters } = program;
+export function initGrid(framebufferSize, use, uniformSetters) {
   const { screenScale, mapCoords, mapShift } = uniformSetters;
 
   function setGrid(tileset, pixRatio = 1) {
@@ -31,10 +28,7 @@ export function initGrid(context, framebufferSize, program) {
     return { translate, scale: pixScale, subsets };
   }
 
-  function initTilesetPainter(id, styleMap) {
-    const zoomFuncs = initSetters(styleMap, uniformSetters);
-    const paintTile = initVectorTilePainter(context, id, uniformSetters.sdf);
-
+  function initTilesetPainter(painter) {
     return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
       if (!tileset || !tileset.length) return;
 
@@ -43,11 +37,11 @@ export function initGrid(context, framebufferSize, program) {
       screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
       const { translate, scale, subsets } = setGrid(tileset, pixRatio);
 
-      zoomFuncs.forEach(f => f(zoom));
+      painter.setStyles(zoom);
 
       subsets.forEach(({ setter, tiles }) => {
         setter();
-        tiles.forEach(box => paintTile(box, translate, scale, height));
+        tiles.forEach(box => painter.paintTile(box, translate, scale, height));
       });
     };
   }

@@ -61,21 +61,27 @@ function setParams(userParams) {
   };
 }
 
-function initSetters(pairs, uniformSetters) {
-  return pairs
+function initTilePainter(context, style, styleMap, setters) {
+  const { id, paint } = style;
+  const setAtlas = setters.sdf;
+
+  const zoomFuncs = styleMap
+    .map(([styleKey, shaderVar]) => ([paint[styleKey], shaderVar]))
     .filter(([get]) => get.type !== "property")
     .map(([get, key]) => {
-      const set = uniformSetters[key];
+      const set = setters[key];
       return (z, f) => set(get(z, f));
     });
-}
 
-function initVectorTilePainter(context, layerId, setAtlas) {
-  return function(tileBox, translate, scale, framebufferHeight) {
+  function setStyles(zoom) {
+    zoomFuncs.forEach(f => f(zoom));
+  }
+
+  function paintTile(tileBox, translate, scale, framebufferHeight) {
     const { x, y, tile } = tileBox;
     const { layers, atlas } = tile.data;
 
-    const data = layers[layerId];
+    const data = layers[id];
     if (!data) return;
 
     const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
@@ -85,11 +91,12 @@ function initVectorTilePainter(context, layerId, setAtlas) {
     if (setAtlas && atlas) setAtlas(atlas);
 
     context.draw(data.buffers);
-  };
+  }
+
+  return { setStyles, paintTile };
 }
 
-function initGrid(context, framebufferSize, program) {
-  const { use, uniformSetters } = program;
+function initGrid(framebufferSize, use, uniformSetters) {
   const { screenScale, mapCoords, mapShift } = uniformSetters;
 
   function setGrid(tileset, pixRatio = 1) {
@@ -119,10 +126,7 @@ function initGrid(context, framebufferSize, program) {
     return { translate, scale: pixScale, subsets };
   }
 
-  function initTilesetPainter(id, styleMap) {
-    const zoomFuncs = initSetters(styleMap, uniformSetters);
-    const paintTile = initVectorTilePainter(context, id, uniformSetters.sdf);
-
+  function initTilesetPainter(painter) {
     return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
       if (!tileset || !tileset.length) return;
 
@@ -131,11 +135,11 @@ function initGrid(context, framebufferSize, program) {
       screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
       const { translate, scale, subsets } = setGrid(tileset, pixRatio);
 
-      zoomFuncs.forEach(f => f(zoom));
+      painter.setStyles(zoom);
 
       subsets.forEach(({ setter, tiles }) => {
         setter();
-        tiles.forEach(box => paintTile(box, translate, scale, height));
+        tiles.forEach(box => painter.paintTile(box, translate, scale, height));
       });
     };
   }
@@ -144,7 +148,7 @@ function initGrid(context, framebufferSize, program) {
 }
 
 function initBackground(context) {
-  function initPainter(id, paint) {
+  function initPainter({ paint }) {
     return function({ zoom }) {
       const opacity = paint["background-opacity"](zoom);
       const color = paint["background-color"](zoom);
@@ -406,7 +410,7 @@ void main() {
 }
 `;
 
-function initFill(context) {
+function initFill() {
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
     tileCoords: { numComponents: 3, divisor: 0 },
@@ -508,15 +512,16 @@ function initPrograms(context, framebuffer, preamble) {
   function initPaintProgram(progInfo) {
     const { vert, frag, styleMap } = progInfo;
 
-    const program = initProgram(preamble + vert, frag);
+    const vertex = preamble + vert;
+    const { use, uniformSetters, constructVao } = initProgram(vertex, frag);
 
-    const load = initLoader(progInfo, program.constructVao);
+    const load = initLoader(progInfo, constructVao);
 
-    const initTilesetPainter = initGrid(context, framebuffer.size, program);
-    function initPainter(id, paint) {
-      const zoomFuncs = styleMap
-        .map(([styleKey, shaderVar]) => ([paint[styleKey], shaderVar]));
-      return initTilesetPainter(id, zoomFuncs);
+    const initTilesetPainter = initGrid(framebuffer.size, use, uniformSetters);
+
+    function initPainter(style) {
+      const painter = initTilePainter(context, style, styleMap, uniformSetters);
+      return initTilesetPainter(painter);
     }
 
     return { load, initPainter };
@@ -546,9 +551,7 @@ function initPrograms(context, framebuffer, preamble) {
       return { vao, indices, count: buffers.indices.length };
     }
 
-    return (!!countInstances)
-      ? loadInstanced
-      : loadIndexed;
+    return (countInstances) ? loadInstanced : loadIndexed;
   }
 }
 
@@ -594,7 +597,7 @@ function initGLpaint(userParams) {
       // We handle line-miter-limit in the paint phase, not layout phase
       paint["line-miter-limit"] = layout["line-miter-limit"];
     }
-    const painter = program.initPainter(id, paint);
+    const painter = program.initPainter(style);
     return Object.assign(painter, { id, type, source, minzoom, maxzoom });
   }
 

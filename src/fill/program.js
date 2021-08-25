@@ -1,7 +1,7 @@
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
 
-export function initFill(context) {
+export function initFill() {
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
     tileCoords: { numComponents: 3, divisor: 0 },

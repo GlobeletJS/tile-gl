@@ -1,3 +1,4 @@
+import { initTilePainter } from "./painter.js";
 import { initGrid } from "./grid.js";
 import { initBackground } from "./background/program.js";
 import { initCircle } from "./circle/program.js";
@@ -19,15 +20,16 @@ export function initPrograms(context, framebuffer, preamble) {
   function initPaintProgram(progInfo) {
     const { vert, frag, styleMap } = progInfo;
 
-    const program = initProgram(preamble + vert, frag);
+    const vertex = preamble + vert;
+    const { use, uniformSetters, constructVao } = initProgram(vertex, frag);
 
-    const load = initLoader(progInfo, program.constructVao);
+    const load = initLoader(progInfo, constructVao);
 
-    const initTilesetPainter = initGrid(context, framebuffer.size, program);
-    function initPainter(id, paint) {
-      const zoomFuncs = styleMap
-        .map(([styleKey, shaderVar]) => ([paint[styleKey], shaderVar]));
-      return initTilesetPainter(id, zoomFuncs);
+    const initTilesetPainter = initGrid(framebuffer.size, use, uniformSetters);
+
+    function initPainter(style) {
+      const painter = initTilePainter(context, style, styleMap, uniformSetters);
+      return initTilesetPainter(painter);
     }
 
     return { load, initPainter };
@@ -57,8 +59,6 @@ export function initPrograms(context, framebuffer, preamble) {
       return { vao, indices, count: buffers.indices.length };
     }
 
-    return (!!countInstances)
-      ? loadInstanced
-      : loadIndexed;
+    return (countInstances) ? loadInstanced : loadIndexed;
   }
 }
