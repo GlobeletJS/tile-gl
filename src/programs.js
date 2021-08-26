@@ -18,7 +18,7 @@ export function initPrograms(context, framebuffer, preamble) {
   };
 
   function initPaintProgram(progInfo) {
-    const { vert, frag, styleMap } = progInfo;
+    const { vert, frag, styleKeys } = progInfo;
 
     const vertex = preamble + vert;
     const { use, uniformSetters, constructVao } = initProgram(vertex, frag);
@@ -28,8 +28,8 @@ export function initPrograms(context, framebuffer, preamble) {
     const initTilesetPainter = initGrid(framebuffer.size, use, uniformSetters);
 
     function initPainter(style) {
-      const painter = initTilePainter(context, style, styleMap, uniformSetters);
-      return initTilesetPainter(painter);
+      const brush = initTilePainter(context, style, styleKeys, uniformSetters);
+      return initTilesetPainter(brush);
     }
 
     return { load, initPainter };

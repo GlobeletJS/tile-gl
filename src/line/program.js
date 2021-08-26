@@ -6,8 +6,8 @@ export function initLine(context) {
 
   const attrInfo = {
     tileCoords: { numComponents: 3 },
-    color: { numComponents: 4 },
-    opacity: { numComponents: 1 },
+    lineColor: { numComponents: 4 },
+    lineOpacity: { numComponents: 1 },
   };
   const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
   const numComponents = 3;
@@ -32,23 +32,22 @@ export function initLine(context) {
     };
   }
 
-  const styleMap = [
-    // [layout["line-cap"],      "lineCap"],
-    // [layout["line-join"],     "lineJoin"],
+  const styleKeys = [
     // NOTE: line-miter-limit is a layout property in the style spec
     // We copied the function to a paint property in ../main.js
-    ["line-miter-limit", "miterLimit"],
+    "line-miter-limit",
+    // Other layout properties not implemented yet:
+    // "line-cap", "line-join",
 
-    ["line-width",     "lineWidth"],
-    ["line-color",     "color"],
-    ["line-opacity",   "opacity"],
-    // line-gap-width,
-    // line-translate, line-translate-anchor,
-    // line-offset, line-blur, line-gradient, line-pattern
+    // Paint properties:
+    "line-color", "line-opacity",
+    "line-width", // "line-gap-width",
+    // "line-translate", "line-translate-anchor",
+    // "line-offset", "line-blur", "line-gradient", "line-pattern"
   ];
 
   return {
-    vert, frag, attrInfo, styleMap, getSpecialAttrs,
+    vert, frag, attrInfo, styleKeys, getSpecialAttrs,
     countInstances: (buffers) => buffers.lines.length / numComponents - 3,
   };
 }

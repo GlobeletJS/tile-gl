@@ -1,9 +1,9 @@
 attribute vec2 quadPos;
 attribute vec3 pointA, pointB, pointC, pointD;
-attribute vec4 color;
-attribute float opacity;
+attribute vec4 lineColor;
+attribute float lineOpacity;
 
-uniform float lineWidth, miterLimit;
+uniform float lineWidth, lineMiterLimit;
 
 varying float yCoord;
 varying vec2 miterCoord1, miterCoord2;
@@ -29,9 +29,9 @@ mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   float sin2 = 1.0 - x_m0 * x_m0; // Could be zero!
   float miterLength = (sin2 > 0.0001)
     ? inversesqrt(sin2)
-    : miterLimit + 1.0;
+    : lineMiterLimit + 1.0;
   float bevelLength = abs(dot(yHat, m0));
-  float tx = (miterLength > miterLimit)
+  float tx = (miterLength > lineMiterLimit)
     ? 0.5 * pixWidth * bevelLength
     : 0.5 * pixWidth * miterLength;
 
@@ -57,7 +57,7 @@ void main() {
   mat3 m2 = miterTransform(-xBasis, yBasis, mapD - mapC, pixWidth);
 
   // Find the position of the current instance vertex, in 3 coordinate systems
-  vec2 extend = miterLimit * xBasis * pixWidth * (quadPos.x - 0.5);
+  vec2 extend = lineMiterLimit * xBasis * pixWidth * (quadPos.x - 0.5);
   // Add one pixel on either side of the line for the anti-alias taper
   float y = (pixWidth + 2.0) * quadPos.y;
   vec2 point = mapB + xAxis * quadPos.x + yBasis * y + extend;
@@ -70,7 +70,7 @@ void main() {
   // TODO: should this premultiplication be done in tile-stencil?
   //vec4 premult = vec4(color.rgb * color.a, color.a);
   //strokeStyle = premult * opacity;
-  strokeStyle = color * opacity;
+  strokeStyle = lineColor * lineOpacity;
 
   gl_Position = mapToClip(point, pointB.z + pointC.z);
 }

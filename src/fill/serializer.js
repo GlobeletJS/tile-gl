@@ -1,12 +1,12 @@
+import { camelCase } from "../camelCase.js";
 import earcut from "earcut";
 
 export function initFillParsing(style) {
   const { paint } = style;
 
-  const dataFuncs = [
-    [paint["fill-color"], "color"],
-    [paint["fill-opacity"], "opacity"],
-  ].filter(([get]) => get.type === "property");
+  const styleKeys = ["fill-color", "fill-opacity"];
+  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
+    .map(k => ([paint[k], camelCase(k)]));
 
   return function(feature, { z, x, y }) {
     const triangles = triangulate(feature.geometry);

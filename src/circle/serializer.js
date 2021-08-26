@@ -1,11 +1,11 @@
+import { camelCase } from "../camelCase.js";
+
 export function initCircleParsing(style) {
   const { paint } = style;
 
-  const dataFuncs = [
-    [paint["circle-radius"],  "radius"],
-    [paint["circle-color"],   "color"],
-    [paint["circle-opacity"], "opacity"],
-  ].filter(([get]) => get.type === "property");
+  const styleKeys = ["circle-radius", "circle-color", "circle-opacity"];
+  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
+    .map(k => ([paint[k], camelCase(k)]));
 
   return function(feature, { z, x, y }) {
     const circlePos = flattenPoints(feature.geometry);

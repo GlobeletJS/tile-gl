@@ -1,12 +1,15 @@
-export function initTilePainter(context, style, styleMap, setters) {
+import { camelCase } from "./camelCase.js";
+
+export function initTilePainter(context, style, styleKeys, setters) {
   const { id, paint } = style;
   const setAtlas = setters.sdf;
 
-  const zoomFuncs = styleMap
-    .map(([styleKey, shaderVar]) => ([paint[styleKey], shaderVar]))
-    .filter(([get]) => get.type !== "property")
-    .map(([get, key]) => {
-      const set = setters[key];
+  const zoomFuncs = styleKeys
+    .filter(styleKey => paint[styleKey].type !== "property")
+    .map(styleKey => {
+      const get = paint[styleKey];
+      const shaderVar = camelCase(styleKey);
+      const set = setters[shaderVar];
       return (z, f) => set(get(z, f));
     });
 

@@ -1,11 +1,12 @@
+import { camelCase } from "../camelCase.js";
+
 export function initLineParsing(style) {
   const { paint } = style;
 
   // TODO: check for property-dependence of lineWidth, lineGapWidth
-  const dataFuncs = [
-    [paint["line-color"], "color"],
-    [paint["line-opacity"], "opacity"],
-  ].filter(([get]) => get.type === "property");
+  const styleKeys = ["line-color", "line-opacity"];
+  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
+    .map(k => ([paint[k], camelCase(k)]));
 
   return function(feature, { z, x, y }) {
     const lines = flattenLines(feature.geometry);

@@ -1,11 +1,13 @@
+function camelCase$1(hyphenated) {
+  return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
+}
+
 function initCircleParsing(style) {
   const { paint } = style;
 
-  const dataFuncs = [
-    [paint["circle-radius"],  "radius"],
-    [paint["circle-color"],   "color"],
-    [paint["circle-opacity"], "opacity"],
-  ].filter(([get]) => get.type === "property");
+  const styleKeys = ["circle-radius", "circle-color", "circle-opacity"];
+  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
+    .map(k => ([paint[k], camelCase$1(k)]));
 
   return function(feature, { z, x, y }) {
     const circlePos = flattenPoints(feature.geometry);
@@ -44,10 +46,9 @@ function initLineParsing(style) {
   const { paint } = style;
 
   // TODO: check for property-dependence of lineWidth, lineGapWidth
-  const dataFuncs = [
-    [paint["line-color"], "color"],
-    [paint["line-opacity"], "opacity"],
-  ].filter(([get]) => get.type === "property");
+  const styleKeys = ["line-color", "line-opacity"];
+  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
+    .map(k => ([paint[k], camelCase$1(k)]));
 
   return function(feature, { z, x, y }) {
     const lines = flattenLines(feature.geometry);
@@ -798,10 +799,9 @@ var earcut$1 = earcut$2.exports;
 function initFillParsing(style) {
   const { paint } = style;
 
-  const dataFuncs = [
-    [paint["fill-color"], "color"],
-    [paint["fill-opacity"], "opacity"],
-  ].filter(([get]) => get.type === "property");
+  const styleKeys = ["fill-color", "fill-opacity"];
+  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
+    .map(k => ([paint[k], camelCase$1(k)]));
 
   return function(feature, { z, x, y }) {
     const triangles = triangulate(feature.geometry);
@@ -1158,10 +1158,9 @@ function initShaping(style) {
 
   const shaper = initShaper(layout);
 
-  const dataFuncs = [
-    [paint["text-color"],   "color"],
-    [paint["text-opacity"], "opacity"],
-  ].filter(([get]) => get.type === "property");
+  const styleKeys = ["text-color", "text-opacity"];
+  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
+    .map(k => ([paint[k], camelCase(k)]));
 
   return function(feature, tileCoords, atlas, tree) {
     // tree is an RBush from the 'rbush' module. NOTE: will be updated!
@@ -1192,6 +1191,10 @@ function initShaping(style) {
     // TODO: drop if outside tile?
     return buffers;
   };
+}
+
+function camelCase(hyphenated) {
+  return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
 function initSerializer(style) {

@@ -61,15 +61,20 @@ function setParams(userParams) {
   };
 }
 
-function initTilePainter(context, style, styleMap, setters) {
+function camelCase(hyphenated) {
+  return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
+}
+
+function initTilePainter(context, style, styleKeys, setters) {
   const { id, paint } = style;
   const setAtlas = setters.sdf;
 
-  const zoomFuncs = styleMap
-    .map(([styleKey, shaderVar]) => ([paint[styleKey], shaderVar]))
-    .filter(([get]) => get.type !== "property")
-    .map(([get, key]) => {
-      const set = setters[key];
+  const zoomFuncs = styleKeys
+    .filter(styleKey => paint[styleKey].type !== "property")
+    .map(styleKey => {
+      const get = paint[styleKey];
+      const shaderVar = camelCase(styleKey);
+      const set = setters[shaderVar];
       return (z, f) => set(get(z, f));
     });
 
@@ -161,24 +166,24 @@ function initBackground(context) {
 
 var vert$3 = `attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
-attribute float radius;
-attribute vec4 color;
-attribute float opacity;
+attribute float circleRadius;
+attribute vec4 circleColor;
+attribute float circleOpacity;
 
 varying vec2 delta;
 varying vec4 strokeStyle;
-varying float circleRadius;
+varying float radius;
 
 void main() {
   vec2 mapPos = tileToMap(circlePos);
 
   // Shift to the appropriate corner of the current instance quad
-  delta = 2.0 * quadPos * (radius + 1.0);
+  delta = quadPos * (circleRadius + 1.0);
   vec2 dPos = delta * styleScale(circlePos);
 
-  strokeStyle = color * opacity;
+  strokeStyle = circleColor * circleOpacity;
   // TODO: normalize delta? Then can drop one varying
-  circleRadius = radius;
+  radius = circleRadius;
 
   gl_Position = mapToClip(mapPos + dPos, 0.0);
 }
@@ -188,13 +193,13 @@ var frag$3 = `precision mediump float;
 
 varying vec2 delta;
 varying vec4 strokeStyle;
-varying float circleRadius;
+varying float radius;
 
 void main() {
   float r = length(delta);
   float dr = fwidth(r);
 
-  float taper = 1.0 - smoothstep(circleRadius - dr, circleRadius + dr, r);
+  float taper = 1.0 - smoothstep(radius - dr, radius + dr, r);
   gl_FragColor = strokeStyle * taper;
 }
 `;
@@ -203,20 +208,16 @@ function initCircle(context) {
   const attrInfo = {
     circlePos: { numComponents: 2 },
     tileCoords: { numComponents: 3 },
-    radius: { numComponents: 1 },
-    color: { numComponents: 4 },
-    opacity: { numComponents: 1 },
+    circleRadius: { numComponents: 1 },
+    circleColor: { numComponents: 4 },
+    circleOpacity: { numComponents: 1 },
   };
-  const quadPos = context.initQuad({ x0: -0.5, y0: -0.5, x1: 0.5, y1: 0.5 });
+  const quadPos = context.initQuad({ x0: -1.0, y0: -1.0, x1: 1.0, y1: 1.0 });
 
-  const styleMap = [
-    ["circle-radius", "radius"],
-    ["circle-color", "color"],
-    ["circle-opacity", "opacity"],
-  ];
+  const styleKeys = ["circle-radius", "circle-color", "circle-opacity"];
 
   return {
-    vert: vert$3, frag: frag$3, attrInfo, styleMap,
+    vert: vert$3, frag: frag$3, attrInfo, styleKeys,
     getSpecialAttrs: () => ({ quadPos }),
     countInstances: (buffers) => buffers.circlePos.length / 2,
   };
@@ -224,10 +225,10 @@ function initCircle(context) {
 
 var vert$2 = `attribute vec2 quadPos;
 attribute vec3 pointA, pointB, pointC, pointD;
-attribute vec4 color;
-attribute float opacity;
+attribute vec4 lineColor;
+attribute float lineOpacity;
 
-uniform float lineWidth, miterLimit;
+uniform float lineWidth, lineMiterLimit;
 
 varying float yCoord;
 varying vec2 miterCoord1, miterCoord2;
@@ -253,9 +254,9 @@ mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   float sin2 = 1.0 - x_m0 * x_m0; // Could be zero!
   float miterLength = (sin2 > 0.0001)
     ? inversesqrt(sin2)
-    : miterLimit + 1.0;
+    : lineMiterLimit + 1.0;
   float bevelLength = abs(dot(yHat, m0));
-  float tx = (miterLength > miterLimit)
+  float tx = (miterLength > lineMiterLimit)
     ? 0.5 * pixWidth * bevelLength
     : 0.5 * pixWidth * miterLength;
 
@@ -281,7 +282,7 @@ void main() {
   mat3 m2 = miterTransform(-xBasis, yBasis, mapD - mapC, pixWidth);
 
   // Find the position of the current instance vertex, in 3 coordinate systems
-  vec2 extend = miterLimit * xBasis * pixWidth * (quadPos.x - 0.5);
+  vec2 extend = lineMiterLimit * xBasis * pixWidth * (quadPos.x - 0.5);
   // Add one pixel on either side of the line for the anti-alias taper
   float y = (pixWidth + 2.0) * quadPos.y;
   vec2 point = mapB + xAxis * quadPos.x + yBasis * y + extend;
@@ -294,7 +295,7 @@ void main() {
   // TODO: should this premultiplication be done in tile-stencil?
   //vec4 premult = vec4(color.rgb * color.a, color.a);
   //strokeStyle = premult * opacity;
-  strokeStyle = color * opacity;
+  strokeStyle = lineColor * lineOpacity;
 
   gl_Position = mapToClip(point, pointB.z + pointC.z);
 }
@@ -337,8 +338,8 @@ function initLine(context) {
 
   const attrInfo = {
     tileCoords: { numComponents: 3 },
-    color: { numComponents: 4 },
-    opacity: { numComponents: 1 },
+    lineColor: { numComponents: 4 },
+    lineOpacity: { numComponents: 1 },
   };
   const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
   const numComponents = 3;
@@ -363,39 +364,38 @@ function initLine(context) {
     };
   }
 
-  const styleMap = [
-    // [layout["line-cap"],      "lineCap"],
-    // [layout["line-join"],     "lineJoin"],
+  const styleKeys = [
     // NOTE: line-miter-limit is a layout property in the style spec
     // We copied the function to a paint property in ../main.js
-    ["line-miter-limit", "miterLimit"],
+    "line-miter-limit",
+    // Other layout properties not implemented yet:
+    // "line-cap", "line-join",
 
-    ["line-width",     "lineWidth"],
-    ["line-color",     "color"],
-    ["line-opacity",   "opacity"],
-    // line-gap-width,
-    // line-translate, line-translate-anchor,
-    // line-offset, line-blur, line-gradient, line-pattern
+    // Paint properties:
+    "line-color", "line-opacity",
+    "line-width", // "line-gap-width",
+    // "line-translate", "line-translate-anchor",
+    // "line-offset", "line-blur", "line-gradient", "line-pattern"
   ];
 
   return {
-    vert: vert$2, frag: frag$2, attrInfo, styleMap, getSpecialAttrs,
+    vert: vert$2, frag: frag$2, attrInfo, styleKeys, getSpecialAttrs,
     countInstances: (buffers) => buffers.lines.length / numComponents - 3,
   };
 }
 
 var vert$1 = `attribute vec2 position;
-attribute vec4 color;
-attribute float opacity;
+attribute vec4 fillColor;
+attribute float fillOpacity;
 
-uniform vec2 translation;   // From style property paint["fill-translate"]
+uniform vec2 fillTranslate;
 
 varying vec4 fillStyle;
 
 void main() {
-  vec2 mapPos = tileToMap(position) + translation * screenScale.z;
+  vec2 mapPos = tileToMap(position) + fillTranslate * screenScale.z;
 
-  fillStyle = color * opacity;
+  fillStyle = fillColor * fillOpacity;
 
   gl_Position = mapToClip(mapPos, 0.0);
 }
@@ -414,18 +414,14 @@ function initFill() {
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
     tileCoords: { numComponents: 3, divisor: 0 },
-    color: { numComponents: 4, divisor: 0 },
-    opacity: { numComponents: 1, divisor: 0 },
+    fillColor: { numComponents: 4, divisor: 0 },
+    fillOpacity: { numComponents: 1, divisor: 0 },
   };
 
-  const styleMap = [
-    ["fill-color", "color"],
-    ["fill-opacity", "opacity"],
-    ["fill-translate", "translation"],
-  ];
+  const styleKeys = ["fill-color", "fill-opacity", "fill-translate"];
 
   return {
-    vert: vert$1, frag: frag$1, attrInfo, styleMap,
+    vert: vert$1, frag: frag$1, attrInfo, styleKeys,
     getSpecialAttrs: () => ({}),
   };
 }
@@ -434,8 +430,8 @@ var vert = `attribute vec2 quadPos;  // Vertices of the quad instance
 attribute vec3 labelPos; // x, y, font size scalar
 attribute vec4 charPos;  // dx, dy (relative to labelPos), w, h
 attribute vec4 sdfRect;  // x, y, w, h
-attribute vec4 color;
-attribute float opacity;
+attribute vec4 textColor;
+attribute float textOpacity;
 
 varying float taperWidth;
 varying vec2 texCoord;
@@ -444,7 +440,7 @@ varying vec4 fillStyle;
 void main() {
   taperWidth = labelPos.z * screenScale.z;
   texCoord = sdfRect.xy + sdfRect.zw * quadPos;
-  fillStyle = color * opacity;
+  fillStyle = textColor * textOpacity;
 
   vec2 mapPos = tileToMap(labelPos.xy);
 
@@ -478,21 +474,16 @@ function initText(context) {
     charPos: { numComponents: 4 },
     sdfRect: { numComponents: 4 },
     tileCoords: { numComponents: 3 },
-    color: { numComponents: 4 },
-    opacity: { numComponents: 1 },
+    textColor: { numComponents: 4 },
+    textOpacity: { numComponents: 1 },
   };
   const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
-  const styleMap = [
-    ["text-color", "color"],
-    ["text-opacity", "opacity"],
-
-    // text-halo-color
-    // TODO: sprites
-  ];
+  const styleKeys = ["text-color", "text-opacity"];
+  // TODO: "text-halo-color", sprites
 
   return {
-    vert, frag, attrInfo, styleMap,
+    vert, frag, attrInfo, styleKeys,
     getSpecialAttrs: () => ({ quadPos }),
     countInstances: (buffers) => buffers.labelPos.length / 3,
   };
@@ -510,7 +501,7 @@ function initPrograms(context, framebuffer, preamble) {
   };
 
   function initPaintProgram(progInfo) {
-    const { vert, frag, styleMap } = progInfo;
+    const { vert, frag, styleKeys } = progInfo;
 
     const vertex = preamble + vert;
     const { use, uniformSetters, constructVao } = initProgram(vertex, frag);
@@ -520,8 +511,8 @@ function initPrograms(context, framebuffer, preamble) {
     const initTilesetPainter = initGrid(framebuffer.size, use, uniformSetters);
 
     function initPainter(style) {
-      const painter = initTilePainter(context, style, styleMap, uniformSetters);
-      return initTilesetPainter(painter);
+      const brush = initTilePainter(context, style, styleKeys, uniformSetters);
+      return initTilesetPainter(brush);
     }
 
     return { load, initPainter };

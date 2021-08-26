@@ -5,18 +5,14 @@ export function initFill() {
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
     tileCoords: { numComponents: 3, divisor: 0 },
-    color: { numComponents: 4, divisor: 0 },
-    opacity: { numComponents: 1, divisor: 0 },
+    fillColor: { numComponents: 4, divisor: 0 },
+    fillOpacity: { numComponents: 1, divisor: 0 },
   };
 
-  const styleMap = [
-    ["fill-color", "color"],
-    ["fill-opacity", "opacity"],
-    ["fill-translate", "translation"],
-  ];
+  const styleKeys = ["fill-color", "fill-opacity", "fill-translate"];
 
   return {
-    vert, frag, attrInfo, styleMap,
+    vert, frag, attrInfo, styleKeys,
     getSpecialAttrs: () => ({}),
   };
 }
