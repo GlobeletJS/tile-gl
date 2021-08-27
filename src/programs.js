@@ -1,4 +1,4 @@
-import { initTilePainter } from "./painter.js";
+import { initStyleProg } from "./style-prog.js";
 import { initGrid } from "./grid.js";
 import { initBackground } from "./background/program.js";
 import { initCircle } from "./circle/program.js";
@@ -8,6 +8,7 @@ import { initText } from "./text/program.js";
 
 export function initPrograms(context, framebuffer, preamble) {
   const { initProgram, initAttribute, initIndices } = context;
+  const bufferSize = framebuffer.size;
 
   return {
     "background": initBackground(context),
@@ -20,16 +21,16 @@ export function initPrograms(context, framebuffer, preamble) {
   function initPaintProgram(progInfo) {
     const { vert, frag, styleKeys } = progInfo;
 
-    const vertex = preamble + vert;
-    const { use, uniformSetters, constructVao } = initProgram(vertex, frag);
+    const program = initProgram(preamble + vert, frag);
+    const { uniformSetters, constructVao } = program;
 
     const load = initLoader(progInfo, constructVao);
 
-    const initTilesetPainter = initGrid(framebuffer.size, use, uniformSetters);
+    const initTileGrid = initGrid(context, uniformSetters);
 
     function initPainter(style) {
-      const brush = initTilePainter(context, style, styleKeys, uniformSetters);
-      return initTilesetPainter(brush);
+      const styleProg = initStyleProg(style, styleKeys, program, bufferSize);
+      return initTileGrid(styleProg);
     }
 
     return { load, initPainter };

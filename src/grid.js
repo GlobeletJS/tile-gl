@@ -1,5 +1,5 @@
-export function initGrid(framebufferSize, use, uniformSetters) {
-  const { screenScale, mapCoords, mapShift } = uniformSetters;
+export function initGrid(context, uniformSetters) {
+  const { mapCoords, mapShift } = uniformSetters;
 
   function setGrid(tileset, pixRatio = 1) {
     const { x, y, z } = tileset[0];
@@ -8,9 +8,9 @@ export function initGrid(framebufferSize, use, uniformSetters) {
     const extent = 512; // TODO: don't assume this!!
     mapCoords([xw, y, z, extent]);
 
-    const { translate, scale } = tileset;
-    const pixScale = scale * pixRatio;
-    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * pixScale);
+    const { translate, scale: rawScale } = tileset;
+    const scale = rawScale * pixRatio;
+    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * scale);
 
     // At low zooms, some tiles may be repeated on opposite ends of the map
     // We split them into subsets, with different values of mapShift
@@ -21,27 +21,35 @@ export function initGrid(framebufferSize, use, uniformSetters) {
         const delta = tile.x - x;
         return (delta >= shift && delta < shift + numTiles);
       });
-      const setter = () => mapShift([dx + shift * pixScale, dy, pixScale]);
+      const setter = () => mapShift([dx + shift * scale, dy, scale]);
       return { tiles, setter };
     }).filter(set => set.tiles.length);
 
-    return { translate, scale: pixScale, subsets };
+    return { translate, scale, subsets };
   }
 
-  function initTilesetPainter(painter) {
+  function initTilesetPainter(styleProg) {
+    function drawTile(box, translate, scale) {
+      const { x, y, tile } = box;
+      const data = styleProg.getData(tile);
+      if (!data) return;
+
+      const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
+      context.clipRectFlipY(x0, y0, scale, scale);
+
+      context.draw(data.buffers);
+    }
+
     return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
       if (!tileset || !tileset.length) return;
 
-      use();
-      const { width, height } = framebufferSize;
-      screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
-      const { translate, scale, subsets } = setGrid(tileset, pixRatio);
+      styleProg.setup(zoom, pixRatio, cameraScale);
 
-      painter.setStyles(zoom);
+      const { translate, scale, subsets } = setGrid(tileset, pixRatio);
 
       subsets.forEach(({ setter, tiles }) => {
         setter();
-        tiles.forEach(box => painter.paintTile(box, translate, scale, height));
+        tiles.forEach(t => drawTile(t, translate, scale));
       });
     };
   }

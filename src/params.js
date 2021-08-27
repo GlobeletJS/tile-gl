@@ -6,6 +6,12 @@ export function setParams(userParams) {
   const { context, framebuffer, projScale } = userParams;
 
   const scaleCode = (projScale) ? mercatorScale : simpleScale;
+  const size = framebuffer.size;
+
+  context.clipRectFlipY = function(x, y, w, h) {
+    const yflip = size.height - y - h;
+    context.clipRect(x, yflip, w, h);
+  };
 
   return {
     context,
