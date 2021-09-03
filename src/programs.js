@@ -26,11 +26,9 @@ export function initPrograms(context, framebuffer, preamble) {
 
     const load = initLoader(progInfo, constructVao);
 
-    const initTileGrid = initGrid(context, uniformSetters);
-
     function initPainter(style) {
       const styleProg = initStyleProg(style, styleKeys, program, bufferSize);
-      return initTileGrid(styleProg);
+      return initGrid(context, uniformSetters, styleProg);
     }
 
     return { load, initPainter };

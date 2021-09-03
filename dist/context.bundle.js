@@ -104,7 +104,7 @@ function initStyleProg(style, styleKeys, program, bufferSize) {
   return { setup, getData };
 }
 
-function initGrid(context, uniformSetters) {
+function initGrid(context, uniformSetters, styleProg) {
   const { mapCoords, mapShift } = uniformSetters;
 
   function setGrid(tileset, pixRatio = 1) {
@@ -134,33 +134,29 @@ function initGrid(context, uniformSetters) {
     return { translate, scale, subsets };
   }
 
-  function initTilesetPainter(styleProg) {
-    function drawTile(box, translate, scale) {
-      const { x, y, tile } = box;
-      const data = styleProg.getData(tile);
-      if (!data) return;
+  function drawTile(box, translate, scale) {
+    const { x, y, tile } = box;
+    const data = styleProg.getData(tile);
+    if (!data) return;
 
-      const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
-      context.clipRectFlipY(x0, y0, scale, scale);
+    const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
+    context.clipRectFlipY(x0, y0, scale, scale);
 
-      context.draw(data.buffers);
-    }
-
-    return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
-      if (!tileset || !tileset.length) return;
-
-      styleProg.setup(zoom, pixRatio, cameraScale);
-
-      const { translate, scale, subsets } = setGrid(tileset, pixRatio);
-
-      subsets.forEach(({ setter, tiles }) => {
-        setter();
-        tiles.forEach(t => drawTile(t, translate, scale));
-      });
-    };
+    context.draw(data.buffers);
   }
 
-  return initTilesetPainter;
+  return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
+    if (!tileset || !tileset.length) return;
+
+    styleProg.setup(zoom, pixRatio, cameraScale);
+
+    const { translate, scale, subsets } = setGrid(tileset, pixRatio);
+
+    subsets.forEach(({ setter, tiles }) => {
+      setter();
+      tiles.forEach(t => drawTile(t, translate, scale));
+    });
+  };
 }
 
 function initBackground(context) {
@@ -520,11 +516,9 @@ function initPrograms(context, framebuffer, preamble) {
 
     const load = initLoader(progInfo, constructVao);
 
-    const initTileGrid = initGrid(context, uniformSetters);
-
     function initPainter(style) {
       const styleProg = initStyleProg(style, styleKeys, program, bufferSize);
-      return initTileGrid(styleProg);
+      return initGrid(context, uniformSetters, styleProg);
     }
 
     return { load, initPainter };
