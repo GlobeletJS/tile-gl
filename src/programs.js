@@ -1,6 +1,5 @@
 import { initStyleProg } from "./style-prog.js";
 import { initGrid } from "./grid.js";
-import { initBackground } from "./background/program.js";
 import { initCircle } from "./circle/program.js";
 import { initLine } from "./line/program.js";
 import { initFill } from "./fill/program.js";
@@ -11,7 +10,6 @@ export function initPrograms(context, framebuffer, preamble) {
   const bufferSize = framebuffer.size;
 
   return {
-    "background": initBackground(context),
     "circle": initPaintProgram(initCircle(context)),
     "line": initPaintProgram(initLine(context)),
     "fill": initPaintProgram(initFill(context)),

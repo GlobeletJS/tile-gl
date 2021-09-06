@@ -1,35 +1,31 @@
 import { setParams } from "./params.js";
 import { initPrograms } from "./programs.js";
+import { initBackground } from "./background/program.js";
 
 export function initGLpaint(userParams) {
   const { context, framebuffer, preamble } = setParams(userParams);
 
   const programs = initPrograms(context, framebuffer, preamble);
+  programs["background"] = initBackground(context);
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);
     return context.clear();
   }
 
-  function loadBuffers(buffers) {
-    if (buffers.indices) {
-      return programs.fill.load(buffers);
-    } else if (buffers.lines) {
-      return programs.line.load(buffers);
-    } else if (buffers.circlePos) {
-      return programs.circle.load(buffers);
-    } else if (buffers.labelPos) {
-      return programs.symbol.load(buffers);
-    } else {
-      throw "loadBuffers: unknown buffers structure!";
-    }
+  function loadBuffers(layer) {
+    const { type, buffers } = layer;
+
+    const program = programs[type];
+    if (!program) throw "loadBuffers: unknown layer type";
+
+    layer.buffers = program.load(buffers);
   }
 
   function loadAtlas(atlas) {
     const format = context.gl.ALPHA;
     const { width, height, data } = atlas;
-    const mips = false;
-    return context.initTexture({ format, width, height, data, mips });
+    return context.initTexture({ format, width, height, data, mips: false });
   }
 
   function initPainter(style) {

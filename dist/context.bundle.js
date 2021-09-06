@@ -159,18 +159,6 @@ function initGrid(context, uniformSetters, styleProg) {
   };
 }
 
-function initBackground(context) {
-  function initPainter({ paint }) {
-    return function({ zoom }) {
-      const opacity = paint["background-opacity"](zoom);
-      const color = paint["background-color"](zoom);
-      context.clear(color.map(c => c * opacity));
-    };
-  }
-
-  return { initPainter };
-}
-
 var vert$3 = `attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
 attribute float circleRadius;
@@ -501,7 +489,6 @@ function initPrograms(context, framebuffer, preamble) {
   const bufferSize = framebuffer.size;
 
   return {
-    "background": initBackground(context),
     "circle": initPaintProgram(initCircle(context)),
     "line": initPaintProgram(initLine(context)),
     "fill": initPaintProgram(initFill()),
@@ -552,35 +539,42 @@ function initPrograms(context, framebuffer, preamble) {
   }
 }
 
+function initBackground(context) {
+  function initPainter({ paint }) {
+    return function({ zoom }) {
+      const opacity = paint["background-opacity"](zoom);
+      const color = paint["background-color"](zoom);
+      context.clear(color.map(c => c * opacity));
+    };
+  }
+
+  return { initPainter };
+}
+
 function initGLpaint(userParams) {
   const { context, framebuffer, preamble } = setParams(userParams);
 
   const programs = initPrograms(context, framebuffer, preamble);
+  programs["background"] = initBackground(context);
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);
     return context.clear();
   }
 
-  function loadBuffers(buffers) {
-    if (buffers.indices) {
-      return programs.fill.load(buffers);
-    } else if (buffers.lines) {
-      return programs.line.load(buffers);
-    } else if (buffers.circlePos) {
-      return programs.circle.load(buffers);
-    } else if (buffers.labelPos) {
-      return programs.symbol.load(buffers);
-    } else {
-      throw "loadBuffers: unknown buffers structure!";
-    }
+  function loadBuffers(layer) {
+    const { type, buffers } = layer;
+
+    const program = programs[type];
+    if (!program) throw "loadBuffers: unknown layer type";
+
+    layer.buffers = program.load(buffers);
   }
 
   function loadAtlas(atlas) {
     const format = context.gl.ALPHA;
     const { width, height, data } = atlas;
-    const mips = false;
-    return context.initTexture({ format, width, height, data, mips });
+    return context.initTexture({ format, width, height, data, mips: false });
   }
 
   function initPainter(style) {
