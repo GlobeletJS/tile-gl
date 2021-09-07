@@ -8,7 +8,9 @@
   ],
   "scripts": {
     "lint": "eslint src",
-    "build": "rollup -c build/rollup.config.js",
+    "build": "npm run build-module && npm run build-examples",
+    "build-module": "rollup -c build/rollup.config.js",
+    "build-examples": "cd examples && rollup -c",
     "test": "npm run lint",
     "postversion": "git push && git push --tags"
   },
@@ -34,7 +36,11 @@
     "@rollup/plugin-node-resolve": "^13.0.0",
     "eslint": "^7.30.0",
     "eslint-config-globeletjs": "^0.0.6",
-    "rollup": "^2.52.7"
+    "rollup": "^2.52.7",
+    "tile-mixer": "^0.2.1",
+    "tile-retriever": "^0.0.4",
+    "tile-stencil": "^0.4.4",
+    "yawgl": "^0.3.3"
   },
   "dependencies": {
     "earcut": "^2.2.3",

@@ -5,9 +5,9 @@ import { initText } from "./text/program.js";
 import { initLoader } from "./loader.js";
 import { initGrid } from "./grid.js";
 import { initStyleProg } from "./style-prog.js";
-import { initTilesetPainter } from "./painters.js";
+import { initTilePainter } from "./painters.js";
 
-export function initPrograms(context, framebuffer, preamble) {
+export function initPrograms(context, framebuffer, preamble, multiTile) {
   return {
     "circle": setupProgram(initCircle(context)),
     "line": setupProgram(initLine(context)),
@@ -26,7 +26,7 @@ export function initPrograms(context, framebuffer, preamble) {
 
     function initPainter(style) {
       const styleProg = initStyleProg(style, styleKeys, uniformSetters);
-      return initTilesetPainter(context, grid, styleProg);
+      return initTilePainter(context, grid, styleProg, multiTile);
     }
 
     return { load, initPainter };

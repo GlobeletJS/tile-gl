@@ -2,7 +2,6 @@ export function initGrid(use, uniformSetters, framebuffer) {
   const { screenScale, mapCoords, mapShift } = uniformSetters;
 
   function setScreen(pixRatio = 1.0, cameraScale = 1.0) {
-    use();
     const { width, height } = framebuffer.size;
     screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
   }
@@ -24,5 +23,5 @@ export function initGrid(use, uniformSetters, framebuffer) {
     return { translate, scale };
   }
 
-  return { setScreen, setCoords, setShift };
+  return { use, setScreen, setCoords, setShift };
 }

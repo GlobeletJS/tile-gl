@@ -1,4 +1,40 @@
-export function initTilesetPainter(context, grid, styleProg) {
+export function initTilePainter(context, program, layer, multiTile) {
+  return (multiTile) ? drawTileset : drawTile;
+
+  function drawTile({ tile, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
+    program.use();
+
+    const data = layer.getData(tile);
+    if (!data) return;
+    const z = (zoom !== undefined) ? zoom : tile.z;
+    layer.setStyles(z);
+
+    program.setScreen(pixRatio, cameraScale);
+    program.setCoords(tile);
+
+    const fakeTileset = [{ x: 0, y: 0 }];
+    Object.assign(fakeTileset, { translate: [0, 0], scale: 512 });
+    program.setShift(fakeTileset, pixRatio);
+
+    context.draw(data.buffers);
+  }
+
+  function drawTileset({ tileset, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
+    if (!tileset || !tileset.length) return;
+
+    program.use();
+    program.setScreen(pixRatio, cameraScale);
+    layer.setStyles(zoom);
+
+    const numTiles = program.setCoords(tileset[0]);
+    const subsets = antiMeridianSplit(tileset, numTiles);
+
+    subsets.forEach(subset => {
+      const { translate, scale } = program.setShift(subset, pixRatio);
+      subset.forEach(t => drawTileBox(t, translate, scale));
+    });
+  }
+
   function antiMeridianSplit(tileset, numTiles) {
     const { translate, scale } = tileset;
     const { x } = tileset[0];
@@ -14,9 +50,9 @@ export function initTilesetPainter(context, grid, styleProg) {
     }).filter(subset => subset.length);
   }
 
-  function drawTile(box, translate, scale) {
+  function drawTileBox(box, translate, scale) {
     const { x, y, tile } = box;
-    const data = styleProg.getData(tile);
+    const data = layer.getData(tile);
     if (!data) return;
 
     const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
@@ -24,19 +60,4 @@ export function initTilesetPainter(context, grid, styleProg) {
 
     context.draw(data.buffers);
   }
-
-  return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
-    if (!tileset || !tileset.length) return;
-
-    grid.setScreen(pixRatio, cameraScale);
-    styleProg.setStyles(zoom);
-
-    const numTiles = grid.setCoords(tileset[0]);
-    const subsets = antiMeridianSplit(tileset, numTiles);
-
-    subsets.forEach(subset => {
-      const { translate, scale } = grid.setShift(subset, pixRatio);
-      subset.forEach(t => drawTile(t, translate, scale));
-    });
-  };
 }

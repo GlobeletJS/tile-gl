@@ -3,7 +3,7 @@ import simpleScale from "./scale.glsl";
 import mercatorScale from "./merc-scale.glsl";
 
 export function setParams(userParams) {
-  const { context, framebuffer, projScale } = userParams;
+  const { context, framebuffer, projScale, multiTile = true } = userParams;
 
   const scaleCode = (projScale) ? mercatorScale : simpleScale;
   const size = framebuffer.size;
@@ -14,8 +14,7 @@ export function setParams(userParams) {
   };
 
   return {
-    context,
-    framebuffer,
+    context, framebuffer, multiTile,
     preamble: preamble + scaleCode,
   };
 }
