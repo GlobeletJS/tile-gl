@@ -1,9 +1,8 @@
 import { camelCase } from "./camelCase.js";
 
-export function initStyleProg(style, styleKeys, program, bufferSize) {
+export function initStyleProg(style, styleKeys, uniformSetters) {
   const { id, paint } = style;
-  const { use, uniformSetters } = program;
-  const { sdf, screenScale } = uniformSetters;
+  const { sdf } = uniformSetters;
 
   const zoomFuncs = styleKeys
     .filter(styleKey => paint[styleKey].type !== "property")
@@ -14,10 +13,7 @@ export function initStyleProg(style, styleKeys, program, bufferSize) {
       return (z, f) => set(get(z, f));
     });
 
-  function setup(zoom, pixRatio = 1.0, cameraScale = 1.0) {
-    use();
-    const { width, height } = bufferSize;
-    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
+  function setStyles(zoom) {
     zoomFuncs.forEach(f => f(zoom));
   }
 
@@ -30,5 +26,5 @@ export function initStyleProg(style, styleKeys, program, bufferSize) {
     return data;
   }
 
-  return { setup, getData };
+  return { setStyles, getData };
 }

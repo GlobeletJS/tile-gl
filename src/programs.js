@@ -1,14 +1,13 @@
-import { initStyleProg } from "./style-prog.js";
-import { initGrid } from "./grid.js";
 import { initCircle } from "./circle/program.js";
 import { initLine } from "./line/program.js";
 import { initFill } from "./fill/program.js";
 import { initText } from "./text/program.js";
+import { initLoader } from "./loader.js";
+import { initGrid } from "./grid.js";
+import { initStyleProg } from "./style-prog.js";
+import { initTilesetPainter } from "./painters.js";
 
 export function initPrograms(context, framebuffer, preamble) {
-  const { initProgram, initAttribute, initIndices } = context;
-  const bufferSize = framebuffer.size;
-
   return {
     "circle": setupProgram(initCircle(context)),
     "line": setupProgram(initLine(context)),
@@ -19,43 +18,17 @@ export function initPrograms(context, framebuffer, preamble) {
   function setupProgram(progInfo) {
     const { vert, frag, styleKeys } = progInfo;
 
-    const program = initProgram(preamble + vert, frag);
-    const { uniformSetters, constructVao } = program;
+    const program = context.initProgram(preamble + vert, frag);
+    const { use, uniformSetters, constructVao } = program;
 
-    const load = initLoader(progInfo, constructVao);
+    const load = initLoader(context, progInfo, constructVao);
+    const grid = initGrid(use, uniformSetters, framebuffer);
 
     function initPainter(style) {
-      const styleProg = initStyleProg(style, styleKeys, program, bufferSize);
-      return initGrid(context, uniformSetters, styleProg);
+      const styleProg = initStyleProg(style, styleKeys, uniformSetters);
+      return initTilesetPainter(context, grid, styleProg);
     }
 
     return { load, initPainter };
-  }
-
-  function initLoader(progInfo, constructVao) {
-    const { attrInfo, getSpecialAttrs, countInstances } = progInfo;
-
-    function getAttributes(buffers) {
-      return Object.entries(attrInfo).reduce((d, [key, info]) => {
-        const data = buffers[key];
-        if (data) d[key] = initAttribute(Object.assign({ data }, info));
-        return d;
-      }, getSpecialAttrs(buffers));
-    }
-
-    function loadInstanced(buffers) {
-      const attributes = getAttributes(buffers);
-      const vao = constructVao({ attributes });
-      return { vao, instanceCount: countInstances(buffers) };
-    }
-
-    function loadIndexed(buffers) {
-      const attributes = getAttributes(buffers);
-      const indices = initIndices({ data: buffers.indices });
-      const vao = constructVao({ attributes, indices });
-      return { vao, indices, count: buffers.indices.length };
-    }
-
-    return (countInstances) ? loadInstanced : loadIndexed;
   }
 }

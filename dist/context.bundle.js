@@ -67,104 +67,6 @@ function setParams(userParams) {
   };
 }
 
-function camelCase(hyphenated) {
-  return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
-}
-
-function initStyleProg(style, styleKeys, program, bufferSize) {
-  const { id, paint } = style;
-  const { use, uniformSetters } = program;
-  const { sdf, screenScale } = uniformSetters;
-
-  const zoomFuncs = styleKeys
-    .filter(styleKey => paint[styleKey].type !== "property")
-    .map(styleKey => {
-      const get = paint[styleKey];
-      const shaderVar = camelCase(styleKey);
-      const set = uniformSetters[shaderVar];
-      return (z, f) => set(get(z, f));
-    });
-
-  function setup(zoom, pixRatio = 1.0, cameraScale = 1.0) {
-    use();
-    const { width, height } = bufferSize;
-    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
-    zoomFuncs.forEach(f => f(zoom));
-  }
-
-  function getData(tile) {
-    const { layers, atlas } = tile.data;
-    const data = layers[id];
-
-    if (data && sdf && atlas) sdf(atlas);
-
-    return data;
-  }
-
-  return { setup, getData };
-}
-
-function initGrid(context, uniformSetters, styleProg) {
-  const { mapCoords, mapShift } = uniformSetters;
-
-  function setCoords({ x, y, z }) {
-    const numTiles = 1 << z;
-    const xw = x - Math.floor(x / numTiles) * numTiles;
-    const extent = 512; // TODO: don't assume this!!
-    mapCoords([xw, y, z, extent]);
-    return numTiles;
-  }
-
-  function setShift(tileset, pixRatio = 1) {
-    const { x, y } = tileset[0];
-    const { translate, scale: rawScale } = tileset;
-    const scale = rawScale * pixRatio;
-    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    mapShift([dx, dy, scale]);
-    return { translate, scale };
-  }
-
-  function antiMeridianSplit(tileset, numTiles) {
-    const { translate, scale } = tileset;
-    const { x } = tileset[0];
-
-    // At low zooms, some tiles may be repeated on opposite ends of the map
-    // We split them into subsets, one tileset for each copy of the map
-    return [0, 1, 2].map(repeat => repeat * numTiles).map(shift => {
-      const tiles = tileset.filter(tile => {
-        const delta = tile.x - x - shift;
-        return (delta >= 0 && delta < numTiles);
-      });
-      return Object.assign(tiles, { translate, scale });
-    }).filter(subset => subset.length);
-  }
-
-  function drawTile(box, translate, scale) {
-    const { x, y, tile } = box;
-    const data = styleProg.getData(tile);
-    if (!data) return;
-
-    const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    context.clipRectFlipY(x0, y0, scale, scale);
-
-    context.draw(data.buffers);
-  }
-
-  return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
-    if (!tileset || !tileset.length) return;
-
-    styleProg.setup(zoom, pixRatio, cameraScale);
-
-    const numTiles = setCoords(tileset[0]);
-    const subsets = antiMeridianSplit(tileset, numTiles);
-
-    subsets.forEach(subset => {
-      const { translate, scale } = setShift(subset, pixRatio);
-      subset.forEach(t => drawTile(t, translate, scale));
-    });
-  };
-}
-
 var vert$3 = `attribute vec2 quadPos; // Vertices of the quad instance
 attribute vec2 circlePos;
 attribute float circleRadius;
@@ -490,10 +392,140 @@ function initText(context) {
   };
 }
 
-function initPrograms(context, framebuffer, preamble) {
-  const { initProgram, initAttribute, initIndices } = context;
-  const bufferSize = framebuffer.size;
+function initLoader(context, progInfo, constructVao) {
+  const { initAttribute, initIndices } = context;
+  const { attrInfo, getSpecialAttrs, countInstances } = progInfo;
 
+  function getAttributes(buffers) {
+    return Object.entries(attrInfo).reduce((d, [key, info]) => {
+      const data = buffers[key];
+      if (data) d[key] = initAttribute(Object.assign({ data }, info));
+      return d;
+    }, getSpecialAttrs(buffers));
+  }
+
+  function loadInstanced(buffers) {
+    const attributes = getAttributes(buffers);
+    const vao = constructVao({ attributes });
+    return { vao, instanceCount: countInstances(buffers) };
+  }
+
+  function loadIndexed(buffers) {
+    const attributes = getAttributes(buffers);
+    const indices = initIndices({ data: buffers.indices });
+    const vao = constructVao({ attributes, indices });
+    return { vao, indices, count: buffers.indices.length };
+  }
+
+  return (countInstances) ? loadInstanced : loadIndexed;
+}
+
+function initGrid(use, uniformSetters, framebuffer) {
+  const { screenScale, mapCoords, mapShift } = uniformSetters;
+
+  function setScreen(pixRatio = 1.0, cameraScale = 1.0) {
+    use();
+    const { width, height } = framebuffer.size;
+    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
+  }
+
+  function setCoords({ x, y, z }) {
+    const numTiles = 1 << z;
+    const xw = x - Math.floor(x / numTiles) * numTiles;
+    const extent = 512; // TODO: don't assume this!!
+    mapCoords([xw, y, z, extent]);
+    return numTiles;
+  }
+
+  function setShift(tileset, pixRatio = 1) {
+    const { x, y } = tileset[0];
+    const { translate, scale: rawScale } = tileset;
+    const scale = rawScale * pixRatio;
+    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * scale);
+    mapShift([dx, dy, scale]);
+    return { translate, scale };
+  }
+
+  return { setScreen, setCoords, setShift };
+}
+
+function camelCase(hyphenated) {
+  return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
+}
+
+function initStyleProg(style, styleKeys, uniformSetters) {
+  const { id, paint } = style;
+  const { sdf } = uniformSetters;
+
+  const zoomFuncs = styleKeys
+    .filter(styleKey => paint[styleKey].type !== "property")
+    .map(styleKey => {
+      const get = paint[styleKey];
+      const shaderVar = camelCase(styleKey);
+      const set = uniformSetters[shaderVar];
+      return (z, f) => set(get(z, f));
+    });
+
+  function setStyles(zoom) {
+    zoomFuncs.forEach(f => f(zoom));
+  }
+
+  function getData(tile) {
+    const { layers, atlas } = tile.data;
+    const data = layers[id];
+
+    if (data && sdf && atlas) sdf(atlas);
+
+    return data;
+  }
+
+  return { setStyles, getData };
+}
+
+function initTilesetPainter(context, grid, styleProg) {
+  function antiMeridianSplit(tileset, numTiles) {
+    const { translate, scale } = tileset;
+    const { x } = tileset[0];
+
+    // At low zooms, some tiles may be repeated on opposite ends of the map
+    // We split them into subsets, one tileset for each copy of the map
+    return [0, 1, 2].map(repeat => repeat * numTiles).map(shift => {
+      const tiles = tileset.filter(tile => {
+        const delta = tile.x - x - shift;
+        return (delta >= 0 && delta < numTiles);
+      });
+      return Object.assign(tiles, { translate, scale });
+    }).filter(subset => subset.length);
+  }
+
+  function drawTile(box, translate, scale) {
+    const { x, y, tile } = box;
+    const data = styleProg.getData(tile);
+    if (!data) return;
+
+    const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
+    context.clipRectFlipY(x0, y0, scale, scale);
+
+    context.draw(data.buffers);
+  }
+
+  return function({ tileset, zoom, pixRatio = 1, cameraScale = 1.0 }) {
+    if (!tileset || !tileset.length) return;
+
+    grid.setScreen(pixRatio, cameraScale);
+    styleProg.setStyles(zoom);
+
+    const numTiles = grid.setCoords(tileset[0]);
+    const subsets = antiMeridianSplit(tileset, numTiles);
+
+    subsets.forEach(subset => {
+      const { translate, scale } = grid.setShift(subset, pixRatio);
+      subset.forEach(t => drawTile(t, translate, scale));
+    });
+  };
+}
+
+function initPrograms(context, framebuffer, preamble) {
   return {
     "circle": setupProgram(initCircle(context)),
     "line": setupProgram(initLine(context)),
@@ -504,44 +536,18 @@ function initPrograms(context, framebuffer, preamble) {
   function setupProgram(progInfo) {
     const { vert, frag, styleKeys } = progInfo;
 
-    const program = initProgram(preamble + vert, frag);
-    const { uniformSetters, constructVao } = program;
+    const program = context.initProgram(preamble + vert, frag);
+    const { use, uniformSetters, constructVao } = program;
 
-    const load = initLoader(progInfo, constructVao);
+    const load = initLoader(context, progInfo, constructVao);
+    const grid = initGrid(use, uniformSetters, framebuffer);
 
     function initPainter(style) {
-      const styleProg = initStyleProg(style, styleKeys, program, bufferSize);
-      return initGrid(context, uniformSetters, styleProg);
+      const styleProg = initStyleProg(style, styleKeys, uniformSetters);
+      return initTilesetPainter(context, grid, styleProg);
     }
 
     return { load, initPainter };
-  }
-
-  function initLoader(progInfo, constructVao) {
-    const { attrInfo, getSpecialAttrs, countInstances } = progInfo;
-
-    function getAttributes(buffers) {
-      return Object.entries(attrInfo).reduce((d, [key, info]) => {
-        const data = buffers[key];
-        if (data) d[key] = initAttribute(Object.assign({ data }, info));
-        return d;
-      }, getSpecialAttrs(buffers));
-    }
-
-    function loadInstanced(buffers) {
-      const attributes = getAttributes(buffers);
-      const vao = constructVao({ attributes });
-      return { vao, instanceCount: countInstances(buffers) };
-    }
-
-    function loadIndexed(buffers) {
-      const attributes = getAttributes(buffers);
-      const indices = initIndices({ data: buffers.indices });
-      const vao = constructVao({ attributes, indices });
-      return { vao, indices, count: buffers.indices.length };
-    }
-
-    return (countInstances) ? loadInstanced : loadIndexed;
   }
 }
 
