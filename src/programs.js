@@ -10,13 +10,13 @@ export function initPrograms(context, framebuffer, preamble) {
   const bufferSize = framebuffer.size;
 
   return {
-    "circle": initPaintProgram(initCircle(context)),
-    "line": initPaintProgram(initLine(context)),
-    "fill": initPaintProgram(initFill(context)),
-    "symbol": initPaintProgram(initText(context)),
+    "circle": setupProgram(initCircle(context)),
+    "line": setupProgram(initLine(context)),
+    "fill": setupProgram(initFill(context)),
+    "symbol": setupProgram(initText(context)),
   };
 
-  function initPaintProgram(progInfo) {
+  function setupProgram(progInfo) {
     const { vert, frag, styleKeys } = progInfo;
 
     const program = initProgram(preamble + vert, frag);

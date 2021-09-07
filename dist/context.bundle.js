@@ -107,31 +107,36 @@ function initStyleProg(style, styleKeys, program, bufferSize) {
 function initGrid(context, uniformSetters, styleProg) {
   const { mapCoords, mapShift } = uniformSetters;
 
-  function setGrid(tileset, pixRatio = 1) {
-    const { x, y, z } = tileset[0];
+  function setCoords({ x, y, z }) {
     const numTiles = 1 << z;
     const xw = x - Math.floor(x / numTiles) * numTiles;
     const extent = 512; // TODO: don't assume this!!
     mapCoords([xw, y, z, extent]);
+    return numTiles;
+  }
 
+  function setShift(tileset, pixRatio = 1) {
+    const { x, y } = tileset[0];
     const { translate, scale: rawScale } = tileset;
     const scale = rawScale * pixRatio;
     const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * scale);
+    mapShift([dx, dy, scale]);
+    return { translate, scale };
+  }
+
+  function antiMeridianSplit(tileset, numTiles) {
+    const { translate, scale } = tileset;
+    const { x } = tileset[0];
 
     // At low zooms, some tiles may be repeated on opposite ends of the map
-    // We split them into subsets, with different values of mapShift
-    // NOTE: Only accounts for repetition across X!
-    const subsets = [0, 1, 2].map(repeat => {
-      const shift = repeat * numTiles;
+    // We split them into subsets, one tileset for each copy of the map
+    return [0, 1, 2].map(repeat => repeat * numTiles).map(shift => {
       const tiles = tileset.filter(tile => {
-        const delta = tile.x - x;
-        return (delta >= shift && delta < shift + numTiles);
+        const delta = tile.x - x - shift;
+        return (delta >= 0 && delta < numTiles);
       });
-      const setter = () => mapShift([dx + shift * scale, dy, scale]);
-      return { tiles, setter };
-    }).filter(set => set.tiles.length);
-
-    return { translate, scale, subsets };
+      return Object.assign(tiles, { translate, scale });
+    }).filter(subset => subset.length);
   }
 
   function drawTile(box, translate, scale) {
@@ -150,11 +155,12 @@ function initGrid(context, uniformSetters, styleProg) {
 
     styleProg.setup(zoom, pixRatio, cameraScale);
 
-    const { translate, scale, subsets } = setGrid(tileset, pixRatio);
+    const numTiles = setCoords(tileset[0]);
+    const subsets = antiMeridianSplit(tileset, numTiles);
 
-    subsets.forEach(({ setter, tiles }) => {
-      setter();
-      tiles.forEach(t => drawTile(t, translate, scale));
+    subsets.forEach(subset => {
+      const { translate, scale } = setShift(subset, pixRatio);
+      subset.forEach(t => drawTile(t, translate, scale));
     });
   };
 }
@@ -489,13 +495,13 @@ function initPrograms(context, framebuffer, preamble) {
   const bufferSize = framebuffer.size;
 
   return {
-    "circle": initPaintProgram(initCircle(context)),
-    "line": initPaintProgram(initLine(context)),
-    "fill": initPaintProgram(initFill()),
-    "symbol": initPaintProgram(initText(context)),
+    "circle": setupProgram(initCircle(context)),
+    "line": setupProgram(initLine(context)),
+    "fill": setupProgram(initFill()),
+    "symbol": setupProgram(initText(context)),
   };
 
-  function initPaintProgram(progInfo) {
+  function setupProgram(progInfo) {
     const { vert, frag, styleKeys } = progInfo;
 
     const program = initProgram(preamble + vert, frag);
