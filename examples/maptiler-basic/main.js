@@ -28,7 +28,8 @@ function setup(error, data, style) {
 
 function render(data, style) {
   const canvas = document.getElementById("tileCanvas");
-  yawgl.resizeCanvasToDisplaySize(canvas, window.devicePixelRatio);
+  const pixRatio = window.devicePixelRatio;
+  yawgl.resizeCanvasToDisplaySize(canvas, pixRatio);
   const gl = yawgl.getExtendedContext(canvas);
   const context = yawgl.initContext(gl);
 
@@ -46,7 +47,7 @@ function render(data, style) {
     .map(tileContext.initPainter);
 
   const tile = Object.assign({ data }, tileCoords);
-  painters.forEach(painter => painter({ tile }));
+  painters.forEach(painter => painter({ tile, pixRatio }));
 
   console.log("All done!");
 }
