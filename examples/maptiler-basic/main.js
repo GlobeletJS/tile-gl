@@ -5,7 +5,7 @@ import * as tileMixer from "tile-mixer";
 import { initGLpaint } from "../../";
 
 const styleHref = "./klokantech-basic-style.json";
-const tileCoords = { z: 11, x: 327, y: 791 };
+const tileCoords = { z: 13, x: 1310, y: 3166 };
 
 export function main() {
   tileStencil.loadStyle(styleHref).then(getTile);
