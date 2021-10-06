@@ -1,87 +1,42 @@
-function camelCase$1(hyphenated) {
-  return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
-}
-
-function initCircleParsing(style) {
-  const { paint } = style;
-
-  const styleKeys = ["circle-radius", "circle-color", "circle-opacity"];
-  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
-    .map(k => ([paint[k], camelCase$1(k)]));
-
-  return function(feature, { z, x, y }) {
-    const circlePos = flattenPoints(feature.geometry);
-    if (!circlePos) return;
-
-    const length = circlePos.length / 2;
-
-    const buffers = {
-      circlePos,
-      tileCoords: Array.from({ length }).flatMap(() => [x, y, z]),
-    };
-
-    dataFuncs.forEach(([get, key]) => {
-      const val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(() => val);
-    });
-
-    return buffers;
-  };
-}
+const circleInfo = {
+  styleKeys: ["circle-radius", "circle-color", "circle-opacity"],
+  serialize: flattenPoints,
+  getLength: (buffers) => buffers.circlePos.length / 2,
+};
 
 function flattenPoints(geometry) {
   const { type, coordinates } = geometry;
+  if (!coordinates || !coordinates.length) return;
 
   switch (type) {
     case "Point":
-      return coordinates;
+      return ({ circlePos: coordinates });
     case "MultiPoint":
-      return coordinates.flat();
+      return ({ circlePos: coordinates.flat() });
     default:
       return;
   }
 }
 
-function initLineParsing(style) {
-  const { paint } = style;
-
-  // TODO: check for property-dependence of lineWidth, lineGapWidth
-  const styleKeys = ["line-color", "line-opacity"];
-  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
-    .map(k => ([paint[k], camelCase$1(k)]));
-
-  return function(feature, { z, x, y }) {
-    const lines = flattenLines(feature.geometry);
-    if (!lines) return;
-
-    const length = lines.length / 3;
-
-    const buffers = {
-      lines,
-      tileCoords: Array.from({ length }).flatMap(() => [x, y, z]),
-    };
-
-    dataFuncs.forEach(([get, key]) => {
-      const val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(() => val);
-    });
-
-    return buffers;
-  };
-}
+const lineInfo = {
+  styleKeys: ["line-color", "line-opacity"], // TODO: line-width, line-gap-width
+  serialize: flattenLines,
+  getLength: (buffers) => buffers.lines.length / 3,
+};
 
 function flattenLines(geometry) {
   const { type, coordinates } = geometry;
+  if (!coordinates || !coordinates.length) return;
 
   switch (type) {
     case "LineString":
-      return flattenLineString(coordinates);
+      return ({ lines: flattenLineString(coordinates) });
     case "MultiLineString":
-      return coordinates.flatMap(flattenLineString);
+      return ({ lines: coordinates.flatMap(flattenLineString) });
     case "Polygon":
-      return flattenPolygon(coordinates);
+      return ({ lines: flattenPolygon(coordinates) });
     case "MultiPolygon":
-      return coordinates.flatMap(flattenPolygon);
+      return ({ lines: coordinates.flatMap(flattenPolygon) });
     default:
       return;
   }
@@ -796,44 +751,23 @@ earcut.flatten = function (data) {
 
 var earcut$1 = earcut$2.exports;
 
-function initFillParsing(style) {
-  const { paint } = style;
-
-  const styleKeys = ["fill-color", "fill-opacity"];
-  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
-    .map(k => ([paint[k], camelCase$1(k)]));
-
-  return function(feature, { z, x, y }) {
-    const triangles = triangulate(feature.geometry);
-    if (!triangles) return;
-
-    const length = triangles.vertices.length / 2;
-
-    const buffers = {
-      position: triangles.vertices,
-      indices: triangles.indices,
-      tileCoords: Array.from({ length }).flatMap(() => [x, y, z]),
-    };
-
-    dataFuncs.forEach(([get, key]) => {
-      const val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(() => val);
-    });
-
-    return buffers;
-  };
-}
+const fillInfo = {
+  styleKeys: ["fill-color", "fill-opacity"],
+  serialize: triangulate,
+  getLength: (buffers) => buffers.position.length / 2,
+};
 
 function triangulate(geometry) {
   const { type, coordinates } = geometry;
+  if (!coordinates || !coordinates.length) return;
 
   switch (type) {
     case "Polygon":
       return indexPolygon(coordinates);
     case "MultiPolygon":
       return coordinates.map(indexPolygon).reduce((acc, cur) => {
-        const indexShift = acc.vertices.length / 2;
-        acc.vertices.push(...cur.vertices);
+        const indexShift = acc.position.length / 2;
+        acc.position.push(...cur.position);
         acc.indices.push(...cur.indices.map(h => h + indexShift));
         return acc;
       });
@@ -845,7 +779,7 @@ function triangulate(geometry) {
 function indexPolygon(coords) {
   const { vertices, holes, dimensions } = earcut$1.flatten(coords);
   const indices = earcut$1(vertices, holes, dimensions);
-  return { vertices, indices };
+  return { position: vertices, indices };
 }
 
 const GLYPH_PBF_BORDER = 3;
@@ -853,23 +787,40 @@ const ONE_EM = 24;
 
 const ATLAS_PADDING = 1;
 
-const RECT_BUFFER = GLYPH_PBF_BORDER + ATLAS_PADDING;
+function initStyle({ layout, paint }) {
+  const layoutKeys = [
+    "text-letter-spacing",
+    "text-max-width",
+    "text-size",
+    "text-padding",
+    "text-line-height",
+    "text-anchor",
+    "text-offset",
+    "text-justify",
+  ];
 
-function layoutLine(glyphs, origin, spacing, scalar) {
-  let xCursor = origin[0];
-  const y0 = origin[1];
+  const paintKeys = [
+    "text-color",
+    "text-opacity",
+  ];
 
-  return glyphs.flatMap(g => {
-    const { left, top, advance } = g.metrics;
-    const { w, h } = g.rect;
+  const bufferFuncs = paintKeys
+    .filter(k => paint[k].type === "property")
+    .map(k => ([paint[k], camelCase$1(k)]));
 
-    const dx = xCursor + left - RECT_BUFFER;
-    const dy = y0 - top - RECT_BUFFER;
+  return function(zoom, feature) {
+    const layoutVals = layoutKeys
+      .reduce((d, k) => (d[k] = layout[k](zoom, feature), d), {});
 
-    xCursor += advance + spacing;
+    const bufferVals = bufferFuncs
+      .reduce((d, [f, k]) => (d[k] = f(zoom, feature), d), {});
 
-    return [dx, dy, w, h].map(c => c * scalar);
-  });
+    return { layoutVals, bufferVals };
+  };
+}
+
+function camelCase$1(hyphenated) {
+  return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
 function getGlyphInfo(feature, atlas) {
@@ -878,56 +829,20 @@ function getGlyphInfo(feature, atlas) {
 
   if (!positions || !charCodes || !charCodes.length) return;
 
-  const info = feature.charCodes.map(code => {
+  const { width, height } = atlas.image;
+
+  return charCodes.map(code => {
     const pos = positions[code];
     if (!pos) return;
-    const { metrics, rect } = pos;
-    return { code, metrics, rect };
-  });
 
-  return info.filter(i => i !== undefined);
-}
+    const { left, top, advance } = pos.metrics;
+    const { x, y, w, h } = pos.rect;
 
-function getTextBoxShift(anchor) {
-  // Shift the top-left corner of the text bounding box
-  // by the returned value * bounding box dimensions
-  switch (anchor) {
-    case "top-left":
-      return [0.0, 0.0];
-    case "top-right":
-      return [-1.0, 0.0];
-    case "top":
-      return [-0.5, 0.0];
-    case "bottom-left":
-      return [0.0, -1.0];
-    case "bottom-right":
-      return [-1.0, -1.0];
-    case "bottom":
-      return [-0.5, -1.0];
-    case "left":
-      return [0.0, -0.5];
-    case "right":
-      return [-1.0, -0.5];
-    case "center":
-    default:
-      return [-0.5, -0.5];
-  }
-}
+    const sdfRect = [x / width, y / height, w / width, h / height];
+    const metrics = { left, top, advance, w, h };
 
-function getLineShift(justify, boxShiftX) {
-  // Shift the start of the text line (left side) by the
-  // returned value * (boundingBoxWidth - lineWidth)
-  switch (justify) {
-    case "auto":
-      return -boxShiftX;
-    case "left":
-      return 0;
-    case "right":
-      return 1;
-    case "center":
-    default:
-      return 0.5;
-  }
+    return { code, metrics, sdfRect };
+  }).filter(i => i !== undefined);
 }
 
 const whitespace = {
@@ -1042,30 +957,22 @@ function calculatePenalty(code, nextCode) {
   return penalty;
 }
 
-function splitLines(glyphs, spacing, maxWidth) {
-  // glyphs is an Array of Objects with properties { code, metrics, rect }
-  // spacing and maxWidth should already be scaled to the same units as
-  //   glyph.metrics.advance
+function splitLines(glyphs, styleVals) {
+  // glyphs is an Array of Objects with properties { code, metrics }
+  const spacing = styleVals["text-letter-spacing"] * ONE_EM;
   const totalWidth = measureLine(glyphs, spacing);
 
+  const maxWidth = styleVals["text-max-width"] * ONE_EM;
   const lineCount = Math.ceil(totalWidth / maxWidth);
   if (lineCount < 1) return [];
 
   const targetWidth = totalWidth / lineCount;
   const breakPoints = getBreakPoints(glyphs, spacing, targetWidth);
 
-  return breakLines(glyphs, breakPoints);
+  return breakLines(glyphs, breakPoints, spacing);
 }
 
-function measureLine(glyphs, spacing) {
-  if (glyphs.length < 1) return 0;
-
-  // No initial value for reduce--so no spacing added for 1st char
-  return glyphs.map(g => g.metrics.advance)
-    .reduce((a, c) => a + c + spacing);
-}
-
-function breakLines(glyphs, breakPoints) {
+function breakLines(glyphs, breakPoints, spacing) {
   let start = 0;
 
   return breakPoints.map(lineBreak => {
@@ -1075,6 +982,7 @@ function breakLines(glyphs, breakPoints) {
     while (line.length && whitespace[line[0].code]) line.shift();
     while (trailingWhiteSpace(line)) line.pop();
 
+    line.width = measureLine(line, spacing);
     start = lineBreak;
     return line;
   });
@@ -1086,90 +994,149 @@ function trailingWhiteSpace(line) {
   return whitespace[line[len - 1].code];
 }
 
-function initShaper(layout) {
-  return function(feature, zoom, atlas) {
-    // For each feature, compute a list of info for each character:
-    // - x0, y0  defining overall label position
-    // - dx, dy  delta positions relative to label position
-    // - x, y, w, h  defining the position of the glyph within the atlas
+function measureLine(glyphs, spacing) {
+  if (glyphs.length < 1) return 0;
 
-    // 1. Get the glyphs for the characters
-    const glyphs = getGlyphInfo(feature, atlas);
-    if (!glyphs) return;
+  // No initial value for reduce--so no spacing added for 1st char
+  return glyphs.map(g => g.metrics.advance)
+    .reduce((a, c) => a + c + spacing);
+}
 
-    // 2. Split into lines
-    const spacing = layout["text-letter-spacing"](zoom, feature) * ONE_EM;
-    const maxWidth = layout["text-max-width"](zoom, feature) * ONE_EM;
-    const lines = splitLines(glyphs, spacing, maxWidth);
-    // TODO: What if no labelText, or it is all whitespace?
+function getTextBox(lines, styleVals) {
+  const [sx, sy] = getTextBoxShift(styleVals["text-anchor"]);
 
-    // 3. Get dimensions of lines and overall text box
-    const lineWidths = lines.map(line => measureLine(line, spacing));
-    const lineHeight = layout["text-line-height"](zoom, feature) * ONE_EM;
+  // Get dimensions and relative position of text area in glyph pixels
+  const w = Math.max(...lines.map(l => l.width));
+  const h = lines.length * styleVals["text-line-height"] * ONE_EM;
+  const x = sx * w + styleVals["text-offset"][0] * ONE_EM;
+  const y = sy * h + styleVals["text-offset"][1] * ONE_EM;
 
-    const boxSize = [Math.max(...lineWidths), lines.length * lineHeight];
-    const textOffset = layout["text-offset"](zoom, feature)
-      .map(c => c * ONE_EM);
-    const boxShift = getTextBoxShift( layout["text-anchor"](zoom, feature) );
-    const boxOrigin = boxShift.map((c, i) => c * boxSize[i] + textOffset[i]);
+  // Get total bounding box after scale and pad
+  const scale = styleVals["text-size"] / ONE_EM;
+  const pad = styleVals["text-padding"];
+  const bbox = [
+    x * scale - pad,
+    y * scale - pad,
+    (x + w) * scale + pad,
+    (y + h) * scale + pad,
+  ];
 
-    // 4. Compute origins for each line
-    const justify = layout["text-justify"](zoom, feature);
-    const lineShiftX = getLineShift(justify, boxShift[0]);
-    const lineOrigins = lineWidths.map((lineWidth, i) => {
-      const x = (boxSize[0] - lineWidth) * lineShiftX + boxOrigin[0];
-      const y = i * lineHeight + boxOrigin[1];
-      return [x, y];
-    });
+  return { x, y, w, h, shiftX: sx, bbox };
+}
 
-    // 5. Compute top left corners of the glyphs in each line,
-    //    appending the font size scalar for final positioning
-    const scalar = layout["text-size"](zoom, feature) / ONE_EM;
-    const charPos = lines
-      .flatMap((l, i) => layoutLine(l, lineOrigins[i], spacing, scalar));
+function getTextBoxShift(anchor) {
+  // Shift the top-left corner of the text bounding box
+  // by the returned value * bounding box dimensions
+  switch (anchor) {
+    case "top-left":
+      return [0.0, 0.0];
+    case "top-right":
+      return [-1.0, 0.0];
+    case "top":
+      return [-0.5, 0.0];
+    case "bottom-left":
+      return [0.0, -1.0];
+    case "bottom-right":
+      return [-1.0, -1.0];
+    case "bottom":
+      return [-0.5, -1.0];
+    case "left":
+      return [0.0, -0.5];
+    case "right":
+      return [-1.0, -0.5];
+    case "center":
+    default:
+      return [-0.5, -0.5];
+  }
+}
 
-    // 6. Fill in label origins for each glyph. TODO: assumes Point geometry
-    const origin = [...feature.geometry.coordinates, scalar];
-    const labelPos = lines.flat()
-      .flatMap(() => origin);
+const RECT_BUFFER = GLYPH_PBF_BORDER + ATLAS_PADDING;
 
-    // 7. Collect all the glyph rects, normalizing by atlas dimensions
-    const { width, height } = atlas.image;
-    const sdfRect = lines.flat().flatMap(g => {
-      const { x, y, w, h } = g.rect;
-      return [x / width, y / height, w / width, h / height];
-    });
+function layoutLines(glyphs, styleVals) {
+  // TODO: what if splitLines returns nothing?
+  const lines = splitLines(glyphs, styleVals);
+  const box = getTextBox(lines, styleVals);
 
-    // 8. Compute bounding box for collision checks
-    const textPadding = layout["text-padding"](zoom, feature);
-    const bbox = [
-      boxOrigin[0] * scalar - textPadding,
-      boxOrigin[1] * scalar - textPadding,
-      (boxOrigin[0] + boxSize[0]) * scalar + textPadding,
-      (boxOrigin[1] + boxSize[1]) * scalar + textPadding
-    ];
+  const lineHeight = styleVals["text-line-height"] * ONE_EM;
+  const lineShiftX = getLineShift(styleVals["text-justify"], box.shiftX);
+  const spacing = styleVals["text-letter-spacing"] * ONE_EM;
+  const fontScalar = styleVals["text-size"] / ONE_EM;
 
-    return { labelPos, charPos, sdfRect, bbox };
+  const chars = lines.flatMap((line, i) => {
+    const x = (box.w - line.width) * lineShiftX + box.x;
+    const y = i * lineHeight + box.y;
+    return layoutLine(line, [x, y], spacing, fontScalar);
+  });
+
+  return Object.assign(chars, { fontScalar, bbox: box.bbox });
+}
+
+function layoutLine(glyphs, origin, spacing, scalar) {
+  let xCursor = origin[0];
+  const y0 = origin[1];
+
+  return glyphs.map(g => {
+    const { left, top, advance, w, h } = g.metrics;
+
+    const dx = xCursor + left - RECT_BUFFER;
+    const dy = y0 - top - RECT_BUFFER;
+
+    xCursor += advance + spacing;
+
+    const pos = [dx, dy, w, h].map(c => c * scalar);
+    const rect = g.sdfRect;
+
+    return { pos, rect };
+  });
+}
+
+function getLineShift(justify, boxShiftX) {
+  switch (justify) {
+    case "auto":
+      return -boxShiftX;
+    case "left":
+      return 0;
+    case "right":
+      return 1;
+    case "center":
+    default:
+      return 0.5;
+  }
+}
+
+function getBuffers(chars, anchor, tileCoord, bufferVals) {
+  const origin = [...anchor, chars.fontScalar];
+  const { z, x, y } = tileCoord;
+
+  const buffers = {
+    sdfRect: chars.flatMap(c => c.rect),
+    charPos: chars.flatMap(c => c.pos),
+    labelPos: chars.flatMap(() => origin),
+    tileCoords: chars.flatMap(() => [x, y, z]),
   };
+
+  Object.entries(bufferVals).forEach(([key, val]) => {
+    buffers[key] = chars.flatMap(() => val);
+  });
+
+  return buffers;
 }
 
 function initShaping(style) {
-  const { layout, paint } = style;
-
-  const shaper = initShaper(layout);
-
-  const styleKeys = ["text-color", "text-opacity"];
-  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
-    .map(k => ([paint[k], camelCase(k)]));
+  const getStyleVals = initStyle(style);
 
   return function(feature, tileCoords, atlas, tree) {
     // tree is an RBush from the 'rbush' module. NOTE: will be updated!
 
-    const { z, x, y } = tileCoords;
-    const buffers = shaper(feature, z, atlas);
-    if (!buffers) return;
+    const glyphs = getGlyphInfo(feature, atlas);
+    if (!glyphs) return;
 
-    const { labelPos: [x0, y0], bbox } = buffers;
+    const { layoutVals, bufferVals } = getStyleVals(tileCoords.z, feature);
+    const chars = layoutLines(glyphs, layoutVals);
+
+    const [x0, y0] = feature.geometry.coordinates;
+    const bbox = chars.bbox;
+
     const box = {
       minX: x0 + bbox[0],
       minY: y0 + bbox[1],
@@ -1180,16 +1147,8 @@ function initShaping(style) {
     if (tree.collides(box)) return;
     tree.insert(box);
 
-    const length = buffers.labelPos.length / 2;
-    buffers.tileCoords = Array.from({ length }).flatMap(() => [x, y, z]);
-
-    dataFuncs.forEach(([get, key]) => {
-      const val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(() => val);
-    });
-
     // TODO: drop if outside tile?
-    return buffers;
+    return getBuffers(chars, [x0, y0], tileCoords, bufferVals);
   };
 }
 
@@ -1198,18 +1157,41 @@ function camelCase(hyphenated) {
 }
 
 function initSerializer(style) {
-  switch (style.type) {
+  const { type, paint } = style;
+
+  switch (type) {
     case "circle":
-      return initCircleParsing(style);
+      return initParsing(paint, circleInfo);
     case "line":
-      return initLineParsing(style);
+      return initParsing(paint, lineInfo);
     case "fill":
-      return initFillParsing(style);
+      return initParsing(paint, fillInfo);
     case "symbol":
       return initShaping(style);
     default:
       throw Error("tile-gl: unknown serializer type!");
   }
+}
+
+function initParsing(paint, info) {
+  const { styleKeys, serialize, getLength } = info;
+  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
+    .map(k => ([paint[k], camelCase(k)]));
+
+  return function(feature, { z, x, y }) {
+    const buffers = serialize(feature.geometry);
+    if (!buffers) return;
+
+    const dummy = Array.from({ length: getLength(buffers) });
+
+    buffers.tileCoords = dummy.flatMap(() => [x, y, z]);
+    dataFuncs.forEach(([get, key]) => {
+      const val = get(null, feature);
+      buffers[key] = dummy.flatMap(() => val);
+    });
+
+    return buffers;
+  };
 }
 
 export { initSerializer };

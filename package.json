@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "earcut": "^2.2.3",
-    "tile-labeler": "^0.4.1"
+    "tile-labeler": "^0.4.2"
   },
   "sideEffects": false
 }

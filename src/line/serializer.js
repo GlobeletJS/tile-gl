@@ -1,45 +1,22 @@
-import { camelCase } from "../camelCase.js";
-
-export function initLineParsing(style) {
-  const { paint } = style;
-
-  // TODO: check for property-dependence of lineWidth, lineGapWidth
-  const styleKeys = ["line-color", "line-opacity"];
-  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
-    .map(k => ([paint[k], camelCase(k)]));
-
-  return function(feature, { z, x, y }) {
-    const lines = flattenLines(feature.geometry);
-    if (!lines) return;
-
-    const length = lines.length / 3;
-
-    const buffers = {
-      lines,
-      tileCoords: Array.from({ length }).flatMap(() => [x, y, z]),
-    };
-
-    dataFuncs.forEach(([get, key]) => {
-      const val = get(null, feature);
-      buffers[key] = Array.from({ length }).flatMap(() => val);
-    });
-
-    return buffers;
-  };
-}
+export const lineInfo = {
+  styleKeys: ["line-color", "line-opacity"], // TODO: line-width, line-gap-width
+  serialize: flattenLines,
+  getLength: (buffers) => buffers.lines.length / 3,
+};
 
 function flattenLines(geometry) {
   const { type, coordinates } = geometry;
+  if (!coordinates || !coordinates.length) return;
 
   switch (type) {
     case "LineString":
-      return flattenLineString(coordinates);
+      return ({ lines: flattenLineString(coordinates) });
     case "MultiLineString":
-      return coordinates.flatMap(flattenLineString);
+      return ({ lines: coordinates.flatMap(flattenLineString) });
     case "Polygon":
-      return flattenPolygon(coordinates);
+      return ({ lines: flattenPolygon(coordinates) });
     case "MultiPolygon":
-      return coordinates.flatMap(flattenPolygon);
+      return ({ lines: coordinates.flatMap(flattenPolygon) });
     default:
       return;
   }
