@@ -37,7 +37,7 @@
     "eslint": "^8.0.0",
     "eslint-config-globeletjs": "^0.0.6",
     "rollup": "^2.52.7",
-    "tile-mixer": "file:../tile-mixer",
+    "tile-mixer": "^0.2.3",
     "tile-retriever": "^0.0.4",
     "tile-stencil": "^0.4.4",
     "yawgl": "^0.3.3"
