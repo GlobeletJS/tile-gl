@@ -17,7 +17,7 @@ export default [{
     name: 'initGLpaint',
   }
 }, {
-  input: 'src/serializer.js',
+  input: 'src/serialize/tile.js',
   plugins: [
     resolve(),
     commonjs(),
@@ -27,6 +27,6 @@ export default [{
   output: {
     file: 'dist/serializer.bundle.js',
     format: 'esm',
-    name: 'initSerializer',
+    name: 'initTileSerializer',
   }
 }];

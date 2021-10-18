@@ -1,8 +1,8 @@
-import { circleInfo } from "./circle/serializer.js";
-import { lineInfo } from "./line/serializer.js";
-import { fillInfo } from "./fill/serializer.js";
+import { circleInfo } from "../circle/serializer.js";
+import { lineInfo } from "../line/serializer.js";
+import { fillInfo } from "../fill/serializer.js";
 import { initShaping } from "tile-labeler";
-import { camelCase } from "./camelCase.js";
+import { camelCase } from "../camelCase.js";
 
 export function initSerializer(style) {
   const { type, paint } = style;
