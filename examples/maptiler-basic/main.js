@@ -2,7 +2,7 @@ import * as tileStencil from "tile-stencil";
 import * as yawgl from "yawgl";
 import * as tileRetriever from "tile-retriever";
 import * as tileMixer from "tile-mixer";
-import { initGLpaint } from "../../";
+import { initSerializer, initGLpaint } from "../../";
 
 const styleHref = "./klokantech-basic-style.json";
 const tileCoords = { z: 13, x: 1310, y: 3166 };
@@ -22,8 +22,10 @@ function setup(error, data, style) {
 
   const { glyphs, layers: rawLayers } = style;
   const layers = rawLayers.filter(l => l.source && l.source === "openmaptiles");
-  const mixer = tileMixer.init({ glyphs, layers });
-  mixer(data, tileCoords).then(data => render(data, style));
+  const mixer = tileMixer.init({ layers });
+  const mixed = mixer(data, tileCoords.z);
+  const serialize = initSerializer({ glyphs, layers });
+  serialize(mixed, tileCoords).then(data => render(data, style));
 }
 
 function render(data, style) {

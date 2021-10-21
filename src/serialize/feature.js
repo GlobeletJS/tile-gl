@@ -4,7 +4,7 @@ import { fillInfo } from "../fill/serializer.js";
 import { initShaping } from "tile-labeler";
 import { camelCase } from "../camelCase.js";
 
-export function initSerializer(style) {
+export function initFeatureSerializer(style) {
   const { type, paint } = style;
 
   switch (type) {

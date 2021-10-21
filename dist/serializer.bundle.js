@@ -1,3 +1,1496 @@
+import Protobuf from 'pbf-esm';
+
+function define(constructor, factory, prototype) {
+  constructor.prototype = factory.prototype = prototype;
+  prototype.constructor = constructor;
+}
+
+function extend$1(parent, definition) {
+  var prototype = Object.create(parent.prototype);
+  for (var key in definition) prototype[key] = definition[key];
+  return prototype;
+}
+
+function Color() {}
+
+var darker = 0.7;
+var brighter = 1 / darker;
+
+var reI = "\\s*([+-]?\\d+)\\s*",
+    reN = "\\s*([+-]?\\d*\\.?\\d+(?:[eE][+-]?\\d+)?)\\s*",
+    reP = "\\s*([+-]?\\d*\\.?\\d+(?:[eE][+-]?\\d+)?)%\\s*",
+    reHex = /^#([0-9a-f]{3,8})$/,
+    reRgbInteger = new RegExp("^rgb\\(" + [reI, reI, reI] + "\\)$"),
+    reRgbPercent = new RegExp("^rgb\\(" + [reP, reP, reP] + "\\)$"),
+    reRgbaInteger = new RegExp("^rgba\\(" + [reI, reI, reI, reN] + "\\)$"),
+    reRgbaPercent = new RegExp("^rgba\\(" + [reP, reP, reP, reN] + "\\)$"),
+    reHslPercent = new RegExp("^hsl\\(" + [reN, reP, reP] + "\\)$"),
+    reHslaPercent = new RegExp("^hsla\\(" + [reN, reP, reP, reN] + "\\)$");
+
+var named = {
+  aliceblue: 0xf0f8ff,
+  antiquewhite: 0xfaebd7,
+  aqua: 0x00ffff,
+  aquamarine: 0x7fffd4,
+  azure: 0xf0ffff,
+  beige: 0xf5f5dc,
+  bisque: 0xffe4c4,
+  black: 0x000000,
+  blanchedalmond: 0xffebcd,
+  blue: 0x0000ff,
+  blueviolet: 0x8a2be2,
+  brown: 0xa52a2a,
+  burlywood: 0xdeb887,
+  cadetblue: 0x5f9ea0,
+  chartreuse: 0x7fff00,
+  chocolate: 0xd2691e,
+  coral: 0xff7f50,
+  cornflowerblue: 0x6495ed,
+  cornsilk: 0xfff8dc,
+  crimson: 0xdc143c,
+  cyan: 0x00ffff,
+  darkblue: 0x00008b,
+  darkcyan: 0x008b8b,
+  darkgoldenrod: 0xb8860b,
+  darkgray: 0xa9a9a9,
+  darkgreen: 0x006400,
+  darkgrey: 0xa9a9a9,
+  darkkhaki: 0xbdb76b,
+  darkmagenta: 0x8b008b,
+  darkolivegreen: 0x556b2f,
+  darkorange: 0xff8c00,
+  darkorchid: 0x9932cc,
+  darkred: 0x8b0000,
+  darksalmon: 0xe9967a,
+  darkseagreen: 0x8fbc8f,
+  darkslateblue: 0x483d8b,
+  darkslategray: 0x2f4f4f,
+  darkslategrey: 0x2f4f4f,
+  darkturquoise: 0x00ced1,
+  darkviolet: 0x9400d3,
+  deeppink: 0xff1493,
+  deepskyblue: 0x00bfff,
+  dimgray: 0x696969,
+  dimgrey: 0x696969,
+  dodgerblue: 0x1e90ff,
+  firebrick: 0xb22222,
+  floralwhite: 0xfffaf0,
+  forestgreen: 0x228b22,
+  fuchsia: 0xff00ff,
+  gainsboro: 0xdcdcdc,
+  ghostwhite: 0xf8f8ff,
+  gold: 0xffd700,
+  goldenrod: 0xdaa520,
+  gray: 0x808080,
+  green: 0x008000,
+  greenyellow: 0xadff2f,
+  grey: 0x808080,
+  honeydew: 0xf0fff0,
+  hotpink: 0xff69b4,
+  indianred: 0xcd5c5c,
+  indigo: 0x4b0082,
+  ivory: 0xfffff0,
+  khaki: 0xf0e68c,
+  lavender: 0xe6e6fa,
+  lavenderblush: 0xfff0f5,
+  lawngreen: 0x7cfc00,
+  lemonchiffon: 0xfffacd,
+  lightblue: 0xadd8e6,
+  lightcoral: 0xf08080,
+  lightcyan: 0xe0ffff,
+  lightgoldenrodyellow: 0xfafad2,
+  lightgray: 0xd3d3d3,
+  lightgreen: 0x90ee90,
+  lightgrey: 0xd3d3d3,
+  lightpink: 0xffb6c1,
+  lightsalmon: 0xffa07a,
+  lightseagreen: 0x20b2aa,
+  lightskyblue: 0x87cefa,
+  lightslategray: 0x778899,
+  lightslategrey: 0x778899,
+  lightsteelblue: 0xb0c4de,
+  lightyellow: 0xffffe0,
+  lime: 0x00ff00,
+  limegreen: 0x32cd32,
+  linen: 0xfaf0e6,
+  magenta: 0xff00ff,
+  maroon: 0x800000,
+  mediumaquamarine: 0x66cdaa,
+  mediumblue: 0x0000cd,
+  mediumorchid: 0xba55d3,
+  mediumpurple: 0x9370db,
+  mediumseagreen: 0x3cb371,
+  mediumslateblue: 0x7b68ee,
+  mediumspringgreen: 0x00fa9a,
+  mediumturquoise: 0x48d1cc,
+  mediumvioletred: 0xc71585,
+  midnightblue: 0x191970,
+  mintcream: 0xf5fffa,
+  mistyrose: 0xffe4e1,
+  moccasin: 0xffe4b5,
+  navajowhite: 0xffdead,
+  navy: 0x000080,
+  oldlace: 0xfdf5e6,
+  olive: 0x808000,
+  olivedrab: 0x6b8e23,
+  orange: 0xffa500,
+  orangered: 0xff4500,
+  orchid: 0xda70d6,
+  palegoldenrod: 0xeee8aa,
+  palegreen: 0x98fb98,
+  paleturquoise: 0xafeeee,
+  palevioletred: 0xdb7093,
+  papayawhip: 0xffefd5,
+  peachpuff: 0xffdab9,
+  peru: 0xcd853f,
+  pink: 0xffc0cb,
+  plum: 0xdda0dd,
+  powderblue: 0xb0e0e6,
+  purple: 0x800080,
+  rebeccapurple: 0x663399,
+  red: 0xff0000,
+  rosybrown: 0xbc8f8f,
+  royalblue: 0x4169e1,
+  saddlebrown: 0x8b4513,
+  salmon: 0xfa8072,
+  sandybrown: 0xf4a460,
+  seagreen: 0x2e8b57,
+  seashell: 0xfff5ee,
+  sienna: 0xa0522d,
+  silver: 0xc0c0c0,
+  skyblue: 0x87ceeb,
+  slateblue: 0x6a5acd,
+  slategray: 0x708090,
+  slategrey: 0x708090,
+  snow: 0xfffafa,
+  springgreen: 0x00ff7f,
+  steelblue: 0x4682b4,
+  tan: 0xd2b48c,
+  teal: 0x008080,
+  thistle: 0xd8bfd8,
+  tomato: 0xff6347,
+  turquoise: 0x40e0d0,
+  violet: 0xee82ee,
+  wheat: 0xf5deb3,
+  white: 0xffffff,
+  whitesmoke: 0xf5f5f5,
+  yellow: 0xffff00,
+  yellowgreen: 0x9acd32
+};
+
+define(Color, color, {
+  copy: function(channels) {
+    return Object.assign(new this.constructor, this, channels);
+  },
+  displayable: function() {
+    return this.rgb().displayable();
+  },
+  hex: color_formatHex, // Deprecated! Use color.formatHex.
+  formatHex: color_formatHex,
+  formatHsl: color_formatHsl,
+  formatRgb: color_formatRgb,
+  toString: color_formatRgb
+});
+
+function color_formatHex() {
+  return this.rgb().formatHex();
+}
+
+function color_formatHsl() {
+  return hslConvert(this).formatHsl();
+}
+
+function color_formatRgb() {
+  return this.rgb().formatRgb();
+}
+
+function color(format) {
+  var m, l;
+  format = (format + "").trim().toLowerCase();
+  return (m = reHex.exec(format)) ? (l = m[1].length, m = parseInt(m[1], 16), l === 6 ? rgbn(m) // #ff0000
+      : l === 3 ? new Rgb((m >> 8 & 0xf) | (m >> 4 & 0xf0), (m >> 4 & 0xf) | (m & 0xf0), ((m & 0xf) << 4) | (m & 0xf), 1) // #f00
+      : l === 8 ? rgba(m >> 24 & 0xff, m >> 16 & 0xff, m >> 8 & 0xff, (m & 0xff) / 0xff) // #ff000000
+      : l === 4 ? rgba((m >> 12 & 0xf) | (m >> 8 & 0xf0), (m >> 8 & 0xf) | (m >> 4 & 0xf0), (m >> 4 & 0xf) | (m & 0xf0), (((m & 0xf) << 4) | (m & 0xf)) / 0xff) // #f000
+      : null) // invalid hex
+      : (m = reRgbInteger.exec(format)) ? new Rgb(m[1], m[2], m[3], 1) // rgb(255, 0, 0)
+      : (m = reRgbPercent.exec(format)) ? new Rgb(m[1] * 255 / 100, m[2] * 255 / 100, m[3] * 255 / 100, 1) // rgb(100%, 0%, 0%)
+      : (m = reRgbaInteger.exec(format)) ? rgba(m[1], m[2], m[3], m[4]) // rgba(255, 0, 0, 1)
+      : (m = reRgbaPercent.exec(format)) ? rgba(m[1] * 255 / 100, m[2] * 255 / 100, m[3] * 255 / 100, m[4]) // rgb(100%, 0%, 0%, 1)
+      : (m = reHslPercent.exec(format)) ? hsla(m[1], m[2] / 100, m[3] / 100, 1) // hsl(120, 50%, 50%)
+      : (m = reHslaPercent.exec(format)) ? hsla(m[1], m[2] / 100, m[3] / 100, m[4]) // hsla(120, 50%, 50%, 1)
+      : named.hasOwnProperty(format) ? rgbn(named[format]) // eslint-disable-line no-prototype-builtins
+      : format === "transparent" ? new Rgb(NaN, NaN, NaN, 0)
+      : null;
+}
+
+function rgbn(n) {
+  return new Rgb(n >> 16 & 0xff, n >> 8 & 0xff, n & 0xff, 1);
+}
+
+function rgba(r, g, b, a) {
+  if (a <= 0) r = g = b = NaN;
+  return new Rgb(r, g, b, a);
+}
+
+function rgbConvert(o) {
+  if (!(o instanceof Color)) o = color(o);
+  if (!o) return new Rgb;
+  o = o.rgb();
+  return new Rgb(o.r, o.g, o.b, o.opacity);
+}
+
+function rgb(r, g, b, opacity) {
+  return arguments.length === 1 ? rgbConvert(r) : new Rgb(r, g, b, opacity == null ? 1 : opacity);
+}
+
+function Rgb(r, g, b, opacity) {
+  this.r = +r;
+  this.g = +g;
+  this.b = +b;
+  this.opacity = +opacity;
+}
+
+define(Rgb, rgb, extend$1(Color, {
+  brighter: function(k) {
+    k = k == null ? brighter : Math.pow(brighter, k);
+    return new Rgb(this.r * k, this.g * k, this.b * k, this.opacity);
+  },
+  darker: function(k) {
+    k = k == null ? darker : Math.pow(darker, k);
+    return new Rgb(this.r * k, this.g * k, this.b * k, this.opacity);
+  },
+  rgb: function() {
+    return this;
+  },
+  displayable: function() {
+    return (-0.5 <= this.r && this.r < 255.5)
+        && (-0.5 <= this.g && this.g < 255.5)
+        && (-0.5 <= this.b && this.b < 255.5)
+        && (0 <= this.opacity && this.opacity <= 1);
+  },
+  hex: rgb_formatHex, // Deprecated! Use color.formatHex.
+  formatHex: rgb_formatHex,
+  formatRgb: rgb_formatRgb,
+  toString: rgb_formatRgb
+}));
+
+function rgb_formatHex() {
+  return "#" + hex(this.r) + hex(this.g) + hex(this.b);
+}
+
+function rgb_formatRgb() {
+  var a = this.opacity; a = isNaN(a) ? 1 : Math.max(0, Math.min(1, a));
+  return (a === 1 ? "rgb(" : "rgba(")
+      + Math.max(0, Math.min(255, Math.round(this.r) || 0)) + ", "
+      + Math.max(0, Math.min(255, Math.round(this.g) || 0)) + ", "
+      + Math.max(0, Math.min(255, Math.round(this.b) || 0))
+      + (a === 1 ? ")" : ", " + a + ")");
+}
+
+function hex(value) {
+  value = Math.max(0, Math.min(255, Math.round(value) || 0));
+  return (value < 16 ? "0" : "") + value.toString(16);
+}
+
+function hsla(h, s, l, a) {
+  if (a <= 0) h = s = l = NaN;
+  else if (l <= 0 || l >= 1) h = s = NaN;
+  else if (s <= 0) h = NaN;
+  return new Hsl(h, s, l, a);
+}
+
+function hslConvert(o) {
+  if (o instanceof Hsl) return new Hsl(o.h, o.s, o.l, o.opacity);
+  if (!(o instanceof Color)) o = color(o);
+  if (!o) return new Hsl;
+  if (o instanceof Hsl) return o;
+  o = o.rgb();
+  var r = o.r / 255,
+      g = o.g / 255,
+      b = o.b / 255,
+      min = Math.min(r, g, b),
+      max = Math.max(r, g, b),
+      h = NaN,
+      s = max - min,
+      l = (max + min) / 2;
+  if (s) {
+    if (r === max) h = (g - b) / s + (g < b) * 6;
+    else if (g === max) h = (b - r) / s + 2;
+    else h = (r - g) / s + 4;
+    s /= l < 0.5 ? max + min : 2 - max - min;
+    h *= 60;
+  } else {
+    s = l > 0 && l < 1 ? 0 : h;
+  }
+  return new Hsl(h, s, l, o.opacity);
+}
+
+function hsl(h, s, l, opacity) {
+  return arguments.length === 1 ? hslConvert(h) : new Hsl(h, s, l, opacity == null ? 1 : opacity);
+}
+
+function Hsl(h, s, l, opacity) {
+  this.h = +h;
+  this.s = +s;
+  this.l = +l;
+  this.opacity = +opacity;
+}
+
+define(Hsl, hsl, extend$1(Color, {
+  brighter: function(k) {
+    k = k == null ? brighter : Math.pow(brighter, k);
+    return new Hsl(this.h, this.s, this.l * k, this.opacity);
+  },
+  darker: function(k) {
+    k = k == null ? darker : Math.pow(darker, k);
+    return new Hsl(this.h, this.s, this.l * k, this.opacity);
+  },
+  rgb: function() {
+    var h = this.h % 360 + (this.h < 0) * 360,
+        s = isNaN(h) || isNaN(this.s) ? 0 : this.s,
+        l = this.l,
+        m2 = l + (l < 0.5 ? l : 1 - l) * s,
+        m1 = 2 * l - m2;
+    return new Rgb(
+      hsl2rgb(h >= 240 ? h - 240 : h + 120, m1, m2),
+      hsl2rgb(h, m1, m2),
+      hsl2rgb(h < 120 ? h + 240 : h - 120, m1, m2),
+      this.opacity
+    );
+  },
+  displayable: function() {
+    return (0 <= this.s && this.s <= 1 || isNaN(this.s))
+        && (0 <= this.l && this.l <= 1)
+        && (0 <= this.opacity && this.opacity <= 1);
+  },
+  formatHsl: function() {
+    var a = this.opacity; a = isNaN(a) ? 1 : Math.max(0, Math.min(1, a));
+    return (a === 1 ? "hsl(" : "hsla(")
+        + (this.h || 0) + ", "
+        + (this.s || 0) * 100 + "%, "
+        + (this.l || 0) * 100 + "%"
+        + (a === 1 ? ")" : ", " + a + ")");
+  }
+}));
+
+/* From FvD 13.37, CSS Color Module Level 3 */
+function hsl2rgb(h, m1, m2) {
+  return (h < 60 ? m1 + (m2 - m1) * h / 60
+      : h < 180 ? m2
+      : h < 240 ? m1 + (m2 - m1) * (240 - h) / 60
+      : m1) * 255;
+}
+
+function buildInterpolator(stops, base = 1) {
+  if (!stops || stops.length < 2 || stops[0].length !== 2) return;
+
+  // Confirm stops are all the same type, and convert colors to arrays
+  const type = getType(stops[0][1]);
+  if (!stops.every(s => getType(s[1]) === type)) return;
+  stops = stops.map(([x, y]) => [x, convertIfColor(y)]);
+
+  const izm = stops.length - 1;
+
+  const scale = getScale(base);
+  const interpolate = getInterpolator(type);
+
+  return function(x) {
+    const iz = stops.findIndex(stop => stop[0] > x);
+
+    if (iz === 0) return stops[0][1]; // x is below first stop
+    if (iz < 0) return stops[izm][1]; // x is above last stop
+
+    const [x0, y0] = stops[iz - 1];
+    const [x1, y1] = stops[iz];
+
+    return interpolate(y0, scale(x0, x, x1), y1);
+  };
+}
+
+function getType(v) {
+  return color(v) ? "color" : typeof v;
+}
+
+function convertIfColor(val) {
+  // Convert CSS color strings to clamped RGBA arrays for WebGL
+  if (!color(val)) return val;
+  const c = rgb(val);
+  return [c.r / 255, c.g / 255, c.b / 255, c.opacity];
+}
+
+function getScale(base) {
+  // Return a function to find the relative position of x between a and b
+
+  // Exponential scale follows mapbox-gl-js, style-spec/function/index.js
+  // NOTE: https://github.com/mapbox/mapbox-gl-js/issues/2698 not addressed!
+  const scale = (base === 1)
+    ? (a, x, b) => (x - a) / (b - a)  // Linear scale
+    : (a, x, b) => (Math.pow(base, x - a) - 1) / (Math.pow(base, b - a) - 1);
+
+  // Add check for zero range
+  return (a, x, b) => (a === b)
+    ? 0
+    : scale(a, x, b);
+}
+
+function getInterpolator(type) {
+  // Return a function to find an interpolated value between end values v1, v2,
+  // given relative position t between the two end positions
+
+  switch (type) {
+    case "number": // Linear interpolator
+      return (v1, t, v2) => v1 + t * (v2 - v1);
+
+    case "color":  // Interpolate RGBA
+      return (v1, t, v2) =>
+        v1.map((v, i) => v + t * (v2[i] - v));
+
+    default:       // Assume step function
+      return (v1) => v1;
+  }
+}
+
+function autoGetters(properties = {}, defaults) {
+  return Object.entries(defaults).reduce((d, [key, val]) => {
+    d[key] = buildStyleFunc(properties[key], val);
+    return d;
+  }, {});
+}
+
+function buildStyleFunc(style, defaultVal) {
+  if (style === undefined) {
+    return getConstFunc(defaultVal);
+
+  } else if (typeof style !== "object" || Array.isArray(style)) {
+    return getConstFunc(style);
+
+  } else {
+    return getStyleFunc(style);
+
+  } // NOT IMPLEMENTED: zoom-and-property functions
+}
+
+function getConstFunc(rawVal) {
+  const val = convertIfColor(rawVal);
+  const func = () => val;
+  return Object.assign(func, { type: "constant" });
+}
+
+function getStyleFunc(style) {
+  const { type, property = "zoom", base = 1, stops } = style;
+
+  const getArg = (property === "zoom")
+    ? (zoom) => zoom
+    : (zoom, feature) => feature.properties[property];
+
+  const getVal = (type === "identity")
+    ? convertIfColor
+    : buildInterpolator(stops, base);
+
+  if (!getVal) return console.log("style: " + JSON.stringify(style) +
+    "\nERROR in tile-stencil: unsupported style!");
+
+  const styleFunc = (zoom, feature) => getVal(getArg(zoom, feature));
+
+  return Object.assign(styleFunc, {
+    type: (property === "zoom") ? "zoom" : "property",
+    property,
+  });
+}
+
+const layoutDefaults = {
+  "background": {
+    "visibility": "visible",
+  },
+  "fill": {
+    "visibility": "visible",
+  },
+  "line": {
+    "visibility": "visible",
+    "line-cap": "butt",
+    "line-join": "miter",
+    "line-miter-limit": 2,
+    "line-round-limit": 1.05,
+  },
+  "symbol": {
+    "visibility": "visible",
+
+    "symbol-placement": "point",
+    "symbol-spacing": 250,
+    "symbol-avoid-edges": false,
+    "symbol-sort-key": undefined,
+    "symbol-z-order": "auto",
+
+    "icon-allow-overlap": false,
+    "icon-ignore-placement": false,
+    "icon-optional": false,
+    "icon-rotation-alignment": "auto",
+    "icon-size": 1,
+    "icon-text-fit": "none",
+    "icon-text-fit-padding": [0, 0, 0, 0],
+    "icon-image": undefined,
+    "icon-rotate": 0,
+    "icon-padding": 2,
+    "icon-keep-upright": false,
+    "icon-offset": [0, 0],
+    "icon-anchor": "center",
+    "icon-pitch-alignment": "auto",
+
+    "text-pitch-alignment": "auto",
+    "text-rotation-alignment": "auto",
+    "text-field": "",
+    "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+    "text-size": 16,
+    "text-max-width": 10,
+    "text-line-height": 1.2,
+    "text-letter-spacing": 0,
+    "text-justify": "center",
+    "text-radial-offset": 0,
+    "text-variable-anchor": undefined,
+    "text-anchor": "center",
+    "text-max-angle": 45,
+    "text-rotate": 0,
+    "text-padding": 2.0,
+    "text-keep-upright": true,
+    "text-transform": "none",
+    "text-offset": [0, 0],
+    "text-allow-overlap": false,
+    "text-ignore-placement": false,
+    "text-optional": false,
+  },
+  "raster": {
+    "visibility": "visible",
+  },
+  "circle": {
+    "visibility": "visible",
+  },
+  "fill-extrusion": {
+    "visibility": "visible",
+  },
+  "heatmap": {
+    "visibility": "visible",
+  },
+  "hillshade": {
+    "visibility": "visible",
+  },
+};
+
+const paintDefaults = {
+  "background": {
+    "background-color": "#000000",
+    "background-opacity": 1,
+    "background-pattern": undefined,
+  },
+  "fill": {
+    "fill-antialias": true,
+    "fill-opacity": 1,
+    "fill-color": "#000000",
+    "fill-outline-color": undefined,
+    "fill-outline-width": 1, // non-standard!
+    "fill-translate": [0, 0],
+    "fill-translate-anchor": "map",
+    "fill-pattern": undefined,
+  },
+  "line": {
+    "line-opacity": 1,
+    "line-color": "#000000",
+    "line-translate": [0, 0],
+    "line-translate-anchor": "map",
+    "line-width": 1,
+    "line-gap-width": 0,
+    "line-offset": 0,
+    "line-blur": 0,
+    "line-dasharray": undefined,
+    "line-pattern": undefined,
+    "line-gradient": undefined,
+  },
+  "symbol": {
+    "icon-opacity": 1,
+    "icon-color": "#000000",
+    "icon-halo-color": "rgba(0, 0, 0, 0)",
+    "icon-halo-width": 0,
+    "icon-halo-blur": 0,
+    "icon-translate": [0, 0],
+    "icon-translate-anchor": "map",
+
+    "text-opacity": 1,
+    "text-color": "#000000",
+    "text-halo-color": "rgba(0, 0, 0, 0)",
+    "text-halo-width": 0,
+    "text-halo-blur": 0,
+    "text-translate": [0, 0],
+    "text-translate-anchor": "map",
+  },
+  "raster": {
+    "raster-opacity": 1,
+    "raster-hue-rotate": 0,
+    "raster-brighness-min": 0,
+    "raster-brightness-max": 1,
+    "raster-saturation": 0,
+    "raster-contrast": 0,
+    "raster-resampling": "linear",
+    "raster-fade-duration": 300,
+  },
+  "circle": {
+    "circle-radius": 5,
+    "circle-color": "#000000",
+    "circle-blur": 0,
+    "circle-opacity": 1,
+    "circle-translate": [0, 0],
+    "circle-translate-anchor": "map",
+    "circle-pitch-scale": "map",
+    "circle-pitch-alignment": "viewport",
+    "circle-stroke-width": 0,
+    "circle-stroke-color": "#000000",
+    "circle-stroke-opacity": 1,
+  },
+  "fill-extrusion": {
+    "fill-extrusion-opacity": 1,
+    "fill-extrusion-color": "#000000",
+    "fill-extrusion-translate": [0, 0],
+    "fill-extrusion-translate-anchor": "map",
+    "fill-extrusion-height": 0,
+    "fill-extrusion-base": 0,
+    "fill-extrusion-vertical-gradient": true,
+  },
+  "heatmap": {
+    "heatmap-radius": 30,
+    "heatmap-weight": 1,
+    "heatmap-intensity": 1,
+    "heatmap-color": [
+      "interpolate", ["linear"], ["heatmap-density"],
+      0, "rgba(0, 0, 255,0)", 0.1, "royalblue", 0.3, "cyan",
+      0.5, "lime", 0.7, "yellow", 1, "red"
+    ],
+    "heatmap-opacity": 1,
+  },
+  "hillshade": {
+    "hillshade-illumination-direction": 335,
+    "hillshade-illumination-anchor": "viewport",
+    "hillshade-exaggeration": 0.5,
+    "hillshade-shadow-color": "#000000",
+    "hillshade-highlight-color": "#FFFFFF",
+    "hillshade-accent-color": "#000000",
+  },
+};
+
+function getStyleFuncs(inputLayer) {
+  const layer = Object.assign({}, inputLayer); // Leave input unchanged
+
+  // Replace rendering properties with functions
+  layer.layout = autoGetters(layer.layout, layoutDefaults[layer.type]);
+  layer.paint  = autoGetters(layer.paint,  paintDefaults[layer.type] );
+
+  return layer;
+}
+
+class AlphaImage {
+  // See maplibre-gl-js/src/util/image.js
+  constructor(size, data) {
+    createImage(this, size, 1, data);
+  }
+
+  resize(size) {
+    resizeImage(this, size, 1);
+  }
+
+  clone() {
+    return new AlphaImage(
+      { width: this.width, height: this.height },
+      new Uint8Array(this.data)
+    );
+  }
+
+  static copy(srcImg, dstImg, srcPt, dstPt, size) {
+    copyImage(srcImg, dstImg, srcPt, dstPt, size, 1);
+  }
+}
+
+function createImage(image, { width, height }, channels, data) {
+  if (!data) {
+    data = new Uint8Array(width * height * channels);
+  } else if (data.length !== width * height * channels) {
+    throw new RangeError("mismatched image size");
+  }
+  return Object.assign(image, { width, height, data });
+}
+
+function resizeImage(image, { width, height }, channels) {
+  if (width === image.width && height === image.height) return;
+
+  const size = {
+    width: Math.min(image.width, width),
+    height: Math.min(image.height, height),
+  };
+
+  const newImage = createImage({}, { width, height }, channels);
+
+  copyImage(image, newImage, { x: 0, y: 0 }, { x: 0, y: 0 }, size, channels);
+
+  Object.assign(image, { width, height, data: newImage.data });
+}
+
+function copyImage(srcImg, dstImg, srcPt, dstPt, size, channels) {
+  if (size.width === 0 || size.height === 0) return dstImg;
+
+  if (outOfRange(srcPt, size, srcImg)) {
+    throw new RangeError("out of range source coordinates for image copy");
+  }
+  if (outOfRange(dstPt, size, dstImg)) {
+    throw new RangeError("out of range destination coordinates for image copy");
+  }
+
+  const srcData = srcImg.data;
+  const dstData = dstImg.data;
+
+  console.assert(
+    srcData !== dstData,
+    "copyImage: src and dst data are identical!"
+  );
+
+  for (let y = 0; y < size.height; y++) {
+    const srcOffset = ((srcPt.y + y) * srcImg.width + srcPt.x) * channels;
+    const dstOffset = ((dstPt.y + y) * dstImg.width + dstPt.x) * channels;
+    for (let i = 0; i < size.width * channels; i++) {
+      dstData[dstOffset + i] = srcData[srcOffset + i];
+    }
+  }
+
+  return dstImg;
+}
+
+function outOfRange(point, size, image) {
+  const { width, height } = size;
+  return (
+    width > image.width ||
+    height > image.height ||
+    point.x > image.width - width ||
+    point.y > image.height - height
+  );
+}
+
+const GLYPH_PBF_BORDER = 3;
+const ONE_EM = 24;
+
+function parseGlyphPbf(data) {
+  // See maplibre-gl-js/src/style/parse_glyph_pbf.js
+  // Input is an ArrayBuffer, which will be read as a Uint8Array
+  return new Protobuf(data).readFields(readFontstacks, []);
+}
+
+function readFontstacks(tag, glyphs, pbf) {
+  if (tag === 1) pbf.readMessage(readFontstack, glyphs);
+}
+
+function readFontstack(tag, glyphs, pbf) {
+  if (tag !== 3) return;
+
+  const glyph = pbf.readMessage(readGlyph, {});
+  const { id, bitmap, width, height, left, top, advance } = glyph;
+
+  const borders = 2 * GLYPH_PBF_BORDER;
+  const size = { width: width + borders, height: height + borders };
+
+  glyphs.push({
+    id,
+    bitmap: new AlphaImage(size, bitmap),
+    metrics: { width, height, left, top, advance }
+  });
+}
+
+function readGlyph(tag, glyph, pbf) {
+  if (tag === 1) glyph.id = pbf.readVarint();
+  else if (tag === 2) glyph.bitmap = pbf.readBytes();
+  else if (tag === 3) glyph.width = pbf.readVarint();
+  else if (tag === 4) glyph.height = pbf.readVarint();
+  else if (tag === 5) glyph.left = pbf.readSVarint();
+  else if (tag === 6) glyph.top = pbf.readSVarint();
+  else if (tag === 7) glyph.advance = pbf.readVarint();
+}
+
+function initGlyphCache(endpoint) {
+  const fonts = {};
+
+  function getBlock(font, range) {
+    const first = range * 256;
+    const last = first + 255;
+    const href = endpoint
+      .replace("{fontstack}", font.split(" ").join("%20"))
+      .replace("{range}", first + "-" + last);
+
+    return fetch(href)
+      .then(getArrayBuffer)
+      .then(parseGlyphPbf)
+      .then(glyphs => glyphs.reduce((d, g) => (d[g.id] = g, d), {}));
+  }
+
+  return function(font, code) {
+    // 1. Find the 256-char block containing this code
+    if (code > 65535) throw Error("glyph codes > 65535 not supported");
+    const range = Math.floor(code / 256);
+
+    // 2. Get the Promise for the retrieval and parsing of the block
+    const blocks = fonts[font] || (fonts[font] = {});
+    const block = blocks[range] || (blocks[range] = getBlock(font, range));
+
+    // 3. Return a Promise that resolves to the requested glyph
+    // NOTE: may be undefined! if the API returns a sparse or empty block
+    return block.then(glyphs => glyphs[code]);
+  };
+}
+
+function getArrayBuffer(response) {
+  if (!response.ok) throw Error(response.status + " " + response.statusText);
+  return response.arrayBuffer();
+}
+
+function potpack(boxes) {
+
+    // calculate total box area and maximum box width
+    let area = 0;
+    let maxWidth = 0;
+
+    for (const box of boxes) {
+        area += box.w * box.h;
+        maxWidth = Math.max(maxWidth, box.w);
+    }
+
+    // sort the boxes for insertion by height, descending
+    boxes.sort((a, b) => b.h - a.h);
+
+    // aim for a squarish resulting container,
+    // slightly adjusted for sub-100% space utilization
+    const startWidth = Math.max(Math.ceil(Math.sqrt(area / 0.95)), maxWidth);
+
+    // start with a single empty space, unbounded at the bottom
+    const spaces = [{x: 0, y: 0, w: startWidth, h: Infinity}];
+
+    let width = 0;
+    let height = 0;
+
+    for (const box of boxes) {
+        // look through spaces backwards so that we check smaller spaces first
+        for (let i = spaces.length - 1; i >= 0; i--) {
+            const space = spaces[i];
+
+            // look for empty spaces that can accommodate the current box
+            if (box.w > space.w || box.h > space.h) continue;
+
+            // found the space; add the box to its top-left corner
+            // |-------|-------|
+            // |  box  |       |
+            // |_______|       |
+            // |         space |
+            // |_______________|
+            box.x = space.x;
+            box.y = space.y;
+
+            height = Math.max(height, box.y + box.h);
+            width = Math.max(width, box.x + box.w);
+
+            if (box.w === space.w && box.h === space.h) {
+                // space matches the box exactly; remove it
+                const last = spaces.pop();
+                if (i < spaces.length) spaces[i] = last;
+
+            } else if (box.h === space.h) {
+                // space matches the box height; update it accordingly
+                // |-------|---------------|
+                // |  box  | updated space |
+                // |_______|_______________|
+                space.x += box.w;
+                space.w -= box.w;
+
+            } else if (box.w === space.w) {
+                // space matches the box width; update it accordingly
+                // |---------------|
+                // |      box      |
+                // |_______________|
+                // | updated space |
+                // |_______________|
+                space.y += box.h;
+                space.h -= box.h;
+
+            } else {
+                // otherwise the box splits the space into two spaces
+                // |-------|-----------|
+                // |  box  | new space |
+                // |_______|___________|
+                // | updated space     |
+                // |___________________|
+                spaces.push({
+                    x: space.x + box.w,
+                    y: space.y,
+                    w: space.w - box.w,
+                    h: box.h
+                });
+                space.y += box.h;
+                space.h -= box.h;
+            }
+            break;
+        }
+    }
+
+    return {
+        w: width, // container width
+        h: height, // container height
+        fill: (area / (width * height)) || 0 // space utilization
+    };
+}
+
+const ATLAS_PADDING = 1;
+
+function buildAtlas(fonts) {
+  // See maplibre-gl-js/src/render/glyph_atlas.js
+
+  // Construct position objects (metrics and rects) for each glyph
+  const positions = Object.entries(fonts)
+    .reduce((pos, [font, glyphs]) => {
+      pos[font] = getPositions(glyphs);
+      return pos;
+    }, {});
+
+  // Figure out how to pack all the bitmaps into one image
+  // NOTE: modifies the rects in the positions object, in place!
+  const rects = Object.values(positions)
+    .flatMap(fontPos => Object.values(fontPos))
+    .map(p => p.rect);
+  const { w, h } = potpack(rects);
+
+  // Using the updated rects, copy all the bitmaps into one image
+  const image = new AlphaImage({ width: w || 1, height: h || 1 });
+  Object.entries(fonts).forEach(([font, glyphs]) => {
+    const fontPos = positions[font];
+    glyphs.forEach(glyph => copyGlyphBitmap(glyph, fontPos, image));
+  });
+
+  return { image, positions };
+}
+
+function getPositions(glyphs) {
+  return glyphs.reduce((dict, glyph) => {
+    const pos = getPosition(glyph);
+    if (pos) dict[glyph.id] = pos;
+    return dict;
+  }, {});
+}
+
+function getPosition(glyph) {
+  const { bitmap: { width, height }, metrics } = glyph;
+  if (width === 0 || height === 0) return;
+
+  // Construct a preliminary rect, positioned at the origin for now
+  const w = width + 2 * ATLAS_PADDING;
+  const h = height + 2 * ATLAS_PADDING;
+  const rect = { x: 0, y: 0, w, h };
+
+  return { metrics, rect };
+}
+
+function copyGlyphBitmap(glyph, positions, image) {
+  const { id, bitmap } = glyph;
+  const position = positions[id];
+  if (!position) return;
+
+  const srcPt = { x: 0, y: 0 };
+  const { x, y } = position.rect;
+  const dstPt = { x: x + ATLAS_PADDING, y: y + ATLAS_PADDING };
+  AlphaImage.copy(bitmap, image, srcPt, dstPt, bitmap);
+}
+
+function initGetter(urlTemplate, key) {
+  // Check if url is valid
+  const urlOK = (
+    (typeof urlTemplate === "string" || urlTemplate instanceof String) &&
+    urlTemplate.slice(0, 4) === "http"
+  );
+  if (!urlOK) return console.log("sdf-manager: no valid glyphs URL!");
+
+  // Put in the API key, if supplied
+  const endpoint = (key)
+    ? urlTemplate.replace("{key}", key)
+    : urlTemplate;
+
+  const getGlyph = initGlyphCache(endpoint);
+
+  return function(fontCodes) {
+    // fontCodes = { font1: [code1, code2...], font2: ... }
+    const fontGlyphs = {};
+
+    const promises = Object.entries(fontCodes).map(([font, codes]) => {
+      const requests = Array.from(codes, code => getGlyph(font, code));
+
+      return Promise.all(requests).then(glyphs => {
+        fontGlyphs[font] = glyphs.filter(g => g !== undefined);
+      });
+    });
+
+    return Promise.all(promises).then(() => {
+      return buildAtlas(fontGlyphs);
+    });
+  };
+}
+
+function getTokenParser(tokenText) {
+  if (!tokenText) return () => undefined;
+  const tokenPattern = /{([^{}]+)}/g;
+
+  // We break tokenText into pieces that are either plain text or tokens,
+  // then construct an array of functions to parse each piece
+  const tokenFuncs = [];
+  let charIndex  = 0;
+  while (charIndex < tokenText.length) {
+    // Find the next token
+    const result = tokenPattern.exec(tokenText);
+
+    if (!result) {
+      // No tokens left. Parse the plain text after the last token
+      const str = tokenText.substring(charIndex);
+      tokenFuncs.push(() => str);
+      break;
+    } else if (result.index > charIndex) {
+      // There is some plain text before the token
+      const str = tokenText.substring(charIndex, result.index);
+      tokenFuncs.push(() => str);
+    }
+
+    // Add a function to process the current token
+    const token = result[1];
+    tokenFuncs.push(props => props[token]);
+    charIndex = tokenPattern.lastIndex;
+  }
+
+  // We now have an array of functions returning either a text string or
+  // a feature property
+  // Return a function that assembles everything
+  return function(properties) {
+    return tokenFuncs.reduce(concat, "");
+    function concat(str, tokenFunc) {
+      const text = tokenFunc(properties) || "";
+      return str += text;
+    }
+  };
+}
+
+function initAtlasGetter({ parsedStyles, glyphEndpoint }) {
+  const getAtlas = initGetter(glyphEndpoint);
+
+  const textGetters = parsedStyles
+    .filter(s => s.type === "symbol")
+    .reduce((d, s) => (d[s.id] = initTextGetter(s), d), {});
+
+  return function(layers, zoom) {
+    const fonts = Object.entries(layers).reduce((d, [id, layer]) => {
+      const getCharCodes = textGetters[id];
+      // NOTE: MODIFIES layer.features IN PLACE
+      if (getCharCodes) layer.features.forEach(f => getCharCodes(f, zoom, d));
+      return d;
+    }, {});
+
+    return getAtlas(fonts);
+  };
+}
+
+function initTextGetter({ layout }) {
+  return function(feature, zoom, fonts) {
+    // Get the label text from feature properties
+    const textField = layout["text-field"](zoom, feature);
+    const text = getTokenParser(textField)(feature.properties);
+    if (!text) return;
+
+    // Apply the text transform, and convert to character codes
+    const transformCode = layout["text-transform"](zoom, feature);
+    const transformedText = getTextTransform(transformCode)(text);
+    const charCodes = transformedText.split("").map(c => c.charCodeAt(0));
+    if (!charCodes.length) return;
+
+    // Update the set of character codes for the appropriate font
+    const font = layout["text-font"](zoom, feature);
+    const charSet = fonts[font] || (fonts[font] = new Set());
+    charCodes.forEach(charSet.add, charSet);
+
+    // Add font name and character codes to the feature (MODIFY IN PLACE!)
+    Object.assign(feature, { font, charCodes });
+  };
+}
+
+function getTextTransform(code) {
+  switch (code) {
+    case "uppercase":
+      return f => f.toUpperCase();
+    case "lowercase":
+      return f => f.toLowerCase();
+    case "none":
+    default:
+      return f => f;
+  }
+}
+
+function initStyle({ layout, paint }) {
+  const layoutKeys = [
+    "text-letter-spacing",
+    "text-max-width",
+    "text-size",
+    "text-padding",
+    "text-line-height",
+    "text-anchor",
+    "text-offset",
+    "text-justify",
+  ];
+
+  const paintKeys = [
+    "text-color",
+    "text-opacity",
+  ];
+
+  const bufferFuncs = paintKeys
+    .filter(k => paint[k].type === "property")
+    .map(k => ([paint[k], camelCase$1(k)]));
+
+  return function(zoom, feature) {
+    const layoutVals = layoutKeys
+      .reduce((d, k) => (d[k] = layout[k](zoom, feature), d), {});
+
+    const bufferVals = bufferFuncs
+      .reduce((d, [f, k]) => (d[k] = f(zoom, feature), d), {});
+
+    return { layoutVals, bufferVals };
+  };
+}
+
+function camelCase$1(hyphenated) {
+  return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
+}
+
+function getGlyphInfo(feature, atlas) {
+  const { font, charCodes } = feature;
+  const positions = atlas.positions[font];
+
+  if (!positions || !charCodes || !charCodes.length) return;
+
+  const { width, height } = atlas.image;
+
+  return charCodes.map(code => {
+    const pos = positions[code];
+    if (!pos) return;
+
+    const { left, top, advance } = pos.metrics;
+    const { x, y, w, h } = pos.rect;
+
+    const sdfRect = [x / width, y / height, w / width, h / height];
+    const metrics = { left, top, advance, w, h };
+
+    return { code, metrics, sdfRect };
+  }).filter(i => i !== undefined);
+}
+
+const whitespace = {
+  // From maplibre-gl-js/src/symbol/shaping.js
+  [0x09]: true, // tab
+  [0x0a]: true, // newline
+  [0x0b]: true, // vertical tab
+  [0x0c]: true, // form feed
+  [0x0d]: true, // carriage return
+  [0x20]: true, // space
+};
+
+const breakable = {
+  // From maplibre-gl-js/src/symbol/shaping.js
+  [0x0a]: true, // newline
+  [0x20]: true, // space
+  [0x26]: true, // ampersand
+  [0x28]: true, // left parenthesis
+  [0x29]: true, // right parenthesis
+  [0x2b]: true, // plus sign
+  [0x2d]: true, // hyphen-minus
+  [0x2f]: true, // solidus
+  [0xad]: true, // soft hyphen
+  [0xb7]: true, // middle dot
+  [0x200b]: true, // zero-width space
+  [0x2010]: true, // hyphen
+  [0x2013]: true, // en dash
+  [0x2027]: true  // interpunct
+};
+
+function getBreakPoints(glyphs, spacing, targetWidth) {
+  const potentialLineBreaks = [];
+  const last = glyphs.length - 1;
+  let cursor = 0;
+
+  glyphs.forEach((g, i) => {
+    const { code, metrics: { advance } } = g;
+    if (!whitespace[code]) cursor += advance + spacing;
+
+    if (i == last) return;
+    // if (!breakable[code]&& !charAllowsIdeographicBreaking(code)) return;
+    if (!breakable[code]) return;
+
+    const breakInfo = evaluateBreak(
+      i + 1,
+      cursor,
+      targetWidth,
+      potentialLineBreaks,
+      calculatePenalty(code, glyphs[i + 1].code),
+      false
+    );
+    potentialLineBreaks.push(breakInfo);
+  });
+
+  const lastBreak = evaluateBreak(
+    glyphs.length,
+    cursor,
+    targetWidth,
+    potentialLineBreaks,
+    0,
+    true
+  );
+
+  return leastBadBreaks(lastBreak);
+}
+
+function leastBadBreaks(lastBreak) {
+  if (!lastBreak) return [];
+  return leastBadBreaks(lastBreak.priorBreak).concat(lastBreak.index);
+}
+
+function evaluateBreak(index, x, targetWidth, breaks, penalty, isLastBreak) {
+  // Start by assuming the supplied (index, x) is the first break
+  const init = {
+    index, x,
+    priorBreak: null,
+    badness: calculateBadness(x)
+  };
+
+  // Now consider all previous possible break points, and
+  // return the pair corresponding to the best combination of breaks
+  return breaks.reduce((best, prev) => {
+    const badness = calculateBadness(x - prev.x) + prev.badness;
+    if (badness < best.badness) {
+      best.priorBreak = prev;
+      best.badness = badness;
+    }
+    return best;
+  }, init);
+
+  function calculateBadness(width) {
+    const raggedness = (width - targetWidth) ** 2;
+
+    if (!isLastBreak) return raggedness + Math.abs(penalty) * penalty;
+
+    // Last line: prefer shorter than average
+    return (width < targetWidth)
+      ? raggedness / 2
+      : raggedness * 2;
+  }
+}
+
+function calculatePenalty(code, nextCode) {
+  let penalty = 0;
+  // Force break on newline
+  if (code === 0x0a) penalty -= 10000;
+  // Penalize open parenthesis at end of line
+  if (code === 0x28 || code === 0xff08) penalty += 50;
+  // Penalize close parenthesis at beginning of line
+  if (nextCode === 0x29 || nextCode === 0xff09) penalty += 50;
+
+  return penalty;
+}
+
+function splitLines(glyphs, styleVals) {
+  // glyphs is an Array of Objects with properties { code, metrics }
+  const spacing = styleVals["text-letter-spacing"] * ONE_EM;
+  const totalWidth = measureLine(glyphs, spacing);
+
+  const maxWidth = styleVals["text-max-width"] * ONE_EM;
+  const lineCount = Math.ceil(totalWidth / maxWidth);
+  if (lineCount < 1) return [];
+
+  const targetWidth = totalWidth / lineCount;
+  const breakPoints = getBreakPoints(glyphs, spacing, targetWidth);
+
+  return breakLines(glyphs, breakPoints, spacing);
+}
+
+function breakLines(glyphs, breakPoints, spacing) {
+  let start = 0;
+
+  return breakPoints.map(lineBreak => {
+    const line = glyphs.slice(start, lineBreak);
+
+    // Trim whitespace from both ends
+    while (line.length && whitespace[line[0].code]) line.shift();
+    while (trailingWhiteSpace(line)) line.pop();
+
+    line.width = measureLine(line, spacing);
+    start = lineBreak;
+    return line;
+  });
+}
+
+function trailingWhiteSpace(line) {
+  const len = line.length;
+  if (!len) return false;
+  return whitespace[line[len - 1].code];
+}
+
+function measureLine(glyphs, spacing) {
+  if (glyphs.length < 1) return 0;
+
+  // No initial value for reduce--so no spacing added for 1st char
+  return glyphs.map(g => g.metrics.advance)
+    .reduce((a, c) => a + c + spacing);
+}
+
+function getTextBox(lines, styleVals) {
+  const [sx, sy] = getTextBoxShift(styleVals["text-anchor"]);
+
+  // Get dimensions and relative position of text area in glyph pixels
+  const w = Math.max(...lines.map(l => l.width));
+  const h = lines.length * styleVals["text-line-height"] * ONE_EM;
+  const x = sx * w + styleVals["text-offset"][0] * ONE_EM;
+  const y = sy * h + styleVals["text-offset"][1] * ONE_EM;
+
+  // Get total bounding box after scale and pad
+  const scale = styleVals["text-size"] / ONE_EM;
+  const pad = styleVals["text-padding"];
+  const bbox = [
+    x * scale - pad,
+    y * scale - pad,
+    (x + w) * scale + pad,
+    (y + h) * scale + pad,
+  ];
+
+  return { x, y, w, h, shiftX: sx, bbox };
+}
+
+function getTextBoxShift(anchor) {
+  // Shift the top-left corner of the text bounding box
+  // by the returned value * bounding box dimensions
+  switch (anchor) {
+    case "top-left":
+      return [0.0, 0.0];
+    case "top-right":
+      return [-1.0, 0.0];
+    case "top":
+      return [-0.5, 0.0];
+    case "bottom-left":
+      return [0.0, -1.0];
+    case "bottom-right":
+      return [-1.0, -1.0];
+    case "bottom":
+      return [-0.5, -1.0];
+    case "left":
+      return [0.0, -0.5];
+    case "right":
+      return [-1.0, -0.5];
+    case "center":
+    default:
+      return [-0.5, -0.5];
+  }
+}
+
+const RECT_BUFFER = GLYPH_PBF_BORDER + ATLAS_PADDING;
+
+function layoutLines(glyphs, styleVals) {
+  // TODO: what if splitLines returns nothing?
+  const lines = splitLines(glyphs, styleVals);
+  const box = getTextBox(lines, styleVals);
+
+  const lineHeight = styleVals["text-line-height"] * ONE_EM;
+  const lineShiftX = getLineShift(styleVals["text-justify"], box.shiftX);
+  const spacing = styleVals["text-letter-spacing"] * ONE_EM;
+  const fontScalar = styleVals["text-size"] / ONE_EM;
+
+  const chars = lines.flatMap((line, i) => {
+    const x = (box.w - line.width) * lineShiftX + box.x;
+    const y = i * lineHeight + box.y;
+    return layoutLine(line, [x, y], spacing, fontScalar);
+  });
+
+  return Object.assign(chars, { fontScalar, bbox: box.bbox });
+}
+
+function layoutLine(glyphs, origin, spacing, scalar) {
+  let xCursor = origin[0];
+  const y0 = origin[1];
+
+  return glyphs.map(g => {
+    const { left, top, advance, w, h } = g.metrics;
+
+    const dx = xCursor + left - RECT_BUFFER;
+    const dy = y0 - top - RECT_BUFFER;
+
+    xCursor += advance + spacing;
+
+    const pos = [dx, dy, w, h].map(c => c * scalar);
+    const rect = g.sdfRect;
+
+    return { pos, rect };
+  });
+}
+
+function getLineShift(justify, boxShiftX) {
+  switch (justify) {
+    case "auto":
+      return -boxShiftX;
+    case "left":
+      return 0;
+    case "right":
+      return 1;
+    case "center":
+    default:
+      return 0.5;
+  }
+}
+
+function getBuffers(chars, anchor, tileCoord, bufferVals) {
+  const origin = [...anchor, chars.fontScalar];
+  const { z, x, y } = tileCoord;
+
+  const buffers = {
+    sdfRect: chars.flatMap(c => c.rect),
+    charPos: chars.flatMap(c => c.pos),
+    labelPos: chars.flatMap(() => origin),
+    tileCoords: chars.flatMap(() => [x, y, z]),
+  };
+
+  Object.entries(bufferVals).forEach(([key, val]) => {
+    buffers[key] = chars.flatMap(() => val);
+  });
+
+  return buffers;
+}
+
+function initShaping(style) {
+  const getStyleVals = initStyle(style);
+
+  return function(feature, tileCoords, atlas, tree) {
+    // tree is an RBush from the 'rbush' module. NOTE: will be updated!
+
+    const glyphs = getGlyphInfo(feature, atlas);
+    if (!glyphs) return;
+
+    const { layoutVals, bufferVals } = getStyleVals(tileCoords.z, feature);
+    const chars = layoutLines(glyphs, layoutVals);
+
+    const [x0, y0] = feature.geometry.coordinates;
+    const bbox = chars.bbox;
+
+    const box = {
+      minX: x0 + bbox[0],
+      minY: y0 + bbox[1],
+      maxX: x0 + bbox[2],
+      maxY: y0 + bbox[3],
+    };
+
+    if (tree.collides(box)) return;
+    tree.insert(box);
+
+    // TODO: drop if outside tile?
+    return getBuffers(chars, [x0, y0], tileCoords, bufferVals);
+  };
+}
+
 const circleInfo = {
   styleKeys: ["circle-radius", "circle-color", "circle-opacity"],
   serialize: flattenPoints,
@@ -782,381 +2275,11 @@ function indexPolygon(coords) {
   return { position: vertices, indices };
 }
 
-const GLYPH_PBF_BORDER = 3;
-const ONE_EM = 24;
-
-const ATLAS_PADDING = 1;
-
-function initStyle({ layout, paint }) {
-  const layoutKeys = [
-    "text-letter-spacing",
-    "text-max-width",
-    "text-size",
-    "text-padding",
-    "text-line-height",
-    "text-anchor",
-    "text-offset",
-    "text-justify",
-  ];
-
-  const paintKeys = [
-    "text-color",
-    "text-opacity",
-  ];
-
-  const bufferFuncs = paintKeys
-    .filter(k => paint[k].type === "property")
-    .map(k => ([paint[k], camelCase$1(k)]));
-
-  return function(zoom, feature) {
-    const layoutVals = layoutKeys
-      .reduce((d, k) => (d[k] = layout[k](zoom, feature), d), {});
-
-    const bufferVals = bufferFuncs
-      .reduce((d, [f, k]) => (d[k] = f(zoom, feature), d), {});
-
-    return { layoutVals, bufferVals };
-  };
-}
-
-function camelCase$1(hyphenated) {
-  return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
-}
-
-function getGlyphInfo(feature, atlas) {
-  const { font, charCodes } = feature;
-  const positions = atlas.positions[font];
-
-  if (!positions || !charCodes || !charCodes.length) return;
-
-  const { width, height } = atlas.image;
-
-  return charCodes.map(code => {
-    const pos = positions[code];
-    if (!pos) return;
-
-    const { left, top, advance } = pos.metrics;
-    const { x, y, w, h } = pos.rect;
-
-    const sdfRect = [x / width, y / height, w / width, h / height];
-    const metrics = { left, top, advance, w, h };
-
-    return { code, metrics, sdfRect };
-  }).filter(i => i !== undefined);
-}
-
-const whitespace = {
-  // From maplibre-gl-js/src/symbol/shaping.js
-  [0x09]: true, // tab
-  [0x0a]: true, // newline
-  [0x0b]: true, // vertical tab
-  [0x0c]: true, // form feed
-  [0x0d]: true, // carriage return
-  [0x20]: true, // space
-};
-
-const breakable = {
-  // From maplibre-gl-js/src/symbol/shaping.js
-  [0x0a]: true, // newline
-  [0x20]: true, // space
-  [0x26]: true, // ampersand
-  [0x28]: true, // left parenthesis
-  [0x29]: true, // right parenthesis
-  [0x2b]: true, // plus sign
-  [0x2d]: true, // hyphen-minus
-  [0x2f]: true, // solidus
-  [0xad]: true, // soft hyphen
-  [0xb7]: true, // middle dot
-  [0x200b]: true, // zero-width space
-  [0x2010]: true, // hyphen
-  [0x2013]: true, // en dash
-  [0x2027]: true  // interpunct
-};
-
-function getBreakPoints(glyphs, spacing, targetWidth) {
-  const potentialLineBreaks = [];
-  const last = glyphs.length - 1;
-  let cursor = 0;
-
-  glyphs.forEach((g, i) => {
-    const { code, metrics: { advance } } = g;
-    if (!whitespace[code]) cursor += advance + spacing;
-
-    if (i == last) return;
-    // if (!breakable[code]&& !charAllowsIdeographicBreaking(code)) return;
-    if (!breakable[code]) return;
-
-    const breakInfo = evaluateBreak(
-      i + 1,
-      cursor,
-      targetWidth,
-      potentialLineBreaks,
-      calculatePenalty(code, glyphs[i + 1].code),
-      false
-    );
-    potentialLineBreaks.push(breakInfo);
-  });
-
-  const lastBreak = evaluateBreak(
-    glyphs.length,
-    cursor,
-    targetWidth,
-    potentialLineBreaks,
-    0,
-    true
-  );
-
-  return leastBadBreaks(lastBreak);
-}
-
-function leastBadBreaks(lastBreak) {
-  if (!lastBreak) return [];
-  return leastBadBreaks(lastBreak.priorBreak).concat(lastBreak.index);
-}
-
-function evaluateBreak(index, x, targetWidth, breaks, penalty, isLastBreak) {
-  // Start by assuming the supplied (index, x) is the first break
-  const init = {
-    index, x,
-    priorBreak: null,
-    badness: calculateBadness(x)
-  };
-
-  // Now consider all previous possible break points, and
-  // return the pair corresponding to the best combination of breaks
-  return breaks.reduce((best, prev) => {
-    const badness = calculateBadness(x - prev.x) + prev.badness;
-    if (badness < best.badness) {
-      best.priorBreak = prev;
-      best.badness = badness;
-    }
-    return best;
-  }, init);
-
-  function calculateBadness(width) {
-    const raggedness = (width - targetWidth) ** 2;
-
-    if (!isLastBreak) return raggedness + Math.abs(penalty) * penalty;
-
-    // Last line: prefer shorter than average
-    return (width < targetWidth)
-      ? raggedness / 2
-      : raggedness * 2;
-  }
-}
-
-function calculatePenalty(code, nextCode) {
-  let penalty = 0;
-  // Force break on newline
-  if (code === 0x0a) penalty -= 10000;
-  // Penalize open parenthesis at end of line
-  if (code === 0x28 || code === 0xff08) penalty += 50;
-  // Penalize close parenthesis at beginning of line
-  if (nextCode === 0x29 || nextCode === 0xff09) penalty += 50;
-
-  return penalty;
-}
-
-function splitLines(glyphs, styleVals) {
-  // glyphs is an Array of Objects with properties { code, metrics }
-  const spacing = styleVals["text-letter-spacing"] * ONE_EM;
-  const totalWidth = measureLine(glyphs, spacing);
-
-  const maxWidth = styleVals["text-max-width"] * ONE_EM;
-  const lineCount = Math.ceil(totalWidth / maxWidth);
-  if (lineCount < 1) return [];
-
-  const targetWidth = totalWidth / lineCount;
-  const breakPoints = getBreakPoints(glyphs, spacing, targetWidth);
-
-  return breakLines(glyphs, breakPoints, spacing);
-}
-
-function breakLines(glyphs, breakPoints, spacing) {
-  let start = 0;
-
-  return breakPoints.map(lineBreak => {
-    const line = glyphs.slice(start, lineBreak);
-
-    // Trim whitespace from both ends
-    while (line.length && whitespace[line[0].code]) line.shift();
-    while (trailingWhiteSpace(line)) line.pop();
-
-    line.width = measureLine(line, spacing);
-    start = lineBreak;
-    return line;
-  });
-}
-
-function trailingWhiteSpace(line) {
-  const len = line.length;
-  if (!len) return false;
-  return whitespace[line[len - 1].code];
-}
-
-function measureLine(glyphs, spacing) {
-  if (glyphs.length < 1) return 0;
-
-  // No initial value for reduce--so no spacing added for 1st char
-  return glyphs.map(g => g.metrics.advance)
-    .reduce((a, c) => a + c + spacing);
-}
-
-function getTextBox(lines, styleVals) {
-  const [sx, sy] = getTextBoxShift(styleVals["text-anchor"]);
-
-  // Get dimensions and relative position of text area in glyph pixels
-  const w = Math.max(...lines.map(l => l.width));
-  const h = lines.length * styleVals["text-line-height"] * ONE_EM;
-  const x = sx * w + styleVals["text-offset"][0] * ONE_EM;
-  const y = sy * h + styleVals["text-offset"][1] * ONE_EM;
-
-  // Get total bounding box after scale and pad
-  const scale = styleVals["text-size"] / ONE_EM;
-  const pad = styleVals["text-padding"];
-  const bbox = [
-    x * scale - pad,
-    y * scale - pad,
-    (x + w) * scale + pad,
-    (y + h) * scale + pad,
-  ];
-
-  return { x, y, w, h, shiftX: sx, bbox };
-}
-
-function getTextBoxShift(anchor) {
-  // Shift the top-left corner of the text bounding box
-  // by the returned value * bounding box dimensions
-  switch (anchor) {
-    case "top-left":
-      return [0.0, 0.0];
-    case "top-right":
-      return [-1.0, 0.0];
-    case "top":
-      return [-0.5, 0.0];
-    case "bottom-left":
-      return [0.0, -1.0];
-    case "bottom-right":
-      return [-1.0, -1.0];
-    case "bottom":
-      return [-0.5, -1.0];
-    case "left":
-      return [0.0, -0.5];
-    case "right":
-      return [-1.0, -0.5];
-    case "center":
-    default:
-      return [-0.5, -0.5];
-  }
-}
-
-const RECT_BUFFER = GLYPH_PBF_BORDER + ATLAS_PADDING;
-
-function layoutLines(glyphs, styleVals) {
-  // TODO: what if splitLines returns nothing?
-  const lines = splitLines(glyphs, styleVals);
-  const box = getTextBox(lines, styleVals);
-
-  const lineHeight = styleVals["text-line-height"] * ONE_EM;
-  const lineShiftX = getLineShift(styleVals["text-justify"], box.shiftX);
-  const spacing = styleVals["text-letter-spacing"] * ONE_EM;
-  const fontScalar = styleVals["text-size"] / ONE_EM;
-
-  const chars = lines.flatMap((line, i) => {
-    const x = (box.w - line.width) * lineShiftX + box.x;
-    const y = i * lineHeight + box.y;
-    return layoutLine(line, [x, y], spacing, fontScalar);
-  });
-
-  return Object.assign(chars, { fontScalar, bbox: box.bbox });
-}
-
-function layoutLine(glyphs, origin, spacing, scalar) {
-  let xCursor = origin[0];
-  const y0 = origin[1];
-
-  return glyphs.map(g => {
-    const { left, top, advance, w, h } = g.metrics;
-
-    const dx = xCursor + left - RECT_BUFFER;
-    const dy = y0 - top - RECT_BUFFER;
-
-    xCursor += advance + spacing;
-
-    const pos = [dx, dy, w, h].map(c => c * scalar);
-    const rect = g.sdfRect;
-
-    return { pos, rect };
-  });
-}
-
-function getLineShift(justify, boxShiftX) {
-  switch (justify) {
-    case "auto":
-      return -boxShiftX;
-    case "left":
-      return 0;
-    case "right":
-      return 1;
-    case "center":
-    default:
-      return 0.5;
-  }
-}
-
-function getBuffers(chars, anchor, tileCoord, bufferVals) {
-  const origin = [...anchor, chars.fontScalar];
-  const { z, x, y } = tileCoord;
-
-  const buffers = {
-    sdfRect: chars.flatMap(c => c.rect),
-    charPos: chars.flatMap(c => c.pos),
-    labelPos: chars.flatMap(() => origin),
-    tileCoords: chars.flatMap(() => [x, y, z]),
-  };
-
-  Object.entries(bufferVals).forEach(([key, val]) => {
-    buffers[key] = chars.flatMap(() => val);
-  });
-
-  return buffers;
-}
-
-function initShaping(style) {
-  const getStyleVals = initStyle(style);
-
-  return function(feature, tileCoords, atlas, tree) {
-    // tree is an RBush from the 'rbush' module. NOTE: will be updated!
-
-    const glyphs = getGlyphInfo(feature, atlas);
-    if (!glyphs) return;
-
-    const { layoutVals, bufferVals } = getStyleVals(tileCoords.z, feature);
-    const chars = layoutLines(glyphs, layoutVals);
-
-    const [x0, y0] = feature.geometry.coordinates;
-    const bbox = chars.bbox;
-
-    const box = {
-      minX: x0 + bbox[0],
-      minY: y0 + bbox[1],
-      maxX: x0 + bbox[2],
-      maxY: y0 + bbox[3],
-    };
-
-    if (tree.collides(box)) return;
-    tree.insert(box);
-
-    // TODO: drop if outside tile?
-    return getBuffers(chars, [x0, y0], tileCoords, bufferVals);
-  };
-}
-
 function camelCase(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function initSerializer(style) {
+function initFeatureSerializer(style) {
   const { type, paint } = style;
 
   switch (type) {
@@ -1228,7 +2351,7 @@ function appendBuffers(buffers, newBuffers) {
 function initLayerSerializer(style) {
   const { id, type, interactive } = style;
 
-  const transform = initSerializer(style);
+  const transform = initFeatureSerializer(style);
   if (!transform) return;
 
   return function(layer, tileCoords, atlas, tree) {
@@ -1817,6 +2940,36 @@ function multiSelect(arr, left, right, n, compare) {
     }
 }
 
+function initSerializer(userParams) {
+  const { glyphEndpoint, layers } = setParams(userParams);
+  const parsedStyles = layers.map(getStyleFuncs);
+
+  const getAtlas = initAtlasGetter({ parsedStyles, glyphEndpoint });
+  const process = initTileSerializer(parsedStyles);
+
+  return function(source, tileCoords) {
+    return getAtlas(source, tileCoords.z).then(atlas => {
+      const layers = process(source, tileCoords, atlas);
+
+      // Note: atlas.data.buffer is a Transferable
+      return { atlas: atlas.image, layers };
+    });
+  };
+}
+
+function setParams({ glyphs, layers }) {
+  if (!layers || !layers.length) fail("no valid array of style layers");
+
+  const glyphsOK = ["string", "undefined"].includes(typeof glyphs);
+  if (!glyphsOK) fail("glyphs must be a string URL");
+
+  return { glyphEndpoint: glyphs, layers };
+}
+
+function fail(message) {
+  throw Error("tile-gl initSerializer: " + message);
+}
+
 function initTileSerializer(styles) {
   const layerSerializers = styles
     .reduce((d, s) => (d[s.id] = initLayerSerializer(s), d), {});
@@ -1835,4 +2988,4 @@ function initTileSerializer(styles) {
   };
 }
 
-export { initTileSerializer };
+export { initSerializer };

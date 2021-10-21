@@ -27,6 +27,6 @@ export default [{
   output: {
     file: 'dist/serializer.bundle.js',
     format: 'esm',
-    name: 'initTileSerializer',
+    name: 'initSerializer',
   }
 }];

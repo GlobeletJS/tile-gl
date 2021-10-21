@@ -1,10 +1,10 @@
-import { initSerializer } from "./feature.js";
+import { initFeatureSerializer } from "./feature.js";
 import { concatBuffers } from "./concat-buffers.js";
 
 export function initLayerSerializer(style) {
   const { id, type, interactive } = style;
 
-  const transform = initSerializer(style);
+  const transform = initFeatureSerializer(style);
   if (!transform) return;
 
   return function(layer, tileCoords, atlas, tree) {
