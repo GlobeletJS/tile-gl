@@ -37,14 +37,14 @@
     "eslint": "^8.0.0",
     "eslint-config-globeletjs": "^0.0.6",
     "rollup": "^2.52.7",
-    "tile-mixer": "^0.3.0",
+    "tile-mixer": "^0.3.1",
     "tile-retriever": "^0.0.4",
     "yawgl": "^0.3.3"
   },
   "dependencies": {
     "earcut": "^2.2.3",
     "rbush": "^3.0.1",
-    "tile-labeler": "^0.4.2",
+    "tile-labeler": "^0.5.0",
     "tile-stencil": "^0.4.4"
   },
   "sideEffects": false

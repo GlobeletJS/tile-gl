@@ -3,7 +3,7 @@ import frag from "./frag.glsl";
 
 export function initText(context) {
   const attrInfo = {
-    labelPos: { numComponents: 3 },
+    labelPos: { numComponents: 4 },
     charPos: { numComponents: 4 },
     sdfRect: { numComponents: 4 },
     tileCoords: { numComponents: 3 },
@@ -18,6 +18,6 @@ export function initText(context) {
   return {
     vert, frag, attrInfo, styleKeys,
     getSpecialAttrs: () => ({ quadPos }),
-    countInstances: (buffers) => buffers.labelPos.length / 3,
+    countInstances: (buffers) => buffers.labelPos.length / 4,
   };
 }

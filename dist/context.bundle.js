@@ -333,7 +333,7 @@ function initFill() {
 }
 
 var vert = `attribute vec2 quadPos;  // Vertices of the quad instance
-attribute vec3 labelPos; // x, y, font size scalar
+attribute vec4 labelPos; // x, y, angle, font size scalar
 attribute vec4 charPos;  // dx, dy (relative to labelPos), w, h
 attribute vec4 sdfRect;  // x, y, w, h
 attribute vec4 textColor;
@@ -344,7 +344,7 @@ varying vec2 texCoord;
 varying vec4 fillStyle;
 
 void main() {
-  taperWidth = labelPos.z * screenScale.z;
+  taperWidth = labelPos.w * screenScale.z;
   texCoord = sdfRect.xy + sdfRect.zw * quadPos;
   fillStyle = textColor * textOpacity;
 
@@ -353,7 +353,12 @@ void main() {
   // Shift to the appropriate corner of the current instance quad
   vec2 dPos = (charPos.xy + charPos.zw * quadPos) * styleScale(labelPos.xy);
 
-  gl_Position = mapToClip(mapPos + dPos, 0.0);
+  float cos_a = cos(labelPos.z);
+  float sin_a = sin(labelPos.z);
+  float dx = dPos.x * cos_a - dPos.y * sin_a;
+  float dy = dPos.x * sin_a + dPos.y * cos_a;
+
+  gl_Position = mapToClip(mapPos + vec2(dx, dy), 0.0);
 }
 `;
 
@@ -376,7 +381,7 @@ void main() {
 
 function initText(context) {
   const attrInfo = {
-    labelPos: { numComponents: 3 },
+    labelPos: { numComponents: 4 },
     charPos: { numComponents: 4 },
     sdfRect: { numComponents: 4 },
     tileCoords: { numComponents: 3 },
@@ -391,7 +396,7 @@ function initText(context) {
   return {
     vert, frag, attrInfo, styleKeys,
     getSpecialAttrs: () => ({ quadPos }),
-    countInstances: (buffers) => buffers.labelPos.length / 3,
+    countInstances: (buffers) => buffers.labelPos.length / 4,
   };
 }
 
