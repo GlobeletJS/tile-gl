@@ -4,7 +4,7 @@ import { fillInfo } from "../fill/serializer.js";
 import { initShaping } from "tile-labeler";
 import { camelCase } from "../camelCase.js";
 
-export function initFeatureSerializer(style) {
+export function initFeatureSerializer(style, spriteData) {
   const { type, paint } = style;
 
   switch (type) {
@@ -15,7 +15,7 @@ export function initFeatureSerializer(style) {
     case "fill":
       return initParsing(paint, fillInfo);
     case "symbol":
-      return initShaping(style);
+      return initShaping(style, spriteData);
     default:
       throw Error("tile-gl: unknown serializer type!");
   }

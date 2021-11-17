@@ -1072,45 +1072,31 @@ function getTokenParser(tokenText) {
   };
 }
 
-function initAtlasGetter({ parsedStyles, glyphEndpoint }) {
-  const getAtlas = initGetter(glyphEndpoint);
+function initPreprocessor({ layout }) {
+  const styleKeys = [
+    "text-field",
+    "text-transform",
+    "text-font",
+    "icon-image",
+  ];
 
-  const textGetters = parsedStyles
-    .filter(s => s.type === "symbol")
-    .reduce((d, s) => (d[s.id] = initTextGetter(s), d), {});
+  return function(feature, zoom) {
+    const styleVals = styleKeys
+      .reduce((d, k) => (d[k] = layout[k](zoom, feature), d), {});
+    const { properties } = feature;
 
-  return function(layers, zoom) {
-    const fonts = Object.entries(layers).reduce((d, [id, layer]) => {
-      const getCharCodes = textGetters[id];
-      // NOTE: MODIFIES layer.features IN PLACE
-      if (getCharCodes) layer.features.forEach(f => getCharCodes(f, zoom, d));
-      return d;
-    }, {});
+    const spriteID = getTokenParser(styleVals["icon-image"])(properties);
+    const text = getTokenParser(styleVals["text-field"])(properties);
+    const haveText = (typeof text === "string" && text.length > 0);
 
-    return getAtlas(fonts);
-  };
-}
+    if (!haveText && spriteID === undefined) return;
 
-function initTextGetter({ layout }) {
-  return function(feature, zoom, fonts) {
-    // Get the label text from feature properties
-    const textField = layout["text-field"](zoom, feature);
-    const text = getTokenParser(textField)(feature.properties);
-    if (!text) return;
+    if (!haveText) return Object.assign(feature, { spriteID });
 
-    // Apply the text transform, and convert to character codes
-    const transformCode = layout["text-transform"](zoom, feature);
-    const transformedText = getTextTransform(transformCode)(text);
-    const charCodes = transformedText.split("").map(c => c.charCodeAt(0));
-    if (!charCodes.length) return;
-
-    // Update the set of character codes for the appropriate font
-    const font = layout["text-font"](zoom, feature);
-    const charSet = fonts[font] || (fonts[font] = new Set());
-    charCodes.forEach(charSet.add, charSet);
-
-    // Add font name and character codes to the feature (MODIFY IN PLACE!)
-    Object.assign(feature, { font, charCodes });
+    const labelText = getTextTransform(styleVals["text-transform"])(text);
+    const charCodes = labelText.split("").map(c => c.charCodeAt(0));
+    const font = styleVals["text-font"];
+    return Object.assign(feature, { spriteID, charCodes, font });
   };
 }
 
@@ -1126,36 +1112,52 @@ function getTextTransform(code) {
   }
 }
 
-function initStyle({ layout, paint }) {
-  const layoutKeys = [
-    "text-letter-spacing",
-    "text-max-width",
-    "text-size",
-    "text-padding",
-    "text-line-height",
-    "text-anchor",
-    "text-offset",
-    "text-justify",
-    "text-rotation-alignment",
-    "symbol-placement",
-    "symbol-spacing",
-  ];
+function initAtlasGetter({ parsedStyles, glyphEndpoint }) {
+  const getAtlas = initGetter(glyphEndpoint);
 
-  const paintKeys = [
-    "text-color",
-    "text-opacity",
-  ];
+  const preprocessors = parsedStyles
+    .filter(s => s.type === "symbol")
+    .reduce((d, s) => (d[s.id] = initPreprocessor(s), d), {});
 
-  const bufferFuncs = paintKeys
+  return function(layers, zoom) {
+    // Add character codes and sprite IDs. MODIFIES layer.features IN PLACE
+    Object.entries(layers).forEach(([id, layer]) => {
+      const preprocessor = preprocessors[id];
+      if (!preprocessor) return;
+      layer.features = layer.features.map(f => preprocessor(f, zoom))
+        .filter(f => f !== undefined);
+    });
+
+    const fonts = Object.values(layers)
+      .flatMap(l => l.features)
+      .filter(f => (f.charCodes && f.charCodes.length))
+      .reduce(updateFonts, {});
+
+    return getAtlas(fonts);
+  };
+}
+
+function updateFonts(fonts, feature) {
+  const { font, charCodes } = feature;
+  const charSet = fonts[font] || (fonts[font] = new Set());
+  charCodes.forEach(charSet.add, charSet);
+  return fonts;
+}
+
+function initStyleGetters(keys, { layout, paint }) {
+  const layoutFuncs = keys.layout
+    .map(k => ([camelCase$1(k), layout[k]]));
+
+  const bufferFuncs = keys.paint
     .filter(k => paint[k].type === "property")
-    .map(k => ([paint[k], camelCase$1(k)]));
+    .map(k => ([camelCase$1(k), paint[k]]));
 
   return function(zoom, feature) {
-    const layoutVals = layoutKeys
-      .reduce((d, k) => (d[k] = layout[k](zoom, feature), d), {});
+    const layoutVals = layoutFuncs
+      .reduce((d, [k, f]) => (d[k] = f(zoom, feature), d), {});
 
     const bufferVals = bufferFuncs
-      .reduce((d, [f, k]) => (d[k] = f(zoom, feature), d), {});
+      .reduce((d, [k, f]) => (d[k] = f(zoom, feature), d), {});
 
     return { layoutVals, bufferVals };
   };
@@ -1165,26 +1167,96 @@ function camelCase$1(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function getGlyphInfo(feature, atlas) {
-  const { font, charCodes } = feature;
-  const positions = atlas.positions[font];
+function getBox(w, h, anchor, offset) {
+  const [sx, sy] = getBoxShift(anchor);
+  const x = sx * w + offset[0];
+  const y = sy * h + offset[1];
+  return { x, y, w, h, shiftX: sx };
+}
 
-  if (!positions || !charCodes || !charCodes.length) return;
+function getBoxShift(anchor) {
+  // Shift the top-left corner of the box by the returned value * box dimensions
+  switch (anchor) {
+    case "top-left":
+      return [0.0, 0.0];
+    case "top-right":
+      return [-1.0, 0.0];
+    case "top":
+      return [-0.5, 0.0];
+    case "bottom-left":
+      return [0.0, -1.0];
+    case "bottom-right":
+      return [-1.0, -1.0];
+    case "bottom":
+      return [-0.5, -1.0];
+    case "left":
+      return [0.0, -0.5];
+    case "right":
+      return [-1.0, -0.5];
+    case "center":
+    default:
+      return [-0.5, -0.5];
+  }
+}
 
-  const { width, height } = atlas.image;
+function scalePadBox(scale, pad, { x, y, w, h }) {
+  return [
+    x * scale - pad,
+    y * scale - pad,
+    (x + w) * scale + pad,
+    (y + h) * scale + pad,
+  ];
+}
 
-  return charCodes.map(code => {
-    const pos = positions[code];
-    if (!pos) return;
+function initIcon(style, spriteData = {}) {
+  const { image: { width, height } = {}, meta = {} } = spriteData;
+  if (!width || !height) return () => undefined;
 
-    const { left, top, advance } = pos.metrics;
-    const { x, y, w, h } = pos.rect;
+  const getStyles = initStyleGetters(iconKeys, style);
 
-    const sdfRect = [x / width, y / height, w / width, h / height];
-    const metrics = { left, top, advance, w, h };
+  return function(feature, tileCoords) {
+    const sprite = getSprite(feature, width, height, meta);
+    if (!sprite) return;
 
-    return { code, metrics, sdfRect };
-  }).filter(i => i !== undefined);
+    // const { layoutVals, bufferVals } = getStyles(tileCoords.z, feature);
+    const { layoutVals } = getStyles(tileCoords.z, feature);
+    const icon = layoutSprite(sprite, layoutVals);
+    return icon; // TODO: what about bufferVals?
+  };
+}
+
+const iconKeys = {
+  layout: [
+    "icon-anchor",
+    "icon-offset",
+    "icon-padding",
+    "icon-rotation-alignment",
+    "icon-size",
+  ],
+  paint: [],
+};
+
+function getSprite({ spriteID }, width, height, meta) {
+  const rawRect = meta[spriteID];
+  if (!rawRect) return;
+
+  const { x, y, width: w, height: h } = rawRect;
+  const spriteRect = [x / width, y / height, w / width, h / height];
+  const metrics = { w, h };
+
+  return { spriteID, metrics, spriteRect };
+}
+
+function layoutSprite(sprite, styleVals) {
+  const { metrics: { w, h }, spriteRect } = sprite;
+
+  const { iconAnchor, iconOffset, iconSize, iconPadding } = styleVals;
+  const iconbox = getBox(w, h, iconAnchor, iconOffset);
+  const bbox = scalePadBox(iconSize, iconPadding, iconbox);
+
+  const pos = [iconbox.x, iconbox.y, w, h].map(c => c * iconSize);
+
+  return { pos, rect: spriteRect, bbox };
 }
 
 const whitespace = {
@@ -1301,14 +1373,13 @@ function calculatePenalty(code, nextCode) {
 
 function splitLines(glyphs, styleVals) {
   // glyphs is an Array of Objects with properties { code, metrics }
-  const spacing = styleVals["text-letter-spacing"] * ONE_EM;
+  const { textLetterSpacing, textMaxWidth, symbolPlacement } = styleVals;
+  const spacing = textLetterSpacing * ONE_EM;
   const totalWidth = measureLine(glyphs, spacing);
   if (totalWidth == 0.0) return [];
 
-  const maxWidth = styleVals["text-max-width"] * ONE_EM;
-  const placement = styleVals["symbol-placement"];
-  const lineCount = (placement === "point" && maxWidth > 0)
-    ? Math.ceil(totalWidth / maxWidth)
+  const lineCount = (symbolPlacement === "point" && textMaxWidth > 0)
+    ? Math.ceil(totalWidth / textMaxWidth / ONE_EM)
     : 1;
 
   // TODO: skip break calculations if lineCount == 1
@@ -1348,65 +1419,13 @@ function measureLine(glyphs, spacing) {
     .reduce((a, c) => a + c + spacing);
 }
 
-function getTextBox(lines, styleVals) {
-  const [sx, sy] = getTextBoxShift(styleVals["text-anchor"]);
-
-  // Get dimensions and relative position of text area in glyph pixels
-  const w = Math.max(...lines.map(l => l.width));
-  const h = lines.length * styleVals["text-line-height"] * ONE_EM;
-  const x = sx * w + styleVals["text-offset"][0] * ONE_EM;
-  const y = sy * h + styleVals["text-offset"][1] * ONE_EM;
-
-  // Get total bounding box after scale and pad
-  const scale = styleVals["text-size"] / ONE_EM;
-  const pad = styleVals["text-padding"];
-  const bbox = [
-    x * scale - pad,
-    y * scale - pad,
-    (x + w) * scale + pad,
-    (y + h) * scale + pad,
-  ];
-
-  return { x, y, w, h, shiftX: sx, bbox };
-}
-
-function getTextBoxShift(anchor) {
-  // Shift the top-left corner of the text bounding box
-  // by the returned value * bounding box dimensions
-  switch (anchor) {
-    case "top-left":
-      return [0.0, 0.0];
-    case "top-right":
-      return [-1.0, 0.0];
-    case "top":
-      return [-0.5, 0.0];
-    case "bottom-left":
-      return [0.0, -1.0];
-    case "bottom-right":
-      return [-1.0, -1.0];
-    case "bottom":
-      return [-0.5, -1.0];
-    case "left":
-      return [0.0, -0.5];
-    case "right":
-      return [-1.0, -0.5];
-    case "center":
-    default:
-      return [-0.5, -0.5];
-  }
-}
-
 const RECT_BUFFER = GLYPH_PBF_BORDER + ATLAS_PADDING;
 
-function layoutLines(glyphs, styleVals) {
-  // TODO: what if splitLines returns nothing?
-  const lines = splitLines(glyphs, styleVals);
-  const box = getTextBox(lines, styleVals);
-
-  const lineHeight = styleVals["text-line-height"] * ONE_EM;
-  const lineShiftX = getLineShift(styleVals["text-justify"], box.shiftX);
-  const spacing = styleVals["text-letter-spacing"] * ONE_EM;
-  const fontScalar = styleVals["text-size"] / ONE_EM;
+function layoutLines(lines, box, styleVals) {
+  const lineHeight = styleVals.textLineHeight * ONE_EM;
+  const lineShiftX = getLineShift(styleVals.textJustify, box.shiftX);
+  const spacing = styleVals.textLetterSpacing * ONE_EM;
+  const fontScalar = styleVals.textSize / ONE_EM;
 
   const chars = lines.flatMap((line, i) => {
     const x = (box.w - line.width) * lineShiftX + box.x;
@@ -1414,7 +1433,7 @@ function layoutLines(glyphs, styleVals) {
     return layoutLine(line, [x, y], spacing, fontScalar);
   });
 
-  return Object.assign(chars, { fontScalar, bbox: box.bbox });
+  return Object.assign(chars, { fontScalar });
 }
 
 function layoutLine(glyphs, origin, spacing, scalar) {
@@ -1452,15 +1471,95 @@ function getLineShift(justify, boxShiftX) {
   }
 }
 
+function layout(glyphs, styleVals) {
+  // Split text into lines
+  // TODO: what if splitLines returns nothing?
+  const lines = splitLines(glyphs, styleVals);
+
+  // Get dimensions and relative position of text area (in glyph pixels)
+  const { textLineHeight, textAnchor, textOffset } = styleVals;
+  const w = Math.max(...lines.map(l => l.width));
+  const h = lines.length * textLineHeight * ONE_EM;
+  const textbox = getBox(w, h, textAnchor, textOffset.map(c => c * ONE_EM));
+
+  // Position characters within text area
+  const chars = layoutLines(lines, textbox, styleVals);
+
+  // Get padded text box (for collision checks)
+  const { textSize, textPadding } = styleVals;
+  const textBbox = scalePadBox(textSize / ONE_EM, textPadding, textbox);
+
+  return Object.assign(chars, { bbox: textBbox });
+}
+
+function initText(style) {
+  const getStyles = initStyleGetters(textKeys, style);
+
+  return function(feature, tileCoords, atlas) {
+    const glyphs = getGlyphs(feature, atlas);
+    if (!glyphs || !glyphs.length) return;
+
+    const { layoutVals, bufferVals } = getStyles(tileCoords.z, feature);
+    const chars = layout(glyphs, layoutVals);
+    return Object.assign(chars, { bufferVals }); // TODO: rethink this
+  };
+}
+
+const textKeys = {
+  layout: [
+    "symbol-placement", // TODO: both here and in ../anchors/anchors.js
+    "text-anchor",
+    "text-justify",
+    "text-letter-spacing",
+    "text-line-height",
+    "text-max-width",
+    "text-offset",
+    "text-padding",
+    "text-rotation-alignment",
+    "text-size",
+  ],
+  paint: [
+    "text-color",
+    "text-opacity",
+  ],
+};
+
+function getGlyphs(feature, atlas) {
+  const { charCodes, font } = feature;
+  const positions = atlas?.positions[font];
+  if (!positions || !charCodes || !charCodes.length) return;
+
+  const { width, height } = atlas.image;
+
+  return charCodes.map(code => {
+    const pos = positions[code];
+    if (!pos) return;
+
+    const { left, top, advance } = pos.metrics;
+    const { x, y, w, h } = pos.rect;
+
+    const sdfRect = [x / width, y / height, w / width, h / height];
+    const metrics = { left, top, advance, w, h };
+
+    return { code, metrics, sdfRect };
+  }).filter(i => i !== undefined);
+}
+
 const { min, max: max$2, cos: cos$1, sin: sin$1 } = Math;
 
-function pointCollision(chars, anchor, tree) {
-  const [x0, y0] = anchor;
-  const box = formatBox(x0, y0, chars.bbox);
+function buildCollider(placement) {
+  return (placement === "line") ? lineCollision : pointCollision;
+}
 
-  if (tree.collides(box)) return true;
+function pointCollision(icon, text, anchor, tree) {
+  const [x0, y0] = anchor;
+  const boxes = [];
+  if (icon) boxes.push(formatBox(x0, y0, icon.bbox));
+  if (text) boxes.push(formatBox(x0, y0, text.bbox));
+
+  if (boxes.some(tree.collides, tree)) return true;
   // TODO: drop if outside tile?
-  tree.insert(box);
+  boxes.forEach(tree.insert, tree);
 }
 
 function formatBox(x0, y0, bbox) {
@@ -1472,15 +1571,17 @@ function formatBox(x0, y0, bbox) {
   };
 }
 
-function lineCollision(chars, anchor, tree) {
+function lineCollision(icon, text, anchor, tree) {
   const [x0, y0, angle] = anchor;
 
   const cos_a = cos$1(angle);
   const sin_a = sin$1(angle);
   const rotate = ([x, y]) => [x * cos_a - y * sin_a, x * sin_a + y * cos_a];
 
-  const boxes = chars.map(c => getCharBbox(c.pos, rotate))
+  // TODO: what if no text?
+  const boxes = text.map(c => getCharBbox(c.pos, rotate))
     .map(bbox => formatBox(x0, y0, bbox));
+  if (icon) boxes.push(formatBox(x0, y0, getCharBbox(icon.pos, rotate)));
 
   if (boxes.some(tree.collides, tree)) return true;
   boxes.forEach(tree.insert, tree);
@@ -1609,53 +1710,6 @@ function setupTransform([ax, ay], angle) {
 
 const { max } = Math;
 
-function placeLineAnchors(line, extent, chars, styleVals) {
-  // TODO: consider icon-rotation-alignment
-  const textRotation = styleVals["text-rotation-alignment"];
-  const labelLength = (textRotation === "viewport")
-    ? 0.0
-    : chars.bbox[2] - chars.bbox[0];
-
-  const rawSpacing = styleVals["symbol-spacing"];
-  const spacing = max(rawSpacing, labelLength + rawSpacing / 4);
-  const fixedExtraOffset = styleVals["text-size"] * 2;
-
-  const isLineContinued = line[0].some(c => c <= 0 || extent <= c);
-  // TODO: correct offset for extension of line[0] beyond tile boundary
-  // (MapLibre assumes continued lines start ON the boundary)
-  const offset = isLineContinued ?
-    (spacing / 2) :
-    (labelLength / 2 + fixedExtraOffset);
-
-  const charSize = styleVals["text-size"] / 2;
-  return getLabelSegments(line, offset, spacing, labelLength, charSize)
-    .map(fitLine)
-    .filter(fit => fit.error < charSize)
-    .map(({ anchor, angle }) => [...anchor, angle]);
-}
-
-function getAnchors(geometry, extent, chars, layoutVals) {
-  switch (layoutVals["symbol-placement"]) {
-    case "point":
-      return getPointAnchors(geometry);
-    case "line":
-      return getLineAnchors(geometry, extent, chars, layoutVals);
-    default:
-      return [];
-  }
-}
-
-function getPointAnchors({ type, coordinates }) {
-  switch (type) {
-    case "Point":
-      return [[...coordinates, 0.0]]; // Add angle coordinate
-    case "MultiPoint":
-      return coordinates.map(c => [...c, 0.0]);
-    default:
-      return [];
-  }
-}
-
 function getLineAnchors(geometry, extent, chars, layoutVals) {
   const { type, coordinates } = geometry;
 
@@ -1676,48 +1730,138 @@ function getLineAnchors(geometry, extent, chars, layoutVals) {
   }
 }
 
-function getBuffers(chars, anchor, tileCoord, bufferVals) {
-  const origin = [...anchor, chars.fontScalar];
-  const { z, x, y } = tileCoord;
+function placeLineAnchors(line, extent, chars, styleVals) {
+  // TODO: consider icon-rotation-alignment
+  const { textRotationAlignment, symbolSpacing, textSize } = styleVals;
 
+  const labelLength = (textRotationAlignment === "viewport")
+    ? 0.0
+    : chars.bbox[2] - chars.bbox[0];
+
+  const spacing = max(symbolSpacing, labelLength + symbolSpacing / 4);
+
+  const isLineContinued = line[0].some(c => c <= 0 || extent <= c);
+  // TODO: correct offset for extension of line[0] beyond tile boundary
+  // (MapLibre assumes continued lines start ON the boundary)
+  const offset = isLineContinued ?
+    (spacing / 2) :
+    (labelLength / 2 + textSize * 2);
+
+  return getLabelSegments(line, offset, spacing, labelLength, textSize / 2)
+    .map(fitLine)
+    .filter(fit => fit.error < textSize / 2)
+    .map(({ anchor, angle }) => [...anchor, angle]);
+}
+
+function initAnchors(style) {
+  const getStyles = initStyleGetters(symbolKeys, style);
+
+  return function(feature, tileCoords, icon, text, tree) {
+    const { layoutVals } = getStyles(tileCoords.z, feature);
+    const collides = buildCollider(layoutVals.symbolPlacement);
+
+    // TODO: get extent from tile?
+    return getAnchors(feature.geometry, 512, text, layoutVals)
+      .filter(anchor => !collides(icon, text, anchor, tree));
+  };
+}
+
+const symbolKeys = {
+  layout: [
+    "symbol-placement",
+    "symbol-spacing",
+    // TODO: these are in 2 places: here and in the text getter
+    "text-rotation-alignment",
+    "text-size",
+  ],
+  paint: [],
+};
+
+function getAnchors(geometry, extent, text, layoutVals) {
+  switch (layoutVals.symbolPlacement) {
+    case "point":
+      return getPointAnchors(geometry);
+    case "line":
+      return getLineAnchors(geometry, extent, text, layoutVals);
+    default:
+      return [];
+  }
+}
+
+function getPointAnchors({ type, coordinates }) {
+  switch (type) {
+    case "Point":
+      return [[...coordinates, 0.0]]; // Add angle coordinate
+    case "MultiPoint":
+      return coordinates.map(c => [...c, 0.0]);
+    default:
+      return [];
+  }
+}
+
+function getBuffers(icon, text, anchor, tileCoords) {
+  const iconBuffers = getIconBuffers(icon, anchor, tileCoords);
+  const textBuffers = getTextBuffers(text, anchor, tileCoords);
+  return mergeBuffers(iconBuffers, textBuffers);
+}
+
+function getIconBuffers(icon, anchor, { z, x, y }) {
+  if (!icon) return;
+
+  // NOTE: mergeBuffers may overwrite tileCoords with the text buffer of the
+  // same name. This is OK because the text buffer, if it exists, is longer
   const buffers = {
-    sdfRect: chars.flatMap(c => c.rect),
-    charPos: chars.flatMap(c => c.pos),
-    labelPos: chars.flatMap(() => origin),
-    tileCoords: chars.flatMap(() => [x, y, z]),
+    spriteRect: icon.rect,
+    spritePos: icon.pos,
+    labelPos0: [...anchor],
+    tileCoords: [x, y, z],
   };
 
-  Object.entries(bufferVals).forEach(([key, val]) => {
-    buffers[key] = chars.flatMap(() => val);
+  return buffers;
+}
+
+function getTextBuffers(text, anchor, { z, x, y }) {
+  if (!text) return;
+
+  const origin = [...anchor, text.fontScalar];
+
+  const buffers = {
+    sdfRect: text.flatMap(c => c.rect),
+    charPos: text.flatMap(c => c.pos),
+    labelPos: text.flatMap(() => origin),
+    tileCoords: text.flatMap(() => [x, y, z]),
+  };
+
+  Object.entries(text.bufferVals).forEach(([key, val]) => {
+    buffers[key] = text.flatMap(() => val);
   });
 
   return buffers;
 }
 
-function initShaping(style) {
-  const getStyleVals = initStyle(style);
+function mergeBuffers(buf1, buf2) {
+  if (!buf1) return buf2;
+  if (!buf2) return buf1;
+  return Object.assign(buf1, buf2);
+}
+
+function initShaping(style, spriteData) {
+  const getIcon = initIcon(style, spriteData);
+  const getText = initText(style);
+  const getAnchors = initAnchors(style);
 
   return function(feature, tileCoords, atlas, tree) {
     // tree is an RBush from the 'rbush' module. NOTE: will be updated!
 
-    const glyphs = getGlyphInfo(feature, atlas);
-    if (!glyphs) return;
+    const icon = getIcon(feature, tileCoords);
+    const text = getText(feature, tileCoords, atlas);
+    if (!icon && !text) return;
 
-    const { layoutVals, bufferVals } = getStyleVals(tileCoords.z, feature);
-    const chars = layoutLines(glyphs, layoutVals);
-
-    const collides = (layoutVals["symbol-placement"] === "line")
-      ? lineCollision
-      : pointCollision;
-
-    // TODO: get extent from tile?
-    const anchors = getAnchors(feature.geometry, 512, chars, layoutVals)
-      .filter(anchor => !collides(chars, anchor, tree));
-
+    const anchors = getAnchors(feature, tileCoords, icon, text, tree);
     if (!anchors || !anchors.length) return;
 
     return anchors
-      .map(anchor => getBuffers(chars, anchor, tileCoords, bufferVals))
+      .map(anchor => getBuffers(icon, text, anchor, tileCoords))
       .reduce(combineBuffers);
   };
 }
@@ -2518,7 +2662,7 @@ function camelCase(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function initFeatureSerializer(style) {
+function initFeatureSerializer(style, spriteData) {
   const { type, paint } = style;
 
   switch (type) {
@@ -2529,7 +2673,7 @@ function initFeatureSerializer(style) {
     case "fill":
       return initParsing(paint, fillInfo);
     case "symbol":
-      return initShaping(style);
+      return initShaping(style, spriteData);
     default:
       throw Error("tile-gl: unknown serializer type!");
   }
@@ -2587,10 +2731,10 @@ function appendBuffers(buffers, newBuffers) {
   });
 }
 
-function initLayerSerializer(style) {
+function initLayerSerializer(style, spriteData) {
   const { id, type, interactive } = style;
 
-  const transform = initFeatureSerializer(style);
+  const transform = initFeatureSerializer(style, spriteData);
   if (!transform) return;
 
   return function(layer, tileCoords, atlas, tree) {
@@ -3179,39 +3323,9 @@ function multiSelect(arr, left, right, n, compare) {
     }
 }
 
-function initSerializer(userParams) {
-  const { glyphEndpoint, layers } = setParams(userParams);
-  const parsedStyles = layers.map(getStyleFuncs);
-
-  const getAtlas = initAtlasGetter({ parsedStyles, glyphEndpoint });
-  const process = initTileSerializer(parsedStyles);
-
-  return function(source, tileCoords) {
-    return getAtlas(source, tileCoords.z).then(atlas => {
-      const layers = process(source, tileCoords, atlas);
-
-      // Note: atlas.data.buffer is a Transferable
-      return { atlas: atlas.image, layers };
-    });
-  };
-}
-
-function setParams({ glyphs, layers }) {
-  if (!layers || !layers.length) fail("no valid array of style layers");
-
-  const glyphsOK = ["string", "undefined"].includes(typeof glyphs);
-  if (!glyphsOK) fail("glyphs must be a string URL");
-
-  return { glyphEndpoint: glyphs, layers };
-}
-
-function fail(message) {
-  throw Error("tile-gl initSerializer: " + message);
-}
-
-function initTileSerializer(styles) {
+function initTileSerializer(styles, spriteData) {
   const layerSerializers = styles
-    .reduce((d, s) => (d[s.id] = initLayerSerializer(s), d), {});
+    .reduce((d, s) => (d[s.id] = initLayerSerializer(s, spriteData), d), {});
 
   return function(layers, tileCoords, atlas) {
     const tree = new RBush();
@@ -3225,6 +3339,36 @@ function initTileSerializer(styles) {
       .reverse()
       .reduce((d, l) => Object.assign(d, l), {});
   };
+}
+
+function initSerializer(userParams) {
+  const { glyphEndpoint, spriteData, layers } = setParams(userParams);
+  const parsedStyles = layers.map(getStyleFuncs);
+
+  const getAtlas = initAtlasGetter({ parsedStyles, glyphEndpoint });
+  const process = initTileSerializer(parsedStyles, spriteData);
+
+  return function(source, tileCoords) {
+    return getAtlas(source, tileCoords.z).then(atlas => {
+      const layers = process(source, tileCoords, atlas);
+
+      // Note: atlas.data.buffer is a Transferable
+      return { atlas: atlas.image, layers };
+    });
+  };
+}
+
+function setParams({ glyphs, spriteData, layers }) {
+  if (!layers || !layers.length) fail("no valid array of style layers");
+
+  const glyphsOK = ["string", "undefined"].includes(typeof glyphs);
+  if (!glyphsOK) fail("glyphs must be a string URL");
+
+  return { glyphEndpoint: glyphs, spriteData, layers };
+}
+
+function fail(message) {
+  throw Error("tile-gl initSerializer: " + message);
 }
 
 export { initSerializer };

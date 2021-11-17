@@ -28,7 +28,11 @@ export function initGLpaint(userParams) {
     return context.initTexture({ format, width, height, data, mips: false });
   }
 
-  function initPainter(style) {
+  function loadSprite(image) {
+    return context.initTexture({ image, mips: false });
+  }
+
+  function initPainter(style, sprite) {
     const { id, type, source, minzoom = 0, maxzoom = 24 } = style;
 
     const program = programs[type];
@@ -39,9 +43,9 @@ export function initGLpaint(userParams) {
       // We handle line-miter-limit in the paint phase, not layout phase
       paint["line-miter-limit"] = layout["line-miter-limit"];
     }
-    const painter = program.initPainter(style);
+    const painter = program.initPainter(style, sprite);
     return Object.assign(painter, { id, type, source, minzoom, maxzoom });
   }
 
-  return { prep, loadBuffers, loadAtlas, initPainter };
+  return { prep, loadBuffers, loadAtlas, loadSprite, initPainter };
 }

@@ -12,8 +12,7 @@ export function initText(context) {
   };
   const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
-  const styleKeys = ["text-color", "text-opacity"];
-  // TODO: "text-halo-color", sprites
+  const styleKeys = ["text-color", "text-opacity"]; // TODO: "text-halo-color"
 
   return {
     vert, frag, attrInfo, styleKeys,

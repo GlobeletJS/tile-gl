@@ -21,11 +21,11 @@ function getTile(style) {
 function setup(error, data, style) {
   if (error) throw error;
 
-  const { glyphs, layers: rawLayers } = style;
+  const { glyphs, layers: rawLayers, spriteData } = style;
   const layers = rawLayers.filter(l => l.source && l.source === "composite");
   const mixer = tileMixer.init({ layers });
   const mixed = mixer(data, tileCoords.z);
-  const serialize = initSerializer({ glyphs, layers });
+  const serialize = initSerializer({ glyphs, layers, spriteData });
   serialize(mixed, tileCoords).then(data => render(data, style));
 }
 
@@ -44,10 +44,11 @@ function render(data, style) {
 
   Object.values(data.layers).forEach(tileContext.loadBuffers);
   data.atlas = tileContext.loadAtlas(data.atlas);
+  const sprite = tileContext.loadSprite(style.spriteData.image);
 
   const painters = style.layers
     .map(tileStencil.getStyleFuncs)
-    .map(tileContext.initPainter);
+    .map(layer => tileContext.initPainter(layer, sprite));
 
   const tile = Object.assign({ data }, tileCoords);
   painters.forEach(painter => painter({ tile, pixRatio }));

@@ -17,7 +17,7 @@ export default [{
     name: 'initGLpaint',
   }
 }, {
-  input: 'src/serialize/tile.js',
+  input: 'src/serialize/serialize.js',
   plugins: [
     resolve(),
     commonjs(),
