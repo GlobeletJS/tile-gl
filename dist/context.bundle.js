@@ -544,17 +544,17 @@ function initStyleProg(style, styleKeys, uniformSetters, spriteTexture) {
   function getIcons(tile) {
     const layer = tile.data.layers[id];
     if (!layer) return;
-    const buffers = layer.buffers.sprite;
-    if (buffers) return { type: layer.type, extent: layer.extent, buffers };
+    const { type, extent, buffers: { sprite } } = layer;
+    if (sprite) return { type, extent, buffers: sprite };
   }
 
   function getText(tile) {
-    const { layers, atlas } = tile.data;
-    const layer = layers[id];
-    if (!layer || !sdf || !atlas) return;
+    const { layers: { [id]: layer }, atlas } = tile.data;
+    if (!layer || !atlas) return;
+    const { type, extent, buffers: { text } } = layer;
+    if (!text || !sdf) return;
     sdf(atlas);
-    const buffers = layer.buffers.text;
-    return { type: layer.type, extent: layer.extent, buffers };
+    return { type, extent, buffers: text };
   }
 
   return { setStyles, getData };
