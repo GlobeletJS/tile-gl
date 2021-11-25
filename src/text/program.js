@@ -9,10 +9,19 @@ export function initText(context) {
     tileCoords: { numComponents: 3 },
     textColor: { numComponents: 4 },
     textOpacity: { numComponents: 1 },
+    textHaloBlur: { numComponents: 1 },
+    textHaloColor: { numComponents: 4 },
+    textHaloWidth: { numComponents: 1 },
   };
   const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
-  const styleKeys = ["text-color", "text-opacity"]; // TODO: "text-halo-color"
+  const styleKeys = [
+    "text-color",
+    "text-opacity",
+    "text-halo-blur",
+    "text-halo-color",
+    "text-halo-width",
+  ];
 
   return {
     vert, frag, attrInfo, styleKeys,

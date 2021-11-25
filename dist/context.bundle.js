@@ -336,11 +336,14 @@ var vert$1 = `attribute vec2 quadPos;    // Vertices of the quad instance
 attribute vec3 labelPos0;   // x, y, angle
 attribute vec4 spritePos;  // dx, dy (relative to labelPos0), w, h
 attribute vec4 spriteRect; // x, y, w, h
+attribute float iconOpacity;
 
+varying float opacity;
 varying vec2 texCoord;
 
 void main() {
   texCoord = spriteRect.xy + spriteRect.zw * quadPos;
+  opacity = iconOpacity;
 
   vec2 mapPos = tileToMap(labelPos0.xy);
 
@@ -360,12 +363,13 @@ var frag$1 = `precision highp float;
 
 uniform sampler2D sprite;
 
+varying float opacity;
 varying vec2 texCoord;
 
 void main() {
   vec4 texColor = texture2D(sprite, texCoord);
   // Input sprite does NOT have pre-multiplied alpha
-  gl_FragColor = vec4(texColor.rgb * texColor.a, texColor.a);
+  gl_FragColor = vec4(texColor.rgb * texColor.a, texColor.a) * opacity;
 }
 `;
 
@@ -375,10 +379,11 @@ function initSprite(context) {
     spritePos: { numComponents: 4 },
     spriteRect: { numComponents: 4 },
     tileCoords: { numComponents: 3 },
+    iconOpacity: { numComponents: 1 },
   };
   const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
-  const styleKeys = [];
+  const styleKeys = ["icon-opacity"];
 
   return {
     vert: vert$1, frag: frag$1, attrInfo, styleKeys,
@@ -393,15 +398,26 @@ attribute vec4 charPos;  // dx, dy (relative to labelPos), w, h
 attribute vec4 sdfRect;  // x, y, w, h
 attribute vec4 textColor;
 attribute float textOpacity;
+attribute float textHaloBlur;
+attribute vec4 textHaloColor;
+attribute float textHaloWidth;
 
-varying float taperWidth;
+varying vec4 fillColor;
+varying vec4 haloColor;
+varying vec2 haloSize; // width, blur
 varying vec2 texCoord;
-varying vec4 fillStyle;
+varying float taperWidth;
 
 void main() {
-  taperWidth = labelPos.w * screenScale.z;
   texCoord = sdfRect.xy + sdfRect.zw * quadPos;
-  fillStyle = textColor * textOpacity;
+
+  taperWidth = labelPos.w * screenScale.z;
+  haloSize = vec2(textHaloWidth, textHaloBlur) * screenScale.z;
+
+  float fillAlpha = textColor.a * textOpacity;
+  fillColor = vec4(textColor.rgb * fillAlpha, fillAlpha);
+  float haloAlpha = textHaloColor.a * textOpacity;
+  haloColor = vec4(textHaloColor.rgb * haloAlpha, haloAlpha);
 
   vec2 mapPos = tileToMap(labelPos.xy);
 
@@ -421,7 +437,9 @@ var frag = `precision highp float;
 
 uniform sampler2D sdf;
 
-varying vec4 fillStyle;
+varying vec4 fillColor;
+varying vec4 haloColor;
+varying vec2 haloSize; // width, blur
 varying vec2 texCoord;
 varying float taperWidth;
 
@@ -429,8 +447,14 @@ void main() {
   float sdfVal = texture2D(sdf, texCoord).a;
   float screenDist = taperWidth * (191.0 - 255.0 * sdfVal) / 32.0;
 
-  float alpha = smoothstep(-0.707, 0.707, -screenDist);
-  gl_FragColor = fillStyle * alpha;
+  float fillAlpha = smoothstep(-0.707, 0.707, -screenDist);
+  float hEdge = haloSize.x - haloSize.y / 2.0;
+  float hTaper = haloSize.x + haloSize.y / 2.0;
+  float haloAlpha = (haloSize.x > 0.0 || haloSize.y > 0.0)
+    ? (1.0 - fillAlpha) * smoothstep(-hTaper, -hEdge, -screenDist)
+    : 0.0;
+
+  gl_FragColor = fillColor * fillAlpha + haloColor * haloAlpha;
 }
 `;
 
@@ -442,10 +466,19 @@ function initText(context) {
     tileCoords: { numComponents: 3 },
     textColor: { numComponents: 4 },
     textOpacity: { numComponents: 1 },
+    textHaloBlur: { numComponents: 1 },
+    textHaloColor: { numComponents: 4 },
+    textHaloWidth: { numComponents: 1 },
   };
   const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
-  const styleKeys = ["text-color", "text-opacity"]; // TODO: "text-halo-color"
+  const styleKeys = [
+    "text-color",
+    "text-opacity",
+    "text-halo-blur",
+    "text-halo-color",
+    "text-halo-width",
+  ];
 
   return {
     vert, frag, attrInfo, styleKeys,

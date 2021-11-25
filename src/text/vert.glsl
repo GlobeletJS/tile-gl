@@ -4,15 +4,26 @@ attribute vec4 charPos;  // dx, dy (relative to labelPos), w, h
 attribute vec4 sdfRect;  // x, y, w, h
 attribute vec4 textColor;
 attribute float textOpacity;
+attribute float textHaloBlur;
+attribute vec4 textHaloColor;
+attribute float textHaloWidth;
 
-varying float taperWidth;
+varying vec4 fillColor;
+varying vec4 haloColor;
+varying vec2 haloSize; // width, blur
 varying vec2 texCoord;
-varying vec4 fillStyle;
+varying float taperWidth;
 
 void main() {
-  taperWidth = labelPos.w * screenScale.z;
   texCoord = sdfRect.xy + sdfRect.zw * quadPos;
-  fillStyle = textColor * textOpacity;
+
+  taperWidth = labelPos.w * screenScale.z;
+  haloSize = vec2(textHaloWidth, textHaloBlur) * screenScale.z;
+
+  float fillAlpha = textColor.a * textOpacity;
+  fillColor = vec4(textColor.rgb * fillAlpha, fillAlpha);
+  float haloAlpha = textHaloColor.a * textOpacity;
+  haloColor = vec4(textHaloColor.rgb * haloAlpha, haloAlpha);
 
   vec2 mapPos = tileToMap(labelPos.xy);
 
