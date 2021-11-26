@@ -757,7 +757,7 @@ function initGLpaint(userParams) {
   }
 
   function loadSprite(image) {
-    return context.initTexture({ image, mips: false });
+    if (image) return context.initTexture({ image, mips: false });
   }
 
   function initPainter(style, sprite) {
