@@ -1,5 +1,10 @@
 export const lineInfo = {
-  styleKeys: ["line-color", "line-opacity"], // TODO: line-width, line-gap-width
+  styleKeys: [
+    "line-color",
+    "line-opacity",
+    "line-width",
+    "line-gap-width",
+  ],
   serialize: flattenLines,
   getLength: (buffers) => buffers.lines.length / 3,
 };

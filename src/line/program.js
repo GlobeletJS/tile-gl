@@ -8,6 +8,8 @@ export function initLine(context) {
     tileCoords: { numComponents: 3 },
     lineColor: { numComponents: 4 },
     lineOpacity: { numComponents: 1 },
+    lineWidth: { numComponents: 1 },
+    lineGapWidth: { numComponents: 1 },
   };
   const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
   const numComponents = 3;
@@ -41,7 +43,7 @@ export function initLine(context) {
 
     // Paint properties:
     "line-color", "line-opacity",
-    "line-width", // "line-gap-width",
+    "line-width", "line-gap-width",
     // "line-translate", "line-translate-anchor",
     // "line-offset", "line-blur", "line-gradient", "line-pattern"
   ];

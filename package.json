@@ -34,9 +34,9 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^19.0.2",
     "@rollup/plugin-node-resolve": "^13.0.0",
-    "eslint": "^8.0.0",
+    "eslint": "^8.3.0",
     "eslint-config-globeletjs": "^0.0.6",
-    "rollup": "^2.52.7",
+    "rollup": "^2.60.1",
     "tile-mixer": "^0.3.1",
     "tile-retriever": "^0.0.4",
     "yawgl": "^0.3.3"
@@ -44,8 +44,8 @@
   "dependencies": {
     "earcut": "^2.2.3",
     "rbush": "^3.0.1",
-    "tile-labeler": "^0.6.1",
-    "tile-stencil": "^0.4.4"
+    "tile-labeler": "^0.6.2",
+    "tile-stencil": "^0.4.5"
   },
   "sideEffects": false
 }

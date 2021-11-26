@@ -1,8 +1,7 @@
 precision highp float;
 
-uniform float lineWidth;
-
 varying float yCoord;
+varying vec2 lineSize; // lineWidth, lineGapWidth
 varying vec2 miterCoord1, miterCoord2;
 varying vec4 strokeStyle;
 
@@ -11,10 +10,16 @@ void main() {
   vec2 step1 = fwidth(miterCoord1) * 0.707;
   vec2 step2 = fwidth(miterCoord2) * 0.707;
 
-  // Antialiasing for edges of lines
-  float outside = -0.5 * lineWidth - step0;
-  float inside = -0.5 * lineWidth + step0;
-  float antialias = smoothstep(outside, inside, -abs(yCoord));
+  // Antialiasing tapers for line edges
+  float hGap = 0.5 * lineSize.y;
+  float inner = (hGap > 0.0)
+    ? smoothstep(hGap - step0, hGap + step0, abs(yCoord))
+    : 1.0;
+  float hWidth = (hGap > 0.0)
+    ? hGap + lineSize.x
+    : 0.5 * lineSize.x;
+  float outer = smoothstep(-hWidth - step0, -hWidth + step0, -abs(yCoord));
+  float antialias = inner * outer;
 
   // Bevels, endcaps: Use smooth taper for antialiasing
   float taperx = 

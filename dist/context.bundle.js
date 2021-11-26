@@ -132,11 +132,12 @@ function initCircle(context) {
 var vert$3 = `attribute vec2 quadPos;
 attribute vec3 pointA, pointB, pointC, pointD;
 attribute vec4 lineColor;
-attribute float lineOpacity;
+attribute float lineOpacity, lineWidth, lineGapWidth;
 
-uniform float lineWidth, lineMiterLimit;
+uniform float lineMiterLimit;
 
 varying float yCoord;
+varying vec2 lineSize; // lineWidth, lineGapWidth
 varying vec2 miterCoord1, miterCoord2;
 varying vec4 strokeStyle;
 
@@ -183,7 +184,9 @@ void main() {
   vec2 yBasis = vec2(-xBasis.y, xBasis.x);
 
   // Get coordinate transforms for the miters
-  float pixWidth = lineWidth * screenScale.z;
+  float pixWidth = (lineGapWidth > 0.0)
+    ? (lineGapWidth + 2.0 * lineWidth) * screenScale.z
+    : lineWidth * screenScale.z;
   mat3 m1 = miterTransform(xBasis, yBasis, mapA - mapB, pixWidth);
   mat3 m2 = miterTransform(-xBasis, yBasis, mapD - mapC, pixWidth);
 
@@ -197,6 +200,7 @@ void main() {
 
   // Remove pixRatio from varying (we taper edges using unscaled value)
   yCoord = y / screenScale.z;
+  lineSize = vec2(lineWidth, lineGapWidth);
 
   // TODO: should this premultiplication be done in tile-stencil?
   //vec4 premult = vec4(color.rgb * color.a, color.a);
@@ -209,9 +213,8 @@ void main() {
 
 var frag$3 = `precision highp float;
 
-uniform float lineWidth;
-
 varying float yCoord;
+varying vec2 lineSize; // lineWidth, lineGapWidth
 varying vec2 miterCoord1, miterCoord2;
 varying vec4 strokeStyle;
 
@@ -220,10 +223,16 @@ void main() {
   vec2 step1 = fwidth(miterCoord1) * 0.707;
   vec2 step2 = fwidth(miterCoord2) * 0.707;
 
-  // Antialiasing for edges of lines
-  float outside = -0.5 * lineWidth - step0;
-  float inside = -0.5 * lineWidth + step0;
-  float antialias = smoothstep(outside, inside, -abs(yCoord));
+  // Antialiasing tapers for line edges
+  float hGap = 0.5 * lineSize.y;
+  float inner = (hGap > 0.0)
+    ? smoothstep(hGap - step0, hGap + step0, abs(yCoord))
+    : 1.0;
+  float hWidth = (hGap > 0.0)
+    ? hGap + lineSize.x
+    : 0.5 * lineSize.x;
+  float outer = smoothstep(-hWidth - step0, -hWidth + step0, -abs(yCoord));
+  float antialias = inner * outer;
 
   // Bevels, endcaps: Use smooth taper for antialiasing
   float taperx = 
@@ -246,6 +255,8 @@ function initLine(context) {
     tileCoords: { numComponents: 3 },
     lineColor: { numComponents: 4 },
     lineOpacity: { numComponents: 1 },
+    lineWidth: { numComponents: 1 },
+    lineGapWidth: { numComponents: 1 },
   };
   const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
   const numComponents = 3;
@@ -279,7 +290,7 @@ function initLine(context) {
 
     // Paint properties:
     "line-color", "line-opacity",
-    "line-width", // "line-gap-width",
+    "line-width", "line-gap-width",
     // "line-translate", "line-translate-anchor",
     // "line-offset", "line-blur", "line-gradient", "line-pattern"
   ];

@@ -1,11 +1,12 @@
 attribute vec2 quadPos;
 attribute vec3 pointA, pointB, pointC, pointD;
 attribute vec4 lineColor;
-attribute float lineOpacity;
+attribute float lineOpacity, lineWidth, lineGapWidth;
 
-uniform float lineWidth, lineMiterLimit;
+uniform float lineMiterLimit;
 
 varying float yCoord;
+varying vec2 lineSize; // lineWidth, lineGapWidth
 varying vec2 miterCoord1, miterCoord2;
 varying vec4 strokeStyle;
 
@@ -52,7 +53,9 @@ void main() {
   vec2 yBasis = vec2(-xBasis.y, xBasis.x);
 
   // Get coordinate transforms for the miters
-  float pixWidth = lineWidth * screenScale.z;
+  float pixWidth = (lineGapWidth > 0.0)
+    ? (lineGapWidth + 2.0 * lineWidth) * screenScale.z
+    : lineWidth * screenScale.z;
   mat3 m1 = miterTransform(xBasis, yBasis, mapA - mapB, pixWidth);
   mat3 m2 = miterTransform(-xBasis, yBasis, mapD - mapC, pixWidth);
 
@@ -66,6 +69,7 @@ void main() {
 
   // Remove pixRatio from varying (we taper edges using unscaled value)
   yCoord = y / screenScale.z;
+  lineSize = vec2(lineWidth, lineGapWidth);
 
   // TODO: should this premultiplication be done in tile-stencil?
   //vec4 premult = vec4(color.rgb * color.a, color.a);
