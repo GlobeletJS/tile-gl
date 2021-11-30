@@ -1,10 +1,10 @@
-attribute vec2 position;
-attribute vec4 fillColor;
-attribute float fillOpacity;
+in vec2 position;
+in vec4 fillColor;
+in float fillOpacity;
 
 uniform vec2 fillTranslate;
 
-varying vec4 fillStyle;
+out vec4 fillStyle;
 
 void main() {
   vec2 mapPos = tileToMap(position) + fillTranslate * screenScale.z;

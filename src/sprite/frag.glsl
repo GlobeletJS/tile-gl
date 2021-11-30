@@ -1,12 +1,16 @@
+#version 300 es
+
 precision highp float;
 
 uniform sampler2D sprite;
 
-varying float opacity;
-varying vec2 texCoord;
+in float opacity;
+in vec2 texCoord;
+
+out vec4 pixColor;
 
 void main() {
-  vec4 texColor = texture2D(sprite, texCoord);
+  vec4 texColor = texture(sprite, texCoord);
   // Input sprite does NOT have pre-multiplied alpha
-  gl_FragColor = vec4(texColor.rgb * texColor.a, texColor.a) * opacity;
+  pixColor = vec4(texColor.rgb * texColor.a, texColor.a) * opacity;
 }

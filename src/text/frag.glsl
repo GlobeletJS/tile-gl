@@ -1,15 +1,19 @@
+#version 300 es
+
 precision highp float;
 
 uniform sampler2D sdf;
 
-varying vec4 fillColor;
-varying vec4 haloColor;
-varying vec2 haloSize; // width, blur
-varying vec2 texCoord;
-varying float taperWidth;
+in vec4 fillColor;
+in vec4 haloColor;
+in vec2 haloSize; // width, blur
+in vec2 texCoord;
+in float taperWidth;
+
+out vec4 pixColor;
 
 void main() {
-  float sdfVal = texture2D(sdf, texCoord).a;
+  float sdfVal = texture(sdf, texCoord).a;
   float screenDist = taperWidth * (191.0 - 255.0 * sdfVal) / 32.0;
 
   float fillAlpha = smoothstep(-0.707, 0.707, -screenDist);
@@ -19,5 +23,5 @@ void main() {
     ? (1.0 - fillAlpha) * smoothstep(-hTaper, -hEdge, -screenDist)
     : 0.0;
 
-  gl_FragColor = fillColor * fillAlpha + haloColor * haloAlpha;
+  pixColor = fillColor * fillAlpha + haloColor * haloAlpha;
 }

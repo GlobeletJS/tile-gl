@@ -1,18 +1,18 @@
-attribute vec2 quadPos;  // Vertices of the quad instance
-attribute vec4 labelPos; // x, y, angle, font size scalar
-attribute vec4 charPos;  // dx, dy (relative to labelPos), w, h
-attribute vec4 sdfRect;  // x, y, w, h
-attribute vec4 textColor;
-attribute float textOpacity;
-attribute float textHaloBlur;
-attribute vec4 textHaloColor;
-attribute float textHaloWidth;
+in vec2 quadPos;  // Vertices of the quad instance
+in vec4 labelPos; // x, y, angle, font size scalar
+in vec4 charPos;  // dx, dy (relative to labelPos), w, h
+in vec4 sdfRect;  // x, y, w, h
+in vec4 textColor;
+in float textOpacity;
+in float textHaloBlur;
+in vec4 textHaloColor;
+in float textHaloWidth;
 
-varying vec4 fillColor;
-varying vec4 haloColor;
-varying vec2 haloSize; // width, blur
-varying vec2 texCoord;
-varying float taperWidth;
+out vec4 fillColor;
+out vec4 haloColor;
+out vec2 haloSize; // width, blur
+out vec2 texCoord;
+out float taperWidth;
 
 void main() {
   texCoord = sdfRect.xy + sdfRect.zw * quadPos;

@@ -1,9 +1,13 @@
+#version 300 es
+
 precision highp float;
 
-varying float yCoord;
-varying vec2 lineSize; // lineWidth, lineGapWidth
-varying vec2 miterCoord1, miterCoord2;
-varying vec4 strokeStyle;
+in float yCoord;
+in vec2 lineSize; // lineWidth, lineGapWidth
+in vec2 miterCoord1, miterCoord2;
+in vec4 strokeStyle;
+
+out vec4 pixColor;
 
 void main() {
   float step0 = fwidth(yCoord) * 0.707;
@@ -31,5 +35,5 @@ void main() {
     step(-0.01 * step1.y, miterCoord1.y) *
     step(0.01 * step2.y, miterCoord2.y);
 
-  gl_FragColor = strokeStyle * antialias * taperx * tapery;
+  pixColor = strokeStyle * antialias * taperx * tapery;
 }

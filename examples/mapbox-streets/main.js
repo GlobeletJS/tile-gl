@@ -33,8 +33,7 @@ function render(data, style) {
   const canvas = document.getElementById("tileCanvas");
   const pixRatio = window.devicePixelRatio;
   yawgl.resizeCanvasToDisplaySize(canvas, pixRatio);
-  const gl = yawgl.getExtendedContext(canvas);
-  const context = yawgl.initContext(gl);
+  const context = yawgl.initContext(canvas);
 
   const tileContext = initGLpaint({ 
     context,

@@ -1,6 +1,8 @@
+#version 300 es
+
 precision highp float;
 
-attribute vec3 tileCoords;
+in vec3 tileCoords;
 
 uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
 uniform vec3 mapShift;    // translate and scale of tileset[0]

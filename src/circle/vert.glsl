@@ -1,12 +1,12 @@
-attribute vec2 quadPos; // Vertices of the quad instance
-attribute vec2 circlePos;
-attribute float circleRadius;
-attribute vec4 circleColor;
-attribute float circleOpacity;
+in vec2 quadPos; // Vertices of the quad instance
+in vec2 circlePos;
+in float circleRadius;
+in vec4 circleColor;
+in float circleOpacity;
 
-varying vec2 delta;
-varying vec4 strokeStyle;
-varying float radius;
+out vec2 delta;
+out vec4 strokeStyle;
+out float radius;
 
 void main() {
   vec2 mapPos = tileToMap(circlePos);

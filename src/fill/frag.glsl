@@ -1,7 +1,11 @@
+#version 300 es
+
 precision mediump float;
 
-varying vec4 fillStyle;
+in vec4 fillStyle;
+
+out vec4 pixColor;
 
 void main() {
-    gl_FragColor = fillStyle;
+    pixColor = fillStyle;
 }

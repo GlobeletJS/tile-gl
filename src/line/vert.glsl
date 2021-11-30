@@ -1,14 +1,14 @@
-attribute vec2 quadPos;
-attribute vec3 pointA, pointB, pointC, pointD;
-attribute vec4 lineColor;
-attribute float lineOpacity, lineWidth, lineGapWidth;
+in vec2 quadPos;
+in vec3 pointA, pointB, pointC, pointD;
+in vec4 lineColor;
+in float lineOpacity, lineWidth, lineGapWidth;
 
 uniform float lineMiterLimit;
 
-varying float yCoord;
-varying vec2 lineSize; // lineWidth, lineGapWidth
-varying vec2 miterCoord1, miterCoord2;
-varying vec4 strokeStyle;
+out float yCoord;
+out vec2 lineSize; // lineWidth, lineGapWidth
+out vec2 miterCoord1, miterCoord2;
+out vec4 strokeStyle;
 
 mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   // Find a coordinate basis vector aligned along the bisector
