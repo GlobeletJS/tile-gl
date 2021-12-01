@@ -6,7 +6,7 @@ import { initSerializer, initGLpaint } from "../../";
 
 const styleHref = "./streets-v8-noInteractive.json";
 const mapboxToken = "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA";
-const tileCoords = { z: 13, x: 1310, y: 3166 };
+const tileCoords = { z: 15, x: 7703, y: 13544 };
 
 export function main() {
   tileStencil.loadStyle(styleHref, mapboxToken).then(getTile);

@@ -1564,7 +1564,7 @@ function getGlyphs(feature, atlas) {
   }).filter(i => i !== undefined);
 }
 
-const { min, max: max$2, cos: cos$1, sin: sin$1 } = Math;
+const { min, max: max$1, cos: cos$1, sin: sin$1 } = Math;
 
 function buildCollider(placement) {
   return (placement === "line") ? lineCollision : pointCollision;
@@ -1615,24 +1615,57 @@ function getCharBbox([x, y, w, h], rotate) {
   const xvals = corners.map(c => c[0]);
   const yvals = corners.map(c => c[1]);
 
-  return [min(...xvals), min(...yvals), max$2(...xvals), max$2(...yvals)];
+  return [min(...xvals), min(...yvals), max$1(...xvals), max$1(...yvals)];
 }
 
-function getLabelSegments(line, offset, spacing, labelLength, charSize) {
-  const points = addDistances(line);
-  const lineLength = points[points.length - 1].dist;
-  const numLabels = Math.floor((lineLength - offset) / spacing) + 1;
+function segmentIntersectsTile([x0, y0], [x1, y1], extent) {
+  // 1. Check if the line is all on one side of the tile
+  if (x0 < 0 && x1 < 0) return false;
+  if (x0 > extent && x1 > extent) return false;
+  if (y0 < 0 && y1 < 0) return false;
+  if (y0 > extent && y1 > extent) return false;
 
-  // How many points for each label? One per character width.
-  // if (labelLength < charSize / 2) nS = 1;
-  const nS = Math.round(labelLength / charSize) + 1;
-  const dS = labelLength / nS;
-  const halfLen = (nS - 1) * dS / 2;
+  // 2. Check if the tile corner points are all on one side of the line
+  // See https://stackoverflow.com/a/293052/10082269
+  const a = y1 - y0;
+  const b = x0 - x1;
+  const c = x1 * y0 - x0 * y1;
+  const lineTest = ([x, y]) => Math.sign(a * x + b * y + c);
 
-  return Array.from({ length: numLabels })
-    .map((v, i) => offset + i * spacing - halfLen)
-    .map(s0 => getSegment(s0, dS, nS, points))
-    .filter(segment => segment !== undefined);
+  const corners = [[extent, 0], [extent, extent], [0, extent]]; // Skips [0, 0]
+  const first = lineTest([0, 0]);
+  if (corners.some(c => lineTest(c) !== first)) return true;
+}
+
+function getIntersections(segment, extent) {
+  const [[x0, y0], [x1, y1]] = segment;
+
+  function interpY(x) {
+    const y = interpC(y0, y1, getT(x0, x, x1));
+    if (y !== undefined) return [x, y];
+  }
+
+  function interpX(y) {
+    const x = interpC(x0, x1, getT(y0, y, y1));
+    if (x !== undefined) return [x, y];
+  }
+
+  function interpC(c0, c1, t) {
+    if (t < 0.0 || 1.0 < t) return;
+    return c0 + t * (c1 - c0);
+  }
+
+  const b = interpX(0);
+  const r = interpY(extent);
+  const t = interpX(extent);
+  const l = interpY(0);
+
+  return [b, r, t, l].filter(p => p !== undefined)
+    .filter(p => p.every(c => 0 <= c && c <= extent));
+}
+
+function getT(x0, x, x1) {
+  return (x0 == x1) ? Infinity : (x - x0) / (x1 - x0);
 }
 
 function addDistances(line) {
@@ -1645,8 +1678,54 @@ function addDistances(line) {
   return distances;
 }
 
+function getDistanceToEdge(line, extent) {
+  // Does the line start inside the tile? Find the distance from edge (<0)
+  const fromEdge = line[0].coord
+    .map(c => Math.max(-c, c - extent)) // Use closer of [0, extent]
+    .reduce((a, c) => Math.max(a, c));  // Use closer of [x, y]
+  if (fromEdge < 0) return fromEdge;
+
+  // Line starts outside. Find segment intersecting the tile
+  const i = line.slice(1).findIndex((p, i) => {
+    return segmentIntersectsTile(line[i].coord, p.coord, extent);
+  });
+  if (i < 0) return 0; // Line stays outside tile
+
+  // Find the first intersection of this segment with the tile boundary
+  const edge = findBoundaryPoint(line[i], line[i + 1], extent);
+
+  return edge.dist;
+}
+
+function findBoundaryPoint(p0, p1, extent) {
+  // The segment from p0 to p1 intersects the square from [0, 0] to
+  // [extent, extent]. Find the intersecting point closest to p0
+  const intersections = getIntersections([p0.coord, p1.coord], extent);
+  if (!intersections.length) return { dist: 0 };
+
+  return intersections
+    .map(p => ({ coord: p, dist: p0.dist + dist(p0.coord, p) }))
+    .reduce((a, c) => (c.dist < a.dist) ? c : a);
+}
+
 function dist([x0, y0], [x1, y1]) {
   return Math.hypot(x1 - x0, y1 - y0);
+}
+
+function getLabelSegments(line, offset, spacing, labelLength, charSize) {
+  const lineLength = line[line.length - 1].dist;
+  const numLabels = Math.floor((lineLength - offset) / spacing) + 1;
+
+  // How many points for each label? One per character width.
+  // if (labelLength < charSize / 2) nS = 1;
+  const nS = Math.round(labelLength / charSize) + 1;
+  const dS = labelLength / nS;
+  const halfLen = (nS - 1) * dS / 2;
+
+  return Array.from({ length: numLabels })
+    .map((v, i) => offset + i * spacing - halfLen)
+    .map(s0 => getSegment(s0, dS, nS, line))
+    .filter(segment => segment !== undefined);
 }
 
 function getSegment(s0, dS, nS, points) {
@@ -1672,7 +1751,7 @@ function interpolate(dist, points) {
   return { coord, dist };
 }
 
-const { max: max$1, abs, cos, sin, atan2 } = Math;
+const { max, abs, cos, sin, atan2 } = Math;
 
 function fitLine(points) {
   if (points.length < 2) {
@@ -1685,14 +1764,12 @@ function fitLine(points) {
 
   // Transform to a single anchor point and rotation angle
   const anchor = [xFit.mean, yFit.mean];
-  const angle = (xFit.slope < 0)
-    ? atan2(-yFit.slope, -xFit.slope)
-    : atan2(yFit.slope, xFit.slope);
+  const angle = atan2(yFit.slope, xFit.slope);
 
   // Compute an error metric: shift and rotate, find largest abs(y)
   const transform = setupTransform(anchor, angle);
   const error = points.map(p => abs(transform(p.coord)[1]))
-    .reduce((maxErr, c) => max$1(maxErr, c));
+    .reduce((maxErr, c) => max(maxErr, c));
 
   return { anchor, angle, error };
 }
@@ -1728,50 +1805,53 @@ function setupTransform([ax, ay], angle) {
   };
 }
 
-const { max } = Math;
-
 function getLineAnchors(geometry, extent, icon, text, layoutVals) {
+  const { max, PI, round } = Math;
   const { type, coordinates } = geometry;
 
-  const box = mergeBoxes(icon?.bbox, text?.bbox);
-  // TODO: consider icon-rotation-alignment
-  const labelLength = (layoutVals.textRotationAlignment === "viewport")
-    ? 0.0
-    : box[2] - box[0];
+  const {
+    iconRotationAlignment, iconKeepUpright,
+    textRotationAlignment, textKeepUpright,
+    symbolSpacing, textSize,
+  } = layoutVals;
 
-  function mapLine(line) {
-    return placeLineAnchors(line, extent, labelLength, layoutVals);
-  }
+  // ASSUME(!): alignment and keepUpright are consistent for icon and text
+  const alignment = (text) ? textRotationAlignment : iconRotationAlignment;
+  const keepUpright = (text) ? textKeepUpright : iconKeepUpright;
+
+  const box = mergeBoxes(icon?.bbox, text?.bbox);
+  const labelLength = (alignment === "viewport") ? 0.0 : box[2] - box[0];
+  const spacing = max(symbolSpacing, labelLength + symbolSpacing / 4);
 
   switch (type) {
     case "LineString":
-      return mapLine(coordinates);
+      return placeLineAnchors(coordinates);
     case "MultiLineString":
     case "Polygon":
-      return coordinates.flatMap(mapLine);
+      return coordinates.flatMap(placeLineAnchors);
     case "MultiPolygon":
-      return coordinates.flat().flatMap(mapLine);
+      return coordinates.flat().flatMap(placeLineAnchors);
     default:
       return [];
   }
-}
 
-function placeLineAnchors(line, extent, labelLength, styleVals) {
-  const { symbolSpacing, textSize } = styleVals;
+  function placeLineAnchors(line) {
+    const pts = addDistances(line);
+    const distToEdge = getDistanceToEdge(pts, extent);
 
-  const spacing = max(symbolSpacing, labelLength + symbolSpacing / 4);
+    const offset = (distToEdge >= 0) ?
+      (distToEdge + spacing / 2) :
+      (labelLength / 2 + textSize * 2);
 
-  const isLineContinued = line[0].some(c => c <= 0 || extent <= c);
-  // TODO: correct offset for extension of line[0] beyond tile boundary
-  // (MapLibre assumes continued lines start ON the boundary)
-  const offset = isLineContinued ?
-    (spacing / 2) :
-    (labelLength / 2 + textSize * 2);
+    return getLabelSegments(pts, offset, spacing, labelLength, textSize / 2)
+      .map(fitLine)
+      .filter(fit => fit.error < textSize / 2)
+      .map(({ anchor, angle }) => ([...anchor, flip(angle)]));
+  }
 
-  return getLabelSegments(line, offset, spacing, labelLength, textSize / 2)
-    .map(fitLine)
-    .filter(fit => fit.error < textSize / 2)
-    .map(({ anchor, angle }) => [...anchor, angle]);
+  function flip(angle) {
+    return (keepUpright) ? angle - round(angle / PI) * PI : angle;
+  }
 }
 
 function initAnchors(style) {
@@ -1794,6 +1874,9 @@ const symbolKeys = {
     // TODO: these are in 2 places: here and in the text getter
     "text-rotation-alignment",
     "text-size",
+    "icon-rotation-alignment",
+    "icon-keep-upright",
+    "text-keep-upright",
   ],
   paint: [],
 };
