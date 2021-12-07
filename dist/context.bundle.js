@@ -141,11 +141,15 @@ in vec4 lineColor;
 in float lineOpacity, lineWidth, lineGapWidth;
 
 uniform float lineMiterLimit;
+const int numDashes = 4;
+uniform float lineDasharray[numDashes];
 
 out float yCoord;
-out vec2 lineSize; // lineWidth, lineGapWidth
+flat out vec2 lineSize; // lineWidth, lineGapWidth
 out vec2 miterCoord1, miterCoord2;
-out vec4 strokeStyle;
+flat out vec4 strokeStyle;
+flat out float dashPattern[numDashes];
+out float lineSoFar;
 
 mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   // Find a coordinate basis vector aligned along the bisector
@@ -176,6 +180,14 @@ mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   float ty = isCap ? 1.2 * pixWidth : 0.0;
 
   return mat3(m0.x, m1.x, 0, m0.y, m1.y, 0, tx, ty, 1);
+}
+
+float sumComponents(float[numDashes] v) {
+  float sum = 0.0;
+  for (int i = 0; i < v.length(); i++) {
+    sum += v[i];
+  }
+  return sum;
 }
 
 void main() {
@@ -213,7 +225,22 @@ void main() {
   //strokeStyle = premult * opacity;
   strokeStyle = lineColor * lineOpacity;
 
-  gl_Position = mapToClip(point, pointB.z + pointC.z);
+  float dashLength = sumComponents(lineDasharray) * lineWidth;
+  if (dashLength <= 0.0) dashLength = 1.0;
+
+  float dashScale = lineWidth / dashLength;
+  dashPattern[0] = lineDasharray[0] * dashScale;
+  for (int i = 1; i < lineDasharray.length(); i++) {
+    dashPattern[i] = dashPattern[i - 1] + lineDasharray[i] * dashScale;
+  }
+
+  float dLine = (pointC.z - pointB.z) / dashLength;
+  float eLine = dLine * length(extend) / length(xAxis);
+  lineSoFar = pointB.z - eLine + quadPos.x * (dLine + 2.0 * eLine);
+
+  float z = (min(pointB.z, pointC.z) < 0.0) ? -2.0 : 0.0;
+
+  gl_Position = mapToClip(point, z);
 }
 `;
 
@@ -222,11 +249,23 @@ var frag$3 = `#version 300 es
 precision highp float;
 
 in float yCoord;
-in vec2 lineSize; // lineWidth, lineGapWidth
+flat in vec2 lineSize; // lineWidth, lineGapWidth
 in vec2 miterCoord1, miterCoord2;
-in vec4 strokeStyle;
+flat in vec4 strokeStyle;
+flat in float dashPattern[4];
+in float lineSoFar;
 
 out vec4 pixColor;
+
+float taper(float edge, float width, float x) {
+  return smoothstep(edge - width, edge + width, x);
+}
+
+float muteGap(float start, float end, float ramp, float x) {
+  return (start < end)
+    ? 1.0 - taper(start, ramp, x) * taper(-end, ramp, -x)
+    : 1.0;
+}
 
 void main() {
   float step0 = fwidth(yCoord) * 0.707;
@@ -235,26 +274,29 @@ void main() {
 
   // Antialiasing tapers for line edges
   float hGap = 0.5 * lineSize.y;
-  float inner = (hGap > 0.0)
-    ? smoothstep(hGap - step0, hGap + step0, abs(yCoord))
-    : 1.0;
-  float hWidth = (hGap > 0.0)
-    ? hGap + lineSize.x
-    : 0.5 * lineSize.x;
-  float outer = smoothstep(-hWidth - step0, -hWidth + step0, -abs(yCoord));
+  float inner = (hGap > 0.0) ? taper(hGap, step0, abs(yCoord)) : 1.0;
+  float hWidth = (hGap > 0.0) ? hGap + lineSize.x : 0.5 * lineSize.x;
+  float outer = taper(-hWidth, step0, -abs(yCoord));
   float antialias = inner * outer;
 
   // Bevels, endcaps: Use smooth taper for antialiasing
-  float taperx = 
-    smoothstep(-step1.x, step1.x, miterCoord1.x) *
-    smoothstep(-step2.x, step2.x, miterCoord2.x);
+  float taperx =
+    taper(0.0, step1.x, miterCoord1.x) * 
+    taper(0.0, step2.x, miterCoord2.x);
 
   // Miters: Use hard step, slightly shifted to avoid overlap at center
   float tapery = 
     step(-0.01 * step1.y, miterCoord1.y) *
     step(0.01 * step2.y, miterCoord2.y);
 
-  pixColor = strokeStyle * antialias * taperx * tapery;
+  // Dashes
+  float dashX = fract(lineSoFar);
+  float stepD = fwidth(lineSoFar) * 0.707;
+  float gap1 = muteGap(dashPattern[0], dashPattern[1], stepD, dashX);
+  float gap2 = muteGap(dashPattern[2], dashPattern[3], stepD, dashX);
+  float dashMute = min(gap1, gap2);
+
+  pixColor = strokeStyle * antialias * taperx * tapery * dashMute;
 }
 `;
 
@@ -300,7 +342,7 @@ function initLine(context) {
 
     // Paint properties:
     "line-color", "line-opacity",
-    "line-width", "line-gap-width",
+    "line-width", "line-gap-width", "line-dasharray",
     // "line-translate", "line-translate-anchor",
     // "line-offset", "line-blur", "line-gradient", "line-pattern"
   ];

@@ -43,7 +43,7 @@ export function initLine(context) {
 
     // Paint properties:
     "line-color", "line-opacity",
-    "line-width", "line-gap-width",
+    "line-width", "line-gap-width", "line-dasharray",
     // "line-translate", "line-translate-anchor",
     // "line-offset", "line-blur", "line-gradient", "line-pattern"
   ];

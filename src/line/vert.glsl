@@ -4,11 +4,15 @@ in vec4 lineColor;
 in float lineOpacity, lineWidth, lineGapWidth;
 
 uniform float lineMiterLimit;
+const int numDashes = 4;
+uniform float lineDasharray[numDashes];
 
 out float yCoord;
-out vec2 lineSize; // lineWidth, lineGapWidth
+flat out vec2 lineSize; // lineWidth, lineGapWidth
 out vec2 miterCoord1, miterCoord2;
-out vec4 strokeStyle;
+flat out vec4 strokeStyle;
+flat out float dashPattern[numDashes];
+out float lineSoFar;
 
 mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   // Find a coordinate basis vector aligned along the bisector
@@ -39,6 +43,14 @@ mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
   float ty = isCap ? 1.2 * pixWidth : 0.0;
 
   return mat3(m0.x, m1.x, 0, m0.y, m1.y, 0, tx, ty, 1);
+}
+
+float sumComponents(float[numDashes] v) {
+  float sum = 0.0;
+  for (int i = 0; i < v.length(); i++) {
+    sum += v[i];
+  }
+  return sum;
 }
 
 void main() {
@@ -76,5 +88,20 @@ void main() {
   //strokeStyle = premult * opacity;
   strokeStyle = lineColor * lineOpacity;
 
-  gl_Position = mapToClip(point, pointB.z + pointC.z);
+  float dashLength = sumComponents(lineDasharray) * lineWidth;
+  if (dashLength <= 0.0) dashLength = 1.0;
+
+  float dashScale = lineWidth / dashLength;
+  dashPattern[0] = lineDasharray[0] * dashScale;
+  for (int i = 1; i < lineDasharray.length(); i++) {
+    dashPattern[i] = dashPattern[i - 1] + lineDasharray[i] * dashScale;
+  }
+
+  float dLine = (pointC.z - pointB.z) / dashLength;
+  float eLine = dLine * length(extend) / length(xAxis);
+  lineSoFar = pointB.z - eLine + quadPos.x * (dLine + 2.0 * eLine);
+
+  float z = (min(pointB.z, pointC.z) < 0.0) ? -2.0 : 0.0;
+
+  gl_Position = mapToClip(point, z);
 }
