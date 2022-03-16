@@ -1,5 +1,5 @@
-import resolve from '@rollup/plugin-node-resolve';
-import commonjs from '@rollup/plugin-commonjs'; // Needed for earcut
+import resolve from "@rollup/plugin-node-resolve";
+import commonjs from "@rollup/plugin-commonjs"; // Needed for earcut
 import { glsl } from "./glsl-plugin.js";
 //import pkg from "../package.json";
 

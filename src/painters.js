@@ -1,3 +1,5 @@
+import { antiMeridianSplit } from "./unwrap-tileset.js";
+
 export function initTilePainter(context, program, layer, multiTile) {
   return (multiTile) ? drawTileset : drawTile;
 
@@ -26,28 +28,13 @@ export function initTilePainter(context, program, layer, multiTile) {
     program.setScreen(pixRatio, cameraScale);
     layer.setStyles(zoom);
 
-    const numTiles = program.setCoords(tileset[0]);
-    const subsets = antiMeridianSplit(tileset, numTiles);
+    program.setCoords(tileset[0]);
+    const subsets = antiMeridianSplit(tileset);
 
     subsets.forEach(subset => {
       const { translate, scale } = program.setShift(subset, pixRatio);
       subset.forEach(t => drawTileBox(t, translate, scale));
     });
-  }
-
-  function antiMeridianSplit(tileset, numTiles) {
-    const { translate, scale } = tileset;
-    const { x } = tileset[0];
-
-    // At low zooms, some tiles may be repeated on opposite ends of the map
-    // We split them into subsets, one tileset for each copy of the map
-    return [0, 1, 2].map(repeat => repeat * numTiles).map(shift => {
-      const tiles = tileset.filter(tile => {
-        const delta = tile.x - x - shift;
-        return (delta >= 0 && delta < numTiles);
-      });
-      return Object.assign(tiles, { translate, scale });
-    }).filter(subset => subset.length);
   }
 
   function drawTileBox(box, translate, scale) {

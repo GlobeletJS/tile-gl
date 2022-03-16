@@ -608,7 +608,6 @@ function initGrid(use, uniformSetters, framebuffer) {
     const xw = x - Math.floor(x / numTiles) * numTiles;
     const extent = 512; // TODO: don't assume this!!
     mapCoords([xw, y, z, extent]);
-    return numTiles;
   }
 
   function setShift(tileset, pixRatio = 1) {
@@ -628,7 +627,6 @@ function camelCase(hyphenated) {
 }
 
 function initStyleProg(style, styleKeys, uniformSetters, spriteTexture) {
-  // TODO: check if spriteTexture is a WebGLTexture
   const { id, type, paint } = style;
   const { sdf, sprite } = uniformSetters;
   const haveSprite = sprite && (spriteTexture instanceof WebGLTexture);
@@ -673,6 +671,25 @@ function initStyleProg(style, styleKeys, uniformSetters, spriteTexture) {
   return { setStyles, getData };
 }
 
+function antiMeridianSplit(tileset) {
+  // At low zooms, some tiles may be repeated on opposite ends of the map
+  // We split them into subsets, one tileset for each copy of the map
+
+  const { 0: { x, z }, translate, scale } = tileset;
+  const numTiles = 1 << z;
+
+  function inRange(tile, shift) {
+    const delta = tile.x - x - shift;
+    return (0 <= delta && delta < numTiles);
+  }
+
+  return [0, 1, 2]
+    .map(repeat => repeat * numTiles)
+    .map(shift => tileset.filter(tile => inRange(tile, shift)))
+    .map(tiles => Object.assign(tiles, { translate, scale }))
+    .filter(subset => subset.length);
+}
+
 function initTilePainter(context, program, layer, multiTile) {
   return (multiTile) ? drawTileset : drawTile;
 
@@ -701,28 +718,13 @@ function initTilePainter(context, program, layer, multiTile) {
     program.setScreen(pixRatio, cameraScale);
     layer.setStyles(zoom);
 
-    const numTiles = program.setCoords(tileset[0]);
-    const subsets = antiMeridianSplit(tileset, numTiles);
+    program.setCoords(tileset[0]);
+    const subsets = antiMeridianSplit(tileset);
 
     subsets.forEach(subset => {
       const { translate, scale } = program.setShift(subset, pixRatio);
       subset.forEach(t => drawTileBox(t, translate, scale));
     });
-  }
-
-  function antiMeridianSplit(tileset, numTiles) {
-    const { translate, scale } = tileset;
-    const { x } = tileset[0];
-
-    // At low zooms, some tiles may be repeated on opposite ends of the map
-    // We split them into subsets, one tileset for each copy of the map
-    return [0, 1, 2].map(repeat => repeat * numTiles).map(shift => {
-      const tiles = tileset.filter(tile => {
-        const delta = tile.x - x - shift;
-        return (delta >= 0 && delta < numTiles);
-      });
-      return Object.assign(tiles, { translate, scale });
-    }).filter(subset => subset.length);
   }
 
   function drawTileBox(box, translate, scale) {

@@ -1544,8 +1544,9 @@ const textKeys = {
 };
 
 function getGlyphs(feature, atlas) {
+  if (!atlas) return;
   const { charCodes, font } = feature;
-  const positions = atlas?.positions[font];
+  const positions = atlas.positions[font];
   if (!positions || !charCodes || !charCodes.length) return;
 
   const { width, height } = atlas.image;
@@ -1819,7 +1820,9 @@ function getLineAnchors(geometry, extent, icon, text, layoutVals) {
   const alignment = (text) ? textRotationAlignment : iconRotationAlignment;
   const keepUpright = (text) ? textKeepUpright : iconKeepUpright;
 
-  const box = mergeBoxes(icon?.bbox, text?.bbox);
+  const iconbox = (icon) ? icon.bbox : undefined;
+  const textbox = (text) ? text.bbox : undefined;
+  const box = mergeBoxes(iconbox, textbox);
   const labelLength = (alignment === "viewport") ? 0.0 : box[2] - box[0];
   const spacing = max(symbolSpacing, labelLength + symbolSpacing / 4);
 

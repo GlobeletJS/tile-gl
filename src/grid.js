@@ -11,7 +11,6 @@ export function initGrid(use, uniformSetters, framebuffer) {
     const xw = x - Math.floor(x / numTiles) * numTiles;
     const extent = 512; // TODO: don't assume this!!
     mapCoords([xw, y, z, extent]);
-    return numTiles;
   }
 
   function setShift(tileset, pixRatio = 1) {
