@@ -1,8 +1,8 @@
 import { camelCase } from "./camelCase.js";
 
-export function initStyleProg(style, styleKeys, uniformSetters, spriteTexture) {
+export function initStyleProg(style, styleKeys, program, spriteTexture) {
   const { id, type, paint } = style;
-  const { sdf, sprite } = uniformSetters;
+  const { sdf, sprite } = program.uniformSetters;
   const haveSprite = sprite && (spriteTexture instanceof WebGLTexture);
 
   const zoomFuncs = styleKeys
@@ -10,11 +10,12 @@ export function initStyleProg(style, styleKeys, uniformSetters, spriteTexture) {
     .map(styleKey => {
       const get = paint[styleKey];
       const shaderVar = camelCase(styleKey);
-      const set = uniformSetters[shaderVar];
+      const set = program.uniformSetters[shaderVar];
       return (z, f) => set(get(z, f));
     });
 
   function setStyles(zoom) {
+    program.use();
     zoomFuncs.forEach(f => f(zoom));
     if (haveSprite) sprite(spriteTexture);
   }

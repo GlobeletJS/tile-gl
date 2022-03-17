@@ -1,4 +1,21 @@
-var preamble = `#version 300 es
+var singlePreamble = `#version 300 es
+
+precision highp float;
+
+uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
+uniform vec4 screenScale; // 2 / width, -2 / height, pixRatio, cameraScale
+
+vec2 tileToMap(vec2 tilePos) {
+  return tilePos;
+}
+
+vec4 mapToClip(vec2 mapPos, float z) {
+  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
+  return vec4(projected, z, 1);
+}
+`;
+
+var multiPreamble = `#version 300 es
 
 precision highp float;
 
@@ -6,7 +23,6 @@ in vec3 tileCoords;
 
 uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
 uniform vec3 mapShift;    // translate and scale of tileset[0]
-
 uniform vec4 screenScale; // 2 / width, -2 / height, pixRatio, cameraScale
 
 vec2 tileToMap(vec2 tilePos) {
@@ -58,6 +74,7 @@ function setParams(userParams) {
     multiTile = true,
   } = userParams;
 
+  const preamble = (multiTile) ? multiPreamble : singlePreamble;
   const scaleCode = (projScale) ? mercatorScale : simpleScale;
   const size = framebuffer.size;
 
@@ -567,6 +584,16 @@ function initText(context) {
   };
 }
 
+function getProgInfo(context) {
+  return {
+    "circle": initCircle(context),
+    "line": initLine(context),
+    "fill": initFill(),
+    "sprite": initSprite(context),
+    "text": initText(context),
+  };
+}
+
 function initLoader(context, progInfo, constructVao) {
   const { initAttribute, initIndices } = context;
   const { attrInfo, getSpecialAttrs, countInstances } = progInfo;
@@ -595,40 +622,13 @@ function initLoader(context, progInfo, constructVao) {
   return (countInstances) ? loadInstanced : loadIndexed;
 }
 
-function initGrid(use, uniformSetters, framebuffer) {
-  const { screenScale, mapCoords, mapShift } = uniformSetters;
-
-  function setScreen(pixRatio = 1.0, cameraScale = 1.0) {
-    const { width, height } = framebuffer.size;
-    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
-  }
-
-  function setCoords({ x, y, z }) {
-    const numTiles = 1 << z;
-    const xw = x - Math.floor(x / numTiles) * numTiles;
-    const extent = 512; // TODO: don't assume this!!
-    mapCoords([xw, y, z, extent]);
-  }
-
-  function setShift(tileset, pixRatio = 1) {
-    const { x, y } = tileset[0];
-    const { translate, scale: rawScale } = tileset;
-    const scale = rawScale * pixRatio;
-    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    mapShift([dx, dy, scale]);
-    return { translate, scale };
-  }
-
-  return { use, setScreen, setCoords, setShift };
-}
-
 function camelCase(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function initStyleProg(style, styleKeys, uniformSetters, spriteTexture) {
+function initStyleProg(style, styleKeys, program, spriteTexture) {
   const { id, type, paint } = style;
-  const { sdf, sprite } = uniformSetters;
+  const { sdf, sprite } = program.uniformSetters;
   const haveSprite = sprite && (spriteTexture instanceof WebGLTexture);
 
   const zoomFuncs = styleKeys
@@ -636,11 +636,12 @@ function initStyleProg(style, styleKeys, uniformSetters, spriteTexture) {
     .map(styleKey => {
       const get = paint[styleKey];
       const shaderVar = camelCase(styleKey);
-      const set = uniformSetters[shaderVar];
+      const set = program.uniformSetters[shaderVar];
       return (z, f) => set(get(z, f));
     });
 
   function setStyles(zoom) {
+    program.use();
     zoomFuncs.forEach(f => f(zoom));
     if (haveSprite) sprite(spriteTexture);
   }
@@ -690,41 +691,35 @@ function antiMeridianSplit(tileset) {
     .filter(subset => subset.length);
 }
 
-function initTilePainter(context, program, layer, multiTile) {
-  return (multiTile) ? drawTileset : drawTile;
+function initTilesetPainter(context, framebuffer, program, layer) {
+  const { screenScale, mapCoords, mapShift } = program.uniformSetters;
 
-  function drawTile({ tile, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
-    program.use();
-
-    const data = layer.getData(tile);
-    if (!data) return;
-    const z = (zoom !== undefined) ? zoom : tile.z;
-    layer.setStyles(z);
-
-    program.setScreen(pixRatio, cameraScale);
-    program.setCoords(tile);
-
-    const fakeTileset = [{ x: 0, y: 0 }];
-    Object.assign(fakeTileset, { translate: [0, 0], scale: 512 });
-    program.setShift(fakeTileset, pixRatio);
-
-    context.draw(data.buffers);
-  }
-
-  function drawTileset({ tileset, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
+  return function({ tileset, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
     if (!tileset || !tileset.length) return;
-
-    program.use();
-    program.setScreen(pixRatio, cameraScale);
     layer.setStyles(zoom);
 
-    program.setCoords(tileset[0]);
-    const subsets = antiMeridianSplit(tileset);
+    // Set screenScale and mapCoords
+    const { width, height } = framebuffer.size;
+    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
 
-    subsets.forEach(subset => {
-      const { translate, scale } = program.setShift(subset, pixRatio);
-      subset.forEach(t => drawTileBox(t, translate, scale));
-    });
+    const { x, y, z } = tileset[0];
+    const numTiles = 1 << z;
+    const xw = x - Math.floor(x / numTiles) * numTiles;
+    const extent = 512; // TODO: don't assume this!!
+    mapCoords([xw, y, z, extent]);
+
+    // Draw tiles. Split into subsets if they are repeated across antimeridian
+    antiMeridianSplit(tileset).forEach(subset => drawSubset(subset, pixRatio));
+  };
+
+  function drawSubset(tileset, pixRatio = 1) {
+    const { 0: { x, y }, translate, scale: rawScale } = tileset;
+    const scale = rawScale * pixRatio;
+
+    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * scale);
+    mapShift([dx, dy, scale]);
+
+    tileset.forEach(tile => drawTileBox(tile, translate, scale));
   }
 
   function drawTileBox(box, translate, scale) {
@@ -739,17 +734,53 @@ function initTilePainter(context, program, layer, multiTile) {
   }
 }
 
+function initTilePainter(context, framebuffer, program, layer) {
+  const { screenScale } = program.uniformSetters;
+
+  return function({ tile, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
+    const z = (zoom !== undefined) ? zoom : tile.z;
+    layer.setStyles(z);
+
+    // Note: layer.getData executes uniform1i for text layers.
+    // So we must call useProgram first (done in layer.setStyles)
+    const data = layer.getData(tile);
+    if (!data) return;
+
+    const { width, height } = framebuffer.size;
+    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
+
+    context.draw(data.buffers);
+  };
+}
+
 function initPrograms(context, framebuffer, preamble, multiTile) {
+  const info = getProgInfo(context);
+  const initRenderer = (multiTile) ? initTilesetPainter : initTilePainter;
+
   return {
-    "circle": setupProgram(initCircle(context)),
-    "line": setupProgram(initLine(context)),
-    "fill": setupProgram(initFill()),
+    "circle": setupProgram(info.circle),
+    "line": setupProgram(info.line),
+    "fill": setupProgram(info.fill),
     "symbol": setupSymbol(),
   };
 
+  function setupProgram(progInfo) {
+    const { vert, frag, styleKeys } = progInfo;
+
+    const program = context.initProgram(preamble + vert, frag);
+    const load = initLoader(context, progInfo, program.constructVao);
+
+    function initPainter(style, sprite) {
+      const styleProg = initStyleProg(style, styleKeys, program, sprite);
+      return initRenderer(context, framebuffer, program, styleProg);
+    }
+
+    return { load, initPainter };
+  }
+
   function setupSymbol() {
-    const spriteProg = setupProgram(initSprite(context));
-    const textProg = setupProgram(initText(context));
+    const spriteProg = setupProgram(info.sprite);
+    const textProg = setupProgram(info.text);
 
     function load(buffers) {
       const loaded = {};
@@ -766,23 +797,6 @@ function initPrograms(context, framebuffer, preamble, multiTile) {
         iconPaint(params);
         textPaint(params);
       };
-    }
-
-    return { load, initPainter };
-  }
-
-  function setupProgram(progInfo) {
-    const { vert, frag, styleKeys } = progInfo;
-
-    const program = context.initProgram(preamble + vert, frag);
-    const { use, uniformSetters, constructVao } = program;
-
-    const load = initLoader(context, progInfo, constructVao);
-    const grid = initGrid(use, uniformSetters, framebuffer);
-
-    function initPainter(style, sprite) {
-      const styleProg = initStyleProg(style, styleKeys, uniformSetters, sprite);
-      return initTilePainter(context, grid, styleProg, multiTile);
     }
 
     return { load, initPainter };

@@ -1,24 +1,37 @@
-import { initCircle } from "./circle/program.js";
-import { initLine } from "./line/program.js";
-import { initFill } from "./fill/program.js";
-import { initSprite } from "./sprite/program.js";
-import { initText } from "./text/program.js";
+import { getProgInfo } from "./prog-info.js";
 import { initLoader } from "./loader.js";
-import { initGrid } from "./grid.js";
 import { initStyleProg } from "./style-prog.js";
-import { initTilePainter } from "./painters.js";
+import { initTilesetPainter } from "./paint-tileset.js";
+import { initTilePainter } from "./paint-tile.js";
 
 export function initPrograms(context, framebuffer, preamble, multiTile) {
+  const info = getProgInfo(context);
+  const initRenderer = (multiTile) ? initTilesetPainter : initTilePainter;
+
   return {
-    "circle": setupProgram(initCircle(context)),
-    "line": setupProgram(initLine(context)),
-    "fill": setupProgram(initFill(context)),
+    "circle": setupProgram(info.circle),
+    "line": setupProgram(info.line),
+    "fill": setupProgram(info.fill),
     "symbol": setupSymbol(),
   };
 
+  function setupProgram(progInfo) {
+    const { vert, frag, styleKeys } = progInfo;
+
+    const program = context.initProgram(preamble + vert, frag);
+    const load = initLoader(context, progInfo, program.constructVao);
+
+    function initPainter(style, sprite) {
+      const styleProg = initStyleProg(style, styleKeys, program, sprite);
+      return initRenderer(context, framebuffer, program, styleProg);
+    }
+
+    return { load, initPainter };
+  }
+
   function setupSymbol() {
-    const spriteProg = setupProgram(initSprite(context));
-    const textProg = setupProgram(initText(context));
+    const spriteProg = setupProgram(info.sprite);
+    const textProg = setupProgram(info.text);
 
     function load(buffers) {
       const loaded = {};
@@ -35,23 +48,6 @@ export function initPrograms(context, framebuffer, preamble, multiTile) {
         iconPaint(params);
         textPaint(params);
       };
-    }
-
-    return { load, initPainter };
-  }
-
-  function setupProgram(progInfo) {
-    const { vert, frag, styleKeys } = progInfo;
-
-    const program = context.initProgram(preamble + vert, frag);
-    const { use, uniformSetters, constructVao } = program;
-
-    const load = initLoader(context, progInfo, constructVao);
-    const grid = initGrid(use, uniformSetters, framebuffer);
-
-    function initPainter(style, sprite) {
-      const styleProg = initStyleProg(style, styleKeys, uniformSetters, sprite);
-      return initTilePainter(context, grid, styleProg, multiTile);
     }
 
     return { load, initPainter };

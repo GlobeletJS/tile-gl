@@ -1,4 +1,5 @@
-import preamble from "./preamble.glsl";
+import singlePreamble from "./single-tile.glsl";
+import multiPreamble from "./multi-tile.glsl";
 import simpleScale from "./scale.glsl";
 import mercatorScale from "./merc-scale.glsl";
 
@@ -9,6 +10,7 @@ export function setParams(userParams) {
     multiTile = true,
   } = userParams;
 
+  const preamble = (multiTile) ? multiPreamble : singlePreamble;
   const scaleCode = (projScale) ? mercatorScale : simpleScale;
   const size = framebuffer.size;
 
