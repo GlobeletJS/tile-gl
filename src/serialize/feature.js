@@ -15,7 +15,7 @@ export function initFeatureSerializer(style, spriteData) {
     case "fill":
       return initParsing(paint, fillInfo);
     case "symbol":
-      return initShaping(style, spriteData);
+      return initSymbolParsing(style, spriteData);
     default:
       throw Error("tile-gl: unknown serializer type!");
   }
@@ -37,6 +37,24 @@ function initParsing(paint, info) {
       const val = get(null, feature);
       buffers[key] = dummy.flatMap(() => val);
     });
+
+    return buffers;
+  };
+}
+
+function initSymbolParsing(style, spriteData) {
+  const shaper = initShaping(style, spriteData);
+
+  return function(feature, tileCoords, atlas, tree) {
+    const buffers = shaper(feature, tileCoords, atlas, tree);
+    if (!buffers) return;
+
+    const { charPos, spritePos } = buffers;
+    const length = charPos ? charPos.length / 4 : spritePos.length / 4;
+    const dummy = Array.from({ length });
+
+    const { z, x, y } = tileCoords;
+    buffers.tileCoords = dummy.flatMap(() => [x, y, z]);
 
     return buffers;
   };
