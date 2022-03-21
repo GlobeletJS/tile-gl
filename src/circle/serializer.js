@@ -4,8 +4,8 @@ export const circleInfo = {
   getLength: (buffers) => buffers.circlePos.length / 2,
 };
 
-function flattenPoints(geometry) {
-  const { type, coordinates } = geometry;
+function flattenPoints(feature) {
+  const { type, coordinates } = feature.geometry;
   if (!coordinates || !coordinates.length) return;
 
   switch (type) {

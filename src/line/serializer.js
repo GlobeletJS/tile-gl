@@ -9,8 +9,8 @@ export const lineInfo = {
   getLength: (buffers) => buffers.lines.length / 3,
 };
 
-function flattenLines(geometry) {
-  const { type, coordinates } = geometry;
+function flattenLines(feature) {
+  const { type, coordinates } = feature.geometry;
   if (!coordinates || !coordinates.length) return;
 
   switch (type) {

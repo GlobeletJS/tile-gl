@@ -6,8 +6,8 @@ export const fillInfo = {
   getLength: (buffers) => buffers.position.length / 2,
 };
 
-function triangulate(geometry) {
-  const { type, coordinates } = geometry;
+function triangulate(feature) {
+  const { type, coordinates } = feature.geometry;
   if (!coordinates || !coordinates.length) return;
 
   switch (type) {

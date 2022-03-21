@@ -15,46 +15,30 @@ export function initFeatureSerializer(style, spriteData) {
     case "fill":
       return initParsing(paint, fillInfo);
     case "symbol":
-      return initSymbolParsing(style, spriteData);
+      return initParsing(paint, initShaping(style, spriteData));
     default:
       throw Error("tile-gl: unknown serializer type!");
   }
 }
 
 function initParsing(paint, info) {
-  const { styleKeys, serialize, getLength } = info;
+  const { styleKeys = [], serialize, getLength } = info;
   const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
     .map(k => ([paint[k], camelCase(k)]));
 
-  return function(feature, { z, x, y }) {
-    const buffers = serialize(feature.geometry);
+  return function(feature, tileCoords, atlas, tree) {
+    const buffers = serialize(feature, tileCoords, atlas, tree);
     if (!buffers) return;
 
     const dummy = Array.from({ length: getLength(buffers) });
 
+    const { z, x, y } = tileCoords;
     buffers.tileCoords = dummy.flatMap(() => [x, y, z]);
+
     dataFuncs.forEach(([get, key]) => {
       const val = get(null, feature);
       buffers[key] = dummy.flatMap(() => val);
     });
-
-    return buffers;
-  };
-}
-
-function initSymbolParsing(style, spriteData) {
-  const shaper = initShaping(style, spriteData);
-
-  return function(feature, tileCoords, atlas, tree) {
-    const buffers = shaper(feature, tileCoords, atlas, tree);
-    if (!buffers) return;
-
-    const { charPos, spritePos } = buffers;
-    const length = charPos ? charPos.length / 4 : spritePos.length / 4;
-    const dummy = Array.from({ length });
-
-    const { z, x, y } = tileCoords;
-    buffers.tileCoords = dummy.flatMap(() => [x, y, z]);
 
     return buffers;
   };
