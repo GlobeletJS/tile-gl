@@ -4,7 +4,6 @@ import frag from "./frag.glsl";
 export function initCircle(context) {
   const attrInfo = {
     circlePos: { numComponents: 2 },
-    tileCoords: { numComponents: 3 },
     circleRadius: { numComponents: 1 },
     circleColor: { numComponents: 4 },
     circleOpacity: { numComponents: 1 },

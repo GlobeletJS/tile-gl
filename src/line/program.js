@@ -5,7 +5,6 @@ export function initLine(context) {
   const { initQuad, createBuffer, initAttribute } = context;
 
   const attrInfo = {
-    tileCoords: { numComponents: 3 },
     lineColor: { numComponents: 4 },
     lineOpacity: { numComponents: 1 },
     lineWidth: { numComponents: 1 },

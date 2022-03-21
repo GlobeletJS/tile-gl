@@ -136,7 +136,6 @@ void main() {
 function initCircle(context) {
   const attrInfo = {
     circlePos: { numComponents: 2 },
-    tileCoords: { numComponents: 3 },
     circleRadius: { numComponents: 1 },
     circleColor: { numComponents: 4 },
     circleOpacity: { numComponents: 1 },
@@ -326,7 +325,6 @@ function initLine(context) {
   const { initQuad, createBuffer, initAttribute } = context;
 
   const attrInfo = {
-    tileCoords: { numComponents: 3 },
     lineColor: { numComponents: 4 },
     lineOpacity: { numComponents: 1 },
     lineWidth: { numComponents: 1 },
@@ -408,7 +406,6 @@ void main() {
 function initFill() {
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
-    tileCoords: { numComponents: 3, divisor: 0 },
     fillColor: { numComponents: 4, divisor: 0 },
     fillOpacity: { numComponents: 1, divisor: 0 },
   };
@@ -471,7 +468,6 @@ function initSprite(context) {
     labelPos0: { numComponents: 3 },
     spritePos: { numComponents: 4 },
     spriteRect: { numComponents: 4 },
-    tileCoords: { numComponents: 3 },
     iconOpacity: { numComponents: 1 },
   };
   const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
@@ -560,7 +556,6 @@ function initText(context) {
     labelPos: { numComponents: 4 },
     charPos: { numComponents: 4 },
     sdfRect: { numComponents: 4 },
-    tileCoords: { numComponents: 3 },
     textColor: { numComponents: 4 },
     textOpacity: { numComponents: 1 },
     textHaloBlur: { numComponents: 1 },
@@ -597,9 +592,11 @@ function getProgInfo(context) {
 function initLoader(context, progInfo, constructVao) {
   const { initAttribute, initIndices } = context;
   const { attrInfo, getSpecialAttrs, countInstances } = progInfo;
+  const universalAttrs = { tileCoords: { numComponents: 3 } };
+  const allAttrs = Object.assign({}, attrInfo, universalAttrs);
 
   function getAttributes(buffers) {
-    return Object.entries(attrInfo).reduce((d, [key, info]) => {
+    return Object.entries(allAttrs).reduce((d, [key, info]) => {
       const data = buffers[key];
       if (data) d[key] = initAttribute(Object.assign({ data }, info));
       return d;

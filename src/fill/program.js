@@ -4,7 +4,6 @@ import frag from "./frag.glsl";
 export function initFill() {
   const attrInfo = {
     position: { numComponents: 2, divisor: 0 },
-    tileCoords: { numComponents: 3, divisor: 0 },
     fillColor: { numComponents: 4, divisor: 0 },
     fillOpacity: { numComponents: 1, divisor: 0 },
   };

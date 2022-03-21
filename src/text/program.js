@@ -6,7 +6,6 @@ export function initText(context) {
     labelPos: { numComponents: 4 },
     charPos: { numComponents: 4 },
     sdfRect: { numComponents: 4 },
-    tileCoords: { numComponents: 3 },
     textColor: { numComponents: 4 },
     textOpacity: { numComponents: 1 },
     textHaloBlur: { numComponents: 1 },
