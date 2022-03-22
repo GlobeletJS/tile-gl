@@ -2795,26 +2795,26 @@ function camelCase(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function initFeatureSerializer(style, spriteData) {
-  const { type, paint } = style;
-
-  switch (type) {
+function getSerializeInfo(style, spriteData) {
+  switch (style.type) {
     case "circle":
-      return initParsing(paint, circleInfo);
+      return circleInfo;
     case "line":
-      return initParsing(paint, lineInfo);
+      return lineInfo;
     case "fill":
-      return initParsing(paint, fillInfo);
+      return fillInfo;
     case "symbol":
-      return initParsing(paint, initShaping(style, spriteData));
+      return initShaping(style, spriteData);
     default:
       throw Error("tile-gl: unknown serializer type!");
   }
 }
 
-function initParsing(paint, info) {
+function initFeatureSerializer(paint, info) {
   const { styleKeys = [], serialize, getLength } = info;
-  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
+
+  const dataFuncs = styleKeys
+    .filter(k => paint[k].type === "property")
     .map(k => ([paint[k], camelCase(k)]));
 
   return function(feature, tileCoords, atlas, tree) {
@@ -2822,9 +2822,6 @@ function initParsing(paint, info) {
     if (!buffers) return;
 
     const dummy = Array.from({ length: getLength(buffers) });
-
-    const { z, x, y } = tileCoords;
-    buffers.tileCoords = dummy.flatMap(() => [x, y, z]);
 
     dataFuncs.forEach(([get, key]) => {
       const val = get(null, feature);
@@ -2869,7 +2866,8 @@ function appendBuffers(buffers, newBuffers) {
 function initLayerSerializer(style, spriteData) {
   const { id, type, interactive } = style;
 
-  const transform = initFeatureSerializer(style, spriteData);
+  const info = getSerializeInfo(style, spriteData);
+  const transform = initFeatureSerializer(style.paint, info);
   if (!transform) return;
 
   return function(layer, tileCoords, atlas, tree) {
@@ -2881,7 +2879,9 @@ function initLayerSerializer(style, spriteData) {
 
     if (!transformed.length) return;
 
-    const newLayer = { type, extent, buffers: concatBuffers(transformed) };
+    const buffers = concatBuffers(transformed);
+    const length = info.getLength(buffers);
+    const newLayer = { type, extent, buffers, length };
 
     if (interactive) newLayer.features = features.slice();
 
@@ -3483,10 +3483,19 @@ function initSerializer(userParams) {
     return getAtlas(source, tileCoords.z).then(atlas => {
       const layers = process(source, tileCoords, atlas);
 
+      Object.values(layers).forEach(l => addTileCoords(l, tileCoords));
+
       // Note: atlas.data.buffer is a Transferable
       return { atlas: atlas.image, layers };
     });
   };
+}
+
+function addTileCoords(layer, { z, x, y }) {
+  const { length, buffers } = layer;
+
+  const coordArray = Array.from({ length }).flatMap(() => [x, y, z]);
+  buffers.tileCoords = new Float32Array(coordArray);
 }
 
 function setParams({ glyphs, spriteData, layers }) {

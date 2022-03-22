@@ -1,10 +1,11 @@
-import { initFeatureSerializer } from "./feature.js";
+import { getSerializeInfo, initFeatureSerializer } from "./feature.js";
 import { concatBuffers } from "./concat-buffers.js";
 
 export function initLayerSerializer(style, spriteData) {
   const { id, type, interactive } = style;
 
-  const transform = initFeatureSerializer(style, spriteData);
+  const info = getSerializeInfo(style, spriteData);
+  const transform = initFeatureSerializer(style.paint, info);
   if (!transform) return;
 
   return function(layer, tileCoords, atlas, tree) {
@@ -16,7 +17,9 @@ export function initLayerSerializer(style, spriteData) {
 
     if (!transformed.length) return;
 
-    const newLayer = { type, extent, buffers: concatBuffers(transformed) };
+    const buffers = concatBuffers(transformed);
+    const length = info.getLength(buffers);
+    const newLayer = { type, extent, buffers, length };
 
     if (interactive) newLayer.features = features.slice();
 

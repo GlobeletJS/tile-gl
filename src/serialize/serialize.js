@@ -13,10 +13,19 @@ export function initSerializer(userParams) {
     return getAtlas(source, tileCoords.z).then(atlas => {
       const layers = process(source, tileCoords, atlas);
 
+      Object.values(layers).forEach(l => addTileCoords(l, tileCoords));
+
       // Note: atlas.data.buffer is a Transferable
       return { atlas: atlas.image, layers };
     });
   };
+}
+
+function addTileCoords(layer, { z, x, y }) {
+  const { length, buffers } = layer;
+
+  const coordArray = Array.from({ length }).flatMap(() => [x, y, z]);
+  buffers.tileCoords = new Float32Array(coordArray);
 }
 
 function setParams({ glyphs, spriteData, layers }) {
