@@ -1989,6 +1989,24 @@ function combineBuffers(dict, buffers) {
   return dict;
 }
 
+function setParams(userParams) {
+  const { glyphs, spriteData, layers } = userParams;
+
+  if (!layers || !layers.length) fail("no valid array of style layers");
+  const parsedStyles = layers.map(getStyleFuncs);
+
+  const glyphsOK = ["string", "undefined"].includes(typeof glyphs);
+  if (!glyphsOK) fail("glyphs must be a string URL");
+
+  const getAtlas = initAtlasGetter({ parsedStyles, glyphEndpoint: glyphs });
+
+  return { parsedStyles, spriteData, getAtlas };
+}
+
+function fail(message) {
+  throw Error("tile-gl initSerializer: " + message);
+}
+
 const circleInfo = {
   styleKeys: ["circle-radius", "circle-color", "circle-opacity"],
   serialize: flattenPoints,
@@ -3454,61 +3472,47 @@ function multiSelect(arr, left, right, n, compare) {
     }
 }
 
-function initTileSerializer(styles, spriteData) {
-  const layerSerializers = styles
-    .reduce((d, s) => (d[s.id] = initLayerSerializer(s, spriteData), d), {});
+function addTileCoords(tile, coords) {
+  const { z, x, y } = coords;
 
-  return function(layers, tileCoords, atlas) {
-    const tree = new RBush();
+  Object.values(tile.layers).forEach(layer => {
+    const { length, buffers } = layer;
+    const coordArray = Array.from({ length }).flatMap(() => [x, y, z]);
+    buffers.tileCoords = new Float32Array(coordArray);
+  });
 
-    return Object.entries(layers)
-      .reverse() // Reverse order for collision checks
-      .map(([id, layer]) => {
-        const serialize = layerSerializers[id];
-        if (serialize) return serialize(layer, tileCoords, atlas, tree);
-      })
-      .reverse()
-      .reduce((d, l) => Object.assign(d, l), {});
-  };
+  return tile;
 }
 
 function initSerializer(userParams) {
-  const { glyphEndpoint, spriteData, layers } = setParams(userParams);
-  const parsedStyles = layers.map(getStyleFuncs);
+  const { parsedStyles, spriteData, getAtlas } = setParams(userParams);
 
-  const getAtlas = initAtlasGetter({ parsedStyles, glyphEndpoint });
-  const process = initTileSerializer(parsedStyles, spriteData);
+  const layerSerializers = parsedStyles
+    .reduce((d, s) => (d[s.id] = initLayerSerializer(s, spriteData), d), {});
 
   return function(source, tileCoords) {
-    return getAtlas(source, tileCoords.z).then(atlas => {
-      const layers = process(source, tileCoords, atlas);
-
-      Object.values(layers).forEach(l => addTileCoords(l, tileCoords));
-
-      // Note: atlas.data.buffer is a Transferable
-      return { atlas: atlas.image, layers };
-    });
+    return getAtlas(source, tileCoords.z)
+      .then(atlas => process(source, tileCoords, atlas))
+      .then(tile => addTileCoords(tile, tileCoords));
   };
-}
 
-function addTileCoords(layer, { z, x, y }) {
-  const { length, buffers } = layer;
+  function process(source, coords, atlas) {
+    const tree = new RBush();
 
-  const coordArray = Array.from({ length }).flatMap(() => [x, y, z]);
-  buffers.tileCoords = new Float32Array(coordArray);
-}
+    function serializeLayer([id, layer]) {
+      const serialize = layerSerializers[id];
+      if (serialize) return serialize(layer, coords, atlas, tree);
+    }
 
-function setParams({ glyphs, spriteData, layers }) {
-  if (!layers || !layers.length) fail("no valid array of style layers");
+    const layers = Object.entries(source)
+      .reverse() // Reverse order for collision checks
+      .map(serializeLayer)
+      .reverse()
+      .reduce((d, l) => Object.assign(d, l), {});
 
-  const glyphsOK = ["string", "undefined"].includes(typeof glyphs);
-  if (!glyphsOK) fail("glyphs must be a string URL");
-
-  return { glyphEndpoint: glyphs, spriteData, layers };
-}
-
-function fail(message) {
-  throw Error("tile-gl initSerializer: " + message);
+    // Note: atlas.data.buffer is a Transferable
+    return { atlas: atlas.image, layers };
+  }
 }
 
 export { initSerializer };
