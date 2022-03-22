@@ -1,14 +1,15 @@
-export function concatBuffers(features) {
+export function concatBuffers(buffers) {
   // Concatenate the buffers from all the features
-  const arrays = features.map(f => f.buffers).reduce(appendBuffers, {});
+  const arrays = buffers.reduce(appendBuffers, {});
 
   // Convert to TypedArrays (now that the lengths are finalized)
-  return Object.entries(arrays).reduce((d, [key, buffer]) => {
-    d[key] = (key === "indices")
-      ? new Uint32Array(buffer)
-      : new Float32Array(buffer);
-    return d;
-  }, {});
+  return Object.entries(arrays)
+    .reduce((d, [k, a]) => (d[k] = makeTypedArray(k, a), d), {});
+}
+
+function makeTypedArray(key, array) {
+  const type = (key === "indices") ? Uint32Array : Float32Array;
+  return new type(array);
 }
 
 function appendBuffers(buffers, newBuffers) {

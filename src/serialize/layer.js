@@ -10,19 +10,15 @@ export function initLayerSerializer(style, spriteData) {
   return function(layer, tileCoords, atlas, tree) {
     const { extent, features } = layer;
 
-    const transformed = features.map(feature => {
-      const { properties, geometry } = feature;
-      const buffers = transform(feature, tileCoords, atlas, tree);
-      // If no buffers, skip entire feature (it won't be rendered)
-      if (buffers) return { properties, geometry, buffers };
-    }).filter(f => f !== undefined);
+    const transformed = features
+      .map(f => transform(f, tileCoords, atlas, tree))
+      .filter(f => f !== undefined);
 
     if (!transformed.length) return;
 
     const newLayer = { type, extent, buffers: concatBuffers(transformed) };
 
-    if (interactive) newLayer.features = transformed
-      .map(({ properties, geometry }) => ({ properties, geometry }));
+    if (interactive) newLayer.features = features.slice();
 
     return { [id]: newLayer };
   };
