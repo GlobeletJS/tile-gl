@@ -1,6 +1,6 @@
 import { camelCase } from "./camelCase.js";
 
-export function initStyleProg(style, styleKeys, program, spriteTexture) {
+export function initStyleProg(style, spriteTexture, styleKeys, program) {
   const { id, type, paint } = style;
   const { sdf, sprite } = program.uniformSetters;
   const haveSprite = sprite && (spriteTexture instanceof WebGLTexture);

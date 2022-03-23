@@ -3,9 +3,10 @@ import { initPrograms } from "./programs.js";
 import { initBackground } from "./background/program.js";
 
 export function initGLpaint(userParams) {
-  const { context, framebuffer, preamble, multiTile } = setParams(userParams);
+  const params = setParams(userParams);
+  const { context, framebuffer } = params;
 
-  const programs = initPrograms(context, framebuffer, preamble, multiTile);
+  const programs = initPrograms(params);
   programs["background"] = initBackground(context);
 
   function prep() {

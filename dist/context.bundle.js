@@ -1,4 +1,4 @@
-var singlePreamble = `#version 300 es
+var defaultPreamble = `#version 300 es
 
 precision highp float;
 
@@ -13,69 +13,18 @@ vec4 mapToClip(vec2 mapPos, float z) {
   vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
   return vec4(projected, z, 1);
 }
-`;
-
-var multiPreamble = `#version 300 es
-
-precision highp float;
-
-in vec3 tileCoords;
-
-uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
-uniform vec3 mapShift;    // translate and scale of tileset[0]
-uniform vec4 screenScale; // 2 / width, -2 / height, pixRatio, cameraScale
-
-vec2 tileToMap(vec2 tilePos) {
-  // Find distance of this tile from top left tile, in tile units
-  float zoomFac = exp2(mapCoords.z - tileCoords.z);
-  vec2 dTile = zoomFac * tileCoords.xy - mapCoords.xy;
-  // tileCoords.x and mapCoords.x are both wrapped to the range [0..exp2(z)]
-  // If the right edge of the tile is left of the map, we need to unwrap dTile
-  dTile.x += (dTile.x + zoomFac <= 0.0) ? exp2(mapCoords.z) : 0.0;
-
-  // Convert to a translation in pixels
-  vec2 tileTranslate = dTile * mapShift.z + mapShift.xy;
-
-  // Find scaling between tile coordinates and screen pixels
-  float tileScale = zoomFac * mapShift.z / mapCoords.w;
-
-  return tilePos * tileScale + tileTranslate;
-}
-
-vec4 mapToClip(vec2 mapPos, float z) {
-  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
-  return vec4(projected, z, 1);
-}
-`;
-
-var simpleScale = `float styleScale(vec2 tilePos) {
-  return screenScale.z;
-}
-`;
-
-var mercatorScale = `const float TWOPI = 6.28318530718;
-
-float mercatorScale(float yWeb) {
-  // Convert Web Mercator Y to standard Mercator Y
-  float yMerc = TWOPI * (0.5 - yWeb);
-  return 0.5 * (exp(yMerc) + exp(-yMerc)); // == cosh(y)
-}
 
 float styleScale(vec2 tilePos) {
-  float y = (tileCoords.y + tilePos.y / mapCoords.w) / exp2(tileCoords.z);
-  return screenScale.z * mercatorScale(y) / screenScale.w;
+  return screenScale.z;
 }
 `;
 
 function setParams(userParams) {
   const {
     context, framebuffer,
-    projScale = false,
-    multiTile = true,
+    preamble = defaultPreamble,
   } = userParams;
 
-  const preamble = (multiTile) ? multiPreamble : singlePreamble;
-  const scaleCode = (projScale) ? mercatorScale : simpleScale;
   const size = framebuffer.size;
 
   context.clipRectFlipY = function(x, y, w, h) {
@@ -83,10 +32,7 @@ function setParams(userParams) {
     context.clipRect(x, yflip, w, h);
   };
 
-  return {
-    context, framebuffer, multiTile,
-    preamble: preamble + scaleCode,
-  };
+  return { context, framebuffer, preamble };
 }
 
 var vert$4 = `in vec2 quadPos; // Vertices of the quad instance
@@ -623,7 +569,7 @@ function camelCase(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function initStyleProg(style, styleKeys, program, spriteTexture) {
+function initStyleProg(style, spriteTexture, styleKeys, program) {
   const { id, type, paint } = style;
   const { sdf, sprite } = program.uniformSetters;
   const haveSprite = sprite && (spriteTexture instanceof WebGLTexture);
@@ -669,68 +615,6 @@ function initStyleProg(style, styleKeys, program, spriteTexture) {
   return { setStyles, getData };
 }
 
-function antiMeridianSplit(tileset) {
-  // At low zooms, some tiles may be repeated on opposite ends of the map
-  // We split them into subsets, one tileset for each copy of the map
-
-  const { 0: { x, z }, translate, scale } = tileset;
-  const numTiles = 1 << z;
-
-  function inRange(tile, shift) {
-    const delta = tile.x - x - shift;
-    return (0 <= delta && delta < numTiles);
-  }
-
-  return [0, 1, 2]
-    .map(repeat => repeat * numTiles)
-    .map(shift => tileset.filter(tile => inRange(tile, shift)))
-    .map(tiles => Object.assign(tiles, { translate, scale }))
-    .filter(subset => subset.length);
-}
-
-function initTilesetPainter(context, framebuffer, program, layer) {
-  const { screenScale, mapCoords, mapShift } = program.uniformSetters;
-
-  return function({ tileset, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
-    if (!tileset || !tileset.length) return;
-    layer.setStyles(zoom);
-
-    // Set screenScale and mapCoords
-    const { width, height } = framebuffer.size;
-    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
-
-    const { x, y, z } = tileset[0];
-    const numTiles = 1 << z;
-    const xw = x - Math.floor(x / numTiles) * numTiles;
-    const extent = 512; // TODO: don't assume this!!
-    mapCoords([xw, y, z, extent]);
-
-    // Draw tiles. Split into subsets if they are repeated across antimeridian
-    antiMeridianSplit(tileset).forEach(subset => drawSubset(subset, pixRatio));
-  };
-
-  function drawSubset(tileset, pixRatio = 1) {
-    const { 0: { x, y }, translate, scale: rawScale } = tileset;
-    const scale = rawScale * pixRatio;
-
-    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    mapShift([dx, dy, scale]);
-
-    tileset.forEach(tile => drawTileBox(tile, translate, scale));
-  }
-
-  function drawTileBox(box, translate, scale) {
-    const { x, y, tile } = box;
-    const data = layer.getData(tile);
-    if (!data) return;
-
-    const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    context.clipRectFlipY(x0, y0, scale, scale);
-
-    context.draw(data.buffers);
-  }
-}
-
 function initTilePainter(context, framebuffer, program, layer) {
   const { screenScale } = program.uniformSetters;
 
@@ -750,9 +634,9 @@ function initTilePainter(context, framebuffer, program, layer) {
   };
 }
 
-function initPrograms(context, framebuffer, preamble, multiTile) {
+function initPrograms(params) {
+  const { context, framebuffer, preamble } = params;
   const info = getProgInfo(context);
-  const initRenderer = (multiTile) ? initTilesetPainter : initTilePainter;
 
   return {
     "circle": setupProgram(info.circle),
@@ -768,8 +652,8 @@ function initPrograms(context, framebuffer, preamble, multiTile) {
     const load = initLoader(context, progInfo, program.constructVao);
 
     function initPainter(style, sprite) {
-      const styleProg = initStyleProg(style, styleKeys, program, sprite);
-      return initRenderer(context, framebuffer, program, styleProg);
+      const styleProg = initStyleProg(style, sprite, styleKeys, program);
+      return initTilePainter(context, framebuffer, program, styleProg);
     }
 
     return { load, initPainter };
@@ -813,9 +697,10 @@ function initBackground(context) {
 }
 
 function initGLpaint(userParams) {
-  const { context, framebuffer, preamble, multiTile } = setParams(userParams);
+  const params = setParams(userParams);
+  const { context, framebuffer } = params;
 
-  const programs = initPrograms(context, framebuffer, preamble, multiTile);
+  const programs = initPrograms(params);
   programs["background"] = initBackground(context);
 
   function prep() {

@@ -1,12 +1,11 @@
 import { getProgInfo } from "./prog-info.js";
 import { initLoader } from "./loader.js";
 import { initStyleProg } from "./style-prog.js";
-import { initTilesetPainter } from "./paint-tileset.js";
 import { initTilePainter } from "./paint-tile.js";
 
-export function initPrograms(context, framebuffer, preamble, multiTile) {
+export function initPrograms(params) {
+  const { context, framebuffer, preamble } = params;
   const info = getProgInfo(context);
-  const initRenderer = (multiTile) ? initTilesetPainter : initTilePainter;
 
   return {
     "circle": setupProgram(info.circle),
@@ -22,8 +21,8 @@ export function initPrograms(context, framebuffer, preamble, multiTile) {
     const load = initLoader(context, progInfo, program.constructVao);
 
     function initPainter(style, sprite) {
-      const styleProg = initStyleProg(style, styleKeys, program, sprite);
-      return initRenderer(context, framebuffer, program, styleProg);
+      const styleProg = initStyleProg(style, sprite, styleKeys, program);
+      return initTilePainter(context, framebuffer, program, styleProg);
     }
 
     return { load, initPainter };
