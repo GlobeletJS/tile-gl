@@ -525,28 +525,9 @@ function initText(context) {
   };
 }
 
-function compilePrograms(context, preamble) {
-  const progInfo = {
-    circle: initCircle(context),
-    line: initLine(context),
-    fill: initFill(),
-    sprite: initSprite(context),
-    text: initText(context),
-  };
-
-  function compile(info) {
-    info.program = context.initProgram(preamble + info.vert, info.frag);
-    delete info.vert;
-    delete info.frag;
-  }
-
-  Object.values(progInfo).forEach(compile);
-  return progInfo;
-}
-
-function initLoader(context, progInfo) {
+function initLoader(context, info, program) {
   const { initAttribute, initIndices } = context;
-  const { attrInfo, getSpecialAttrs, countInstances, program } = progInfo;
+  const { attrInfo, getSpecialAttrs, countInstances } = info;
 
   const universalAttrs = { tileCoords: { numComponents: 3 } };
   const allAttrs = Object.assign({}, attrInfo, universalAttrs);
@@ -573,6 +554,26 @@ function initLoader(context, progInfo) {
   }
 
   return (countInstances) ? loadInstanced : loadIndexed;
+}
+
+function compilePrograms(context, preamble) {
+  const progInfo = {
+    circle: initCircle(context),
+    line: initLine(context),
+    fill: initFill(),
+    sprite: initSprite(context),
+    text: initText(context),
+  };
+
+  function compile(info) {
+    const { vert, frag, styleKeys } = info;
+    const program = context.initProgram(preamble + vert, frag);
+    const load = initLoader(context, info, program);
+    return { program, load, styleKeys };
+  }
+
+  return Object.entries(progInfo)
+    .reduce((d, [k, info]) => (d[k] = compile(info), d), {});
 }
 
 function camelCase(hyphenated) {
@@ -634,12 +635,8 @@ function initTilePainter(context, layer) {
     const z = (zoom !== undefined) ? zoom : tile.z;
     layer.setStyles(z, pixRatio, cameraScale);
 
-    // Note: layer.getData executes uniform1i for text layers.
-    // So we must call useProgram first (done in layer.setStyles)
     const data = layer.getData(tile);
-    if (!data) return;
-
-    context.draw(data.buffers);
+    if (data) context.draw(data.buffers);
   };
 }
 
@@ -655,14 +652,12 @@ function initPrograms(params) {
   };
 
   function setup(info) {
-    const load = initLoader(context, info);
-
     function initPainter(style, sprite) {
       const styleProg = initStyleProg(style, sprite, info, framebuffer);
       return initTilePainter(context, styleProg);
     }
 
-    return { load, initPainter };
+    return { load: info.load, initPainter };
   }
 
   function setupSymbol() {

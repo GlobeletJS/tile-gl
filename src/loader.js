@@ -1,6 +1,6 @@
-export function initLoader(context, progInfo) {
+export function initLoader(context, info, program) {
   const { initAttribute, initIndices } = context;
-  const { attrInfo, getSpecialAttrs, countInstances, program } = progInfo;
+  const { attrInfo, getSpecialAttrs, countInstances } = info;
 
   const universalAttrs = { tileCoords: { numComponents: 3 } };
   const allAttrs = Object.assign({}, attrInfo, universalAttrs);

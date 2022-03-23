@@ -1,5 +1,4 @@
 import { compilePrograms } from "./compile.js";
-import { initLoader } from "./loader.js";
 import { initStyleProg } from "./style-prog.js";
 import { initTilePainter } from "./paint-tile.js";
 
@@ -15,14 +14,12 @@ export function initPrograms(params) {
   };
 
   function setup(info) {
-    const load = initLoader(context, info);
-
     function initPainter(style, sprite) {
       const styleProg = initStyleProg(style, sprite, info, framebuffer);
       return initTilePainter(context, styleProg);
     }
 
-    return { load, initPainter };
+    return { load: info.load, initPainter };
   }
 
   function setupSymbol() {

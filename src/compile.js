@@ -3,6 +3,7 @@ import { initLine } from "./line/program.js";
 import { initFill } from "./fill/program.js";
 import { initSprite } from "./sprite/program.js";
 import { initText } from "./text/program.js";
+import { initLoader } from "./loader.js";
 
 export function compilePrograms(context, preamble) {
   const progInfo = {
@@ -14,11 +15,12 @@ export function compilePrograms(context, preamble) {
   };
 
   function compile(info) {
-    info.program = context.initProgram(preamble + info.vert, info.frag);
-    delete info.vert;
-    delete info.frag;
+    const { vert, frag, styleKeys } = info;
+    const program = context.initProgram(preamble + vert, frag);
+    const load = initLoader(context, info, program);
+    return { program, load, styleKeys };
   }
 
-  Object.values(progInfo).forEach(compile);
-  return progInfo;
+  return Object.entries(progInfo)
+    .reduce((d, [k, info]) => (d[k] = compile(info), d), {});
 }
