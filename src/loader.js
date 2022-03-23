@@ -1,6 +1,7 @@
-export function initLoader(context, progInfo, constructVao) {
+export function initLoader(context, progInfo) {
   const { initAttribute, initIndices } = context;
-  const { attrInfo, getSpecialAttrs, countInstances } = progInfo;
+  const { attrInfo, getSpecialAttrs, countInstances, program } = progInfo;
+
   const universalAttrs = { tileCoords: { numComponents: 3 } };
   const allAttrs = Object.assign({}, attrInfo, universalAttrs);
 
@@ -14,14 +15,14 @@ export function initLoader(context, progInfo, constructVao) {
 
   function loadInstanced(buffers) {
     const attributes = getAttributes(buffers);
-    const vao = constructVao({ attributes });
+    const vao = program.constructVao({ attributes });
     return { vao, instanceCount: countInstances(buffers) };
   }
 
   function loadIndexed(buffers) {
     const attributes = getAttributes(buffers);
     const indices = initIndices({ data: buffers.indices });
-    const vao = constructVao({ attributes, indices });
+    const vao = program.constructVao({ attributes, indices });
     return { vao, indices, count: buffers.indices.length };
   }
 

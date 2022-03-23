@@ -1,36 +1,33 @@
-import { getProgInfo } from "./prog-info.js";
+import { compilePrograms } from "./compile.js";
 import { initLoader } from "./loader.js";
 import { initStyleProg } from "./style-prog.js";
 import { initTilePainter } from "./paint-tile.js";
 
 export function initPrograms(params) {
-  const { context, framebuffer, preamble } = params;
-  const info = getProgInfo(context);
+  const { context, preamble, framebuffer } = params;
+  const programs = compilePrograms(context, preamble);
 
   return {
-    "circle": setupProgram(info.circle),
-    "line": setupProgram(info.line),
-    "fill": setupProgram(info.fill),
+    "circle": setup(programs.circle),
+    "line": setup(programs.line),
+    "fill": setup(programs.fill),
     "symbol": setupSymbol(),
   };
 
-  function setupProgram(progInfo) {
-    const { vert, frag, styleKeys } = progInfo;
-
-    const program = context.initProgram(preamble + vert, frag);
-    const load = initLoader(context, progInfo, program.constructVao);
+  function setup(info) {
+    const load = initLoader(context, info);
 
     function initPainter(style, sprite) {
-      const styleProg = initStyleProg(style, sprite, styleKeys, program);
-      return initTilePainter(context, framebuffer, program, styleProg);
+      const styleProg = initStyleProg(style, sprite, info, framebuffer);
+      return initTilePainter(context, styleProg);
     }
 
     return { load, initPainter };
   }
 
   function setupSymbol() {
-    const spriteProg = setupProgram(info.sprite);
-    const textProg = setupProgram(info.text);
+    const spriteProg = setup(programs.sprite);
+    const textProg = setup(programs.text);
 
     function load(buffers) {
       const loaded = {};

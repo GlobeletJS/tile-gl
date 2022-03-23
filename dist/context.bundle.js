@@ -525,19 +525,29 @@ function initText(context) {
   };
 }
 
-function getProgInfo(context) {
-  return {
-    "circle": initCircle(context),
-    "line": initLine(context),
-    "fill": initFill(),
-    "sprite": initSprite(context),
-    "text": initText(context),
+function compilePrograms(context, preamble) {
+  const progInfo = {
+    circle: initCircle(context),
+    line: initLine(context),
+    fill: initFill(),
+    sprite: initSprite(context),
+    text: initText(context),
   };
+
+  function compile(info) {
+    info.program = context.initProgram(preamble + info.vert, info.frag);
+    delete info.vert;
+    delete info.frag;
+  }
+
+  Object.values(progInfo).forEach(compile);
+  return progInfo;
 }
 
-function initLoader(context, progInfo, constructVao) {
+function initLoader(context, progInfo) {
   const { initAttribute, initIndices } = context;
-  const { attrInfo, getSpecialAttrs, countInstances } = progInfo;
+  const { attrInfo, getSpecialAttrs, countInstances, program } = progInfo;
+
   const universalAttrs = { tileCoords: { numComponents: 3 } };
   const allAttrs = Object.assign({}, attrInfo, universalAttrs);
 
@@ -551,14 +561,14 @@ function initLoader(context, progInfo, constructVao) {
 
   function loadInstanced(buffers) {
     const attributes = getAttributes(buffers);
-    const vao = constructVao({ attributes });
+    const vao = program.constructVao({ attributes });
     return { vao, instanceCount: countInstances(buffers) };
   }
 
   function loadIndexed(buffers) {
     const attributes = getAttributes(buffers);
     const indices = initIndices({ data: buffers.indices });
-    const vao = constructVao({ attributes, indices });
+    const vao = program.constructVao({ attributes, indices });
     return { vao, indices, count: buffers.indices.length };
   }
 
@@ -569,9 +579,11 @@ function camelCase(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function initStyleProg(style, spriteTexture, styleKeys, program) {
+function initStyleProg(style, spriteTexture, info, framebuffer) {
   const { id, type, paint } = style;
-  const { sdf, sprite } = program.uniformSetters;
+  const { styleKeys, program } = info;
+
+  const { sdf, sprite, screenScale } = program.uniformSetters;
   const haveSprite = sprite && (spriteTexture instanceof WebGLTexture);
 
   const zoomFuncs = styleKeys
@@ -583,8 +595,10 @@ function initStyleProg(style, spriteTexture, styleKeys, program) {
       return (z, f) => set(get(z, f));
     });
 
-  function setStyles(zoom) {
+  function setStyles(zoom, pixRatio, cameraScale = 1.0) {
     program.use();
+    const { width, height } = framebuffer.size;
+    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
     zoomFuncs.forEach(f => f(zoom));
     if (haveSprite) sprite(spriteTexture);
   }
@@ -615,53 +629,45 @@ function initStyleProg(style, spriteTexture, styleKeys, program) {
   return { setStyles, getData };
 }
 
-function initTilePainter(context, framebuffer, program, layer) {
-  const { screenScale } = program.uniformSetters;
-
+function initTilePainter(context, layer) {
   return function({ tile, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
     const z = (zoom !== undefined) ? zoom : tile.z;
-    layer.setStyles(z);
+    layer.setStyles(z, pixRatio, cameraScale);
 
     // Note: layer.getData executes uniform1i for text layers.
     // So we must call useProgram first (done in layer.setStyles)
     const data = layer.getData(tile);
     if (!data) return;
 
-    const { width, height } = framebuffer.size;
-    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
-
     context.draw(data.buffers);
   };
 }
 
 function initPrograms(params) {
-  const { context, framebuffer, preamble } = params;
-  const info = getProgInfo(context);
+  const { context, preamble, framebuffer } = params;
+  const programs = compilePrograms(context, preamble);
 
   return {
-    "circle": setupProgram(info.circle),
-    "line": setupProgram(info.line),
-    "fill": setupProgram(info.fill),
+    "circle": setup(programs.circle),
+    "line": setup(programs.line),
+    "fill": setup(programs.fill),
     "symbol": setupSymbol(),
   };
 
-  function setupProgram(progInfo) {
-    const { vert, frag, styleKeys } = progInfo;
-
-    const program = context.initProgram(preamble + vert, frag);
-    const load = initLoader(context, progInfo, program.constructVao);
+  function setup(info) {
+    const load = initLoader(context, info);
 
     function initPainter(style, sprite) {
-      const styleProg = initStyleProg(style, sprite, styleKeys, program);
-      return initTilePainter(context, framebuffer, program, styleProg);
+      const styleProg = initStyleProg(style, sprite, info, framebuffer);
+      return initTilePainter(context, styleProg);
     }
 
     return { load, initPainter };
   }
 
   function setupSymbol() {
-    const spriteProg = setupProgram(info.sprite);
-    const textProg = setupProgram(info.text);
+    const spriteProg = setup(programs.sprite);
+    const textProg = setup(programs.text);
 
     function load(buffers) {
       const loaded = {};
