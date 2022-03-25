@@ -487,7 +487,7 @@ function initSymbol(context) {
   };
 }
 
-function initLoader(context, info, program) {
+function initLoader(context, info, constructVao) {
   const { initAttribute, initIndices } = context;
   const { attrInfo, getSpecialAttrs, countInstances } = info;
 
@@ -504,14 +504,14 @@ function initLoader(context, info, program) {
 
   function loadInstanced(buffers) {
     const attributes = getAttributes(buffers);
-    const vao = program.constructVao({ attributes });
+    const vao = constructVao({ attributes });
     return { vao, instanceCount: countInstances(buffers) };
   }
 
   function loadIndexed(buffers) {
     const attributes = getAttributes(buffers);
     const indices = initIndices({ data: buffers.indices });
-    const vao = program.constructVao({ attributes, indices });
+    const vao = constructVao({ attributes, indices });
     return { vao, indices, count: buffers.indices.length };
   }
 
@@ -529,26 +529,32 @@ function compilePrograms(context, preamble) {
   function compile(info) {
     const { vert, frag, styleKeys } = info;
     const program = context.initProgram(preamble + vert, frag);
-    const load = initLoader(context, info, program);
-    return { program, load, styleKeys };
+    const { use, constructVao, uniformSetters } = program;
+    const load = initLoader(context, info, constructVao);
+    return { load, use, uniformSetters, styleKeys };
   }
 
   return Object.entries(progInfo)
     .reduce((d, [k, info]) => (d[k] = compile(info), d), {});
 }
 
+function initBackground(context, { paint }) {
+  return function({ zoom }) {
+    const opacity = paint["background-opacity"](zoom);
+    const color = paint["background-color"](zoom);
+    context.clear(color.map(c => c * opacity));
+  };
+}
+
 function camelCase(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function initStyleProg(style, spriteTexture, info, framebuffer) {
-  const { id, type, paint } = style;
-  const { styleKeys, program } = info;
+function initStyleProg(style, program, framebuffer) {
+  const { id, paint } = style;
+  const { sdf, screenScale } = program.uniformSetters;
 
-  const { sdf, sprite, screenScale } = program.uniformSetters;
-  const haveSprite = sprite && (spriteTexture instanceof WebGLTexture);
-
-  const zoomFuncs = styleKeys
+  const zoomFuncs = program.styleKeys
     .filter(styleKey => paint[styleKey].type !== "property")
     .map(styleKey => {
       const get = paint[styleKey];
@@ -562,7 +568,6 @@ function initStyleProg(style, spriteTexture, info, framebuffer) {
     const { width, height } = framebuffer.size;
     screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
     zoomFuncs.forEach(f => f(zoom));
-    if (haveSprite) sprite(spriteTexture);
   }
 
   function getData(tile) {
@@ -588,79 +593,64 @@ function initPrograms(params) {
   const { context, preamble, framebuffer } = params;
   const programs = compilePrograms(context, preamble);
 
-  return {
-    "circle": setup(programs.circle),
-    "line": setup(programs.line),
-    "fill": setup(programs.fill),
-    "symbol": setup(programs.symbol),
-  };
+  return { loadBuffers, loadSprite, initPainter };
 
-  function setup(info) {
-    function initPainter(style, sprite) {
-      const styleProg = initStyleProg(style, sprite, info, framebuffer);
-      return initTilePainter(context, styleProg);
+  function loadBuffers(layer) {
+    const { type, buffers } = layer;
+
+    const program = programs[type];
+    if (!program) throw Error("tile-gl loadBuffers: unknown layer type");
+
+    layer.buffers = program.load(buffers);
+  }
+
+  function loadSprite(image) {
+    if (!image) return false;
+    const spriteTex = context.initTexture({ image, mips: false });
+    programs.symbol.use();
+    programs.symbol.uniformSetters.sprite(spriteTex);
+    return true;
+  }
+
+  function initPainter(style) {
+    const { id, type, source, minzoom = 0, maxzoom = 24 } = style;
+    const painter = getPainter(style);
+    return Object.assign(painter, { id, type, source, minzoom, maxzoom });
+  }
+
+  function getPainter(style) {
+    const { type, layout, paint } = style;
+
+    if (type === "background") return initBackground(context, style);
+
+    const program = programs[type];
+    if (!program) return () => null;
+
+    if (type === "line") {
+      // We handle line-miter-limit in the paint phase, not layout phase
+      paint["line-miter-limit"] = layout["line-miter-limit"];
     }
+    const styleProg = initStyleProg(style, program, framebuffer);
 
-    return { load: info.load, initPainter };
+    return initTilePainter(context, styleProg);
   }
-}
-
-function initBackground(context) {
-  function initPainter({ paint }) {
-    return function({ zoom }) {
-      const opacity = paint["background-opacity"](zoom);
-      const color = paint["background-color"](zoom);
-      context.clear(color.map(c => c * opacity));
-    };
-  }
-
-  return { initPainter };
 }
 
 function initGLpaint(userParams) {
   const params = setParams(userParams);
   const { context, framebuffer } = params;
 
-  const programs = initPrograms(params);
-  programs["background"] = initBackground(context);
+  const { loadBuffers, loadSprite, initPainter } = initPrograms(params);
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);
     return context.clear();
   }
 
-  function loadBuffers(layer) {
-    const { type, buffers } = layer;
-
-    const program = programs[type];
-    if (!program) throw "loadBuffers: unknown layer type";
-
-    layer.buffers = program.load(buffers);
-  }
-
   function loadAtlas(atlas) {
     const format = context.gl.ALPHA;
     const { width, height, data } = atlas;
     return context.initTexture({ format, width, height, data, mips: false });
-  }
-
-  function loadSprite(image) {
-    if (image) return context.initTexture({ image, mips: false });
-  }
-
-  function initPainter(style, sprite) {
-    const { id, type, source, minzoom = 0, maxzoom = 24 } = style;
-
-    const program = programs[type];
-    if (!program) return () => null;
-
-    const { layout, paint } = style;
-    if (type === "line") {
-      // We handle line-miter-limit in the paint phase, not layout phase
-      paint["line-miter-limit"] = layout["line-miter-limit"];
-    }
-    const painter = program.initPainter(style, sprite);
-    return Object.assign(painter, { id, type, source, minzoom, maxzoom });
   }
 
   return { prep, loadBuffers, loadAtlas, loadSprite, initPainter };

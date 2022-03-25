@@ -1,4 +1,4 @@
-export function initLoader(context, info, program) {
+export function initLoader(context, info, constructVao) {
   const { initAttribute, initIndices } = context;
   const { attrInfo, getSpecialAttrs, countInstances } = info;
 
@@ -15,14 +15,14 @@ export function initLoader(context, info, program) {
 
   function loadInstanced(buffers) {
     const attributes = getAttributes(buffers);
-    const vao = program.constructVao({ attributes });
+    const vao = constructVao({ attributes });
     return { vao, instanceCount: countInstances(buffers) };
   }
 
   function loadIndexed(buffers) {
     const attributes = getAttributes(buffers);
     const indices = initIndices({ data: buffers.indices });
-    const vao = program.constructVao({ attributes, indices });
+    const vao = constructVao({ attributes, indices });
     return { vao, indices, count: buffers.indices.length };
   }
 

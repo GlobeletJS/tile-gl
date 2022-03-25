@@ -44,11 +44,11 @@ function render(data, style) {
 
   Object.values(data.layers).forEach(tileContext.loadBuffers);
   data.atlas = tileContext.loadAtlas(data.atlas);
-  const sprite = tileContext.loadSprite(style.spriteData.image);
+  tileContext.loadSprite(style.spriteData.image);
 
   const painters = style.layers
     .map(tileStencil.getStyleFuncs)
-    .map(layer => tileContext.initPainter(layer, sprite));
+    .map(tileContext.initPainter);
 
   const tile = Object.assign({ data }, tileCoords);
   painters.forEach(painter => painter({ tile, pixRatio }));

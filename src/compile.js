@@ -15,8 +15,9 @@ export function compilePrograms(context, preamble) {
   function compile(info) {
     const { vert, frag, styleKeys } = info;
     const program = context.initProgram(preamble + vert, frag);
-    const load = initLoader(context, info, program);
-    return { program, load, styleKeys };
+    const { use, constructVao, uniformSetters } = program;
+    const load = initLoader(context, info, constructVao);
+    return { load, use, uniformSetters, styleKeys };
   }
 
   return Object.entries(progInfo)

@@ -45,7 +45,7 @@ function render(data, style) {
 
   const painters = style.layers
     .map(tileStencil.getStyleFuncs)
-    .map(layer => tileContext.initPainter(layer));
+    .map(tileContext.initPainter);
 
   const tile = Object.assign({ data }, tileCoords);
   painters.forEach(painter => painter({ tile, pixRatio }));

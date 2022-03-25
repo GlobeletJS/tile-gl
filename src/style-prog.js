@@ -1,13 +1,10 @@
 import { camelCase } from "./camelCase.js";
 
-export function initStyleProg(style, spriteTexture, info, framebuffer) {
-  const { id, type, paint } = style;
-  const { styleKeys, program } = info;
+export function initStyleProg(style, program, framebuffer) {
+  const { id, paint } = style;
+  const { sdf, screenScale } = program.uniformSetters;
 
-  const { sdf, sprite, screenScale } = program.uniformSetters;
-  const haveSprite = sprite && (spriteTexture instanceof WebGLTexture);
-
-  const zoomFuncs = styleKeys
+  const zoomFuncs = program.styleKeys
     .filter(styleKey => paint[styleKey].type !== "property")
     .map(styleKey => {
       const get = paint[styleKey];
@@ -21,7 +18,6 @@ export function initStyleProg(style, spriteTexture, info, framebuffer) {
     const { width, height } = framebuffer.size;
     screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
     zoomFuncs.forEach(f => f(zoom));
-    if (haveSprite) sprite(spriteTexture);
   }
 
   function getData(tile) {
