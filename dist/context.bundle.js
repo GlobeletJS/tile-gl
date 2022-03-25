@@ -35,7 +35,7 @@ function setParams(userParams) {
   return { context, framebuffer, preamble };
 }
 
-var vert$4 = `in vec2 quadPos; // Vertices of the quad instance
+var vert$3 = `in vec2 quadPos; // Vertices of the quad instance
 in vec2 circlePos;
 in float circleRadius;
 in vec4 circleColor;
@@ -60,7 +60,7 @@ void main() {
 }
 `;
 
-var frag$4 = `#version 300 es
+var frag$3 = `#version 300 es
 
 precision mediump float;
 
@@ -91,13 +91,13 @@ function initCircle(context) {
   const styleKeys = ["circle-radius", "circle-color", "circle-opacity"];
 
   return {
-    vert: vert$4, frag: frag$4, attrInfo, styleKeys,
+    vert: vert$3, frag: frag$3, attrInfo, styleKeys,
     getSpecialAttrs: () => ({ quadPos }),
     countInstances: (buffers) => buffers.circlePos.length / 2,
   };
 }
 
-var vert$3 = `in vec2 quadPos;
+var vert$2 = `in vec2 quadPos;
 in vec3 pointA, pointB, pointC, pointD;
 in vec4 lineColor;
 in float lineOpacity, lineWidth, lineGapWidth;
@@ -211,7 +211,7 @@ void main() {
 }
 `;
 
-var frag$3 = `#version 300 es
+var frag$2 = `#version 300 es
 
 precision highp float;
 
@@ -314,12 +314,12 @@ function initLine(context) {
   ];
 
   return {
-    vert: vert$3, frag: frag$3, attrInfo, styleKeys, getSpecialAttrs,
+    vert: vert$2, frag: frag$2, attrInfo, styleKeys, getSpecialAttrs,
     countInstances: (buffers) => buffers.lines.length / numComponents - 3,
   };
 }
 
-var vert$2 = `in vec2 position;
+var vert$1 = `in vec2 position;
 in vec4 fillColor;
 in float fillOpacity;
 
@@ -336,7 +336,7 @@ void main() {
 }
 `;
 
-var frag$2 = `#version 300 es
+var frag$1 = `#version 300 es
 
 precision mediump float;
 
@@ -359,94 +359,39 @@ function initFill() {
   const styleKeys = ["fill-color", "fill-opacity", "fill-translate"];
 
   return {
-    vert: vert$2, frag: frag$2, attrInfo, styleKeys,
+    vert: vert$1, frag: frag$1, attrInfo, styleKeys,
     getSpecialAttrs: () => ({}),
   };
 }
 
-var vert$1 = `in vec2 quadPos;    // Vertices of the quad instance
-in vec3 labelPos0;   // x, y, angle
-in vec4 spritePos;  // dx, dy (relative to labelPos0), w, h
-in vec4 spriteRect; // x, y, w, h
+var vert = `in vec2 quadPos;   // Vertices of the quad instance
+in vec4 labelPos;  // x, y, angle, font size scalar (0 for icons)
+in vec4 glyphPos;  // dx, dy (relative to labelPos), w, h
+in vec4 glyphRect; // x, y, w, h
+
 in float iconOpacity;
 
-out float opacity;
-out vec2 texCoord;
-
-void main() {
-  texCoord = spriteRect.xy + spriteRect.zw * quadPos;
-  opacity = iconOpacity;
-
-  vec2 mapPos = tileToMap(labelPos0.xy);
-
-  // Shift to the appropriate corner of the current instance quad
-  vec2 dPos = (spritePos.xy + spritePos.zw * quadPos) * styleScale(labelPos0.xy);
-
-  float cos_a = cos(labelPos0.z);
-  float sin_a = sin(labelPos0.z);
-  float dx = dPos.x * cos_a - dPos.y * sin_a;
-  float dy = dPos.x * sin_a + dPos.y * cos_a;
-
-  gl_Position = mapToClip(mapPos + vec2(dx, dy), 0.0);
-}
-`;
-
-var frag$1 = `#version 300 es
-
-precision highp float;
-
-uniform sampler2D sprite;
-
-in float opacity;
-in vec2 texCoord;
-
-out vec4 pixColor;
-
-void main() {
-  vec4 texColor = texture(sprite, texCoord);
-  // Input sprite does NOT have pre-multiplied alpha
-  pixColor = vec4(texColor.rgb * texColor.a, texColor.a) * opacity;
-}
-`;
-
-function initSprite(context) {
-  const attrInfo = {
-    labelPos0: { numComponents: 3 },
-    spritePos: { numComponents: 4 },
-    spriteRect: { numComponents: 4 },
-    iconOpacity: { numComponents: 1 },
-  };
-  const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
-
-  const styleKeys = ["icon-opacity"];
-
-  return {
-    vert: vert$1, frag: frag$1, attrInfo, styleKeys,
-    getSpecialAttrs: () => ({ quadPos }),
-    countInstances: (buffers) => buffers.labelPos0.length / 3,
-  };
-}
-
-var vert = `in vec2 quadPos;  // Vertices of the quad instance
-in vec4 labelPos; // x, y, angle, font size scalar
-in vec4 charPos;  // dx, dy (relative to labelPos), w, h
-in vec4 sdfRect;  // x, y, w, h
 in vec4 textColor;
 in float textOpacity;
 in float textHaloBlur;
 in vec4 textHaloColor;
 in float textHaloWidth;
 
+out vec2 texCoord;
+
+out float opacity;
+
 out vec4 fillColor;
 out vec4 haloColor;
 out vec2 haloSize; // width, blur
-out vec2 texCoord;
 out float taperWidth;
 
 void main() {
-  texCoord = sdfRect.xy + sdfRect.zw * quadPos;
+  // For icons only
+  opacity = iconOpacity;
 
-  taperWidth = labelPos.w * screenScale.z;
+  // For text only
+  taperWidth = labelPos.w * screenScale.z; // == 0.0 for icon glyphs
   haloSize = vec2(textHaloWidth, textHaloBlur) * screenScale.z;
 
   float fillAlpha = textColor.a * textOpacity;
@@ -454,10 +399,14 @@ void main() {
   float haloAlpha = textHaloColor.a * textOpacity;
   haloColor = vec4(textHaloColor.rgb * haloAlpha, haloAlpha);
 
+  // Texture coordinates
+  texCoord = glyphRect.xy + glyphRect.zw * quadPos;
+
+  // Compute glyph position. First transform the label origin
   vec2 mapPos = tileToMap(labelPos.xy);
 
   // Shift to the appropriate corner of the current instance quad
-  vec2 dPos = (charPos.xy + charPos.zw * quadPos) * styleScale(labelPos.xy);
+  vec2 dPos = (glyphPos.xy + glyphPos.zw * quadPos) * styleScale(labelPos.xy);
 
   float cos_a = cos(labelPos.z);
   float sin_a = sin(labelPos.z);
@@ -472,17 +421,26 @@ var frag = `#version 300 es
 
 precision highp float;
 
-uniform sampler2D sdf;
+uniform sampler2D sprite, sdf;
+
+in vec2 texCoord;
+
+in float opacity;
 
 in vec4 fillColor;
 in vec4 haloColor;
 in vec2 haloSize; // width, blur
-in vec2 texCoord;
-in float taperWidth;
+in float taperWidth; // 0 for icons
 
 out vec4 pixColor;
 
 void main() {
+  // Get color from sprite if this is an icon glyph
+  vec4 spritePix = texture(sprite, texCoord);
+  // Input sprite does NOT have pre-multiplied alpha
+  vec4 iconColor = vec4(spritePix.rgb * spritePix.a, spritePix.a) * opacity;
+
+  // Compute fill and halo color from sdf if this is a text glyph
   float sdfVal = texture(sdf, texCoord).a;
   float screenDist = taperWidth * (191.0 - 255.0 * sdfVal) / 32.0;
 
@@ -492,16 +450,19 @@ void main() {
   float haloAlpha = (haloSize.x > 0.0 || haloSize.y > 0.0)
     ? (1.0 - fillAlpha) * smoothstep(-hTaper, -hEdge, -screenDist)
     : 0.0;
+  vec4 textColor = fillColor * fillAlpha + haloColor * haloAlpha;
 
-  pixColor = fillColor * fillAlpha + haloColor * haloAlpha;
+  // Choose icon or text color based on taperWidth value
+  pixColor = (taperWidth == 0.0) ? iconColor : textColor;
 }
 `;
 
-function initText(context) {
+function initSymbol(context) {
   const attrInfo = {
     labelPos: { numComponents: 4 },
-    charPos: { numComponents: 4 },
-    sdfRect: { numComponents: 4 },
+    glyphPos: { numComponents: 4 },
+    glyphRect: { numComponents: 4 },
+    iconOpacity: { numComponents: 1 },
     textColor: { numComponents: 4 },
     textOpacity: { numComponents: 1 },
     textHaloBlur: { numComponents: 1 },
@@ -511,6 +472,7 @@ function initText(context) {
   const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
   const styleKeys = [
+    "icon-opacity",
     "text-color",
     "text-opacity",
     "text-halo-blur",
@@ -561,8 +523,7 @@ function compilePrograms(context, preamble) {
     circle: initCircle(context),
     line: initLine(context),
     fill: initFill(),
-    sprite: initSprite(context),
-    text: initText(context),
+    symbol: initSymbol(context),
   };
 
   function compile(info) {
@@ -604,27 +565,10 @@ function initStyleProg(style, spriteTexture, info, framebuffer) {
     if (haveSprite) sprite(spriteTexture);
   }
 
-  const getData = (type !== "symbol") ? getFeatures :
-    (haveSprite) ? getIcons : getText;
-
-  function getFeatures(tile) {
-    return tile.data.layers[id];
-  }
-
-  function getIcons(tile) {
-    const layer = tile.data.layers[id];
-    if (!layer) return;
-    const { type, extent, buffers: { sprite } } = layer;
-    if (sprite) return { type, extent, buffers: sprite };
-  }
-
-  function getText(tile) {
+  function getData(tile) {
     const { layers: { [id]: layer }, atlas } = tile.data;
-    if (!layer || !atlas) return;
-    const { type, extent, buffers: { text } } = layer;
-    if (!text || !sdf) return;
-    sdf(atlas);
-    return { type, extent, buffers: text };
+    if (sdf && atlas) sdf(atlas);
+    return layer;
   }
 
   return { setStyles, getData };
@@ -648,7 +592,7 @@ function initPrograms(params) {
     "circle": setup(programs.circle),
     "line": setup(programs.line),
     "fill": setup(programs.fill),
-    "symbol": setupSymbol(),
+    "symbol": setup(programs.symbol),
   };
 
   function setup(info) {
@@ -658,30 +602,6 @@ function initPrograms(params) {
     }
 
     return { load: info.load, initPainter };
-  }
-
-  function setupSymbol() {
-    const spriteProg = setup(programs.sprite);
-    const textProg = setup(programs.text);
-
-    function load(buffers) {
-      const loaded = {};
-      if (buffers.spritePos) loaded.sprite = spriteProg.load(buffers);
-      if (buffers.charPos) loaded.text = textProg.load(buffers);
-      return loaded;
-    }
-
-    function initPainter(style, sprite) {
-      const iconPaint = spriteProg.initPainter(style, sprite);
-      const textPaint = textProg.initPainter(style);
-
-      return function(params) {
-        iconPaint(params);
-        textPaint(params);
-      };
-    }
-
-    return { load, initPainter };
   }
 }
 

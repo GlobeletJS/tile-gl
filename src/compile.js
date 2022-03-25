@@ -1,8 +1,7 @@
 import { initCircle } from "./circle/program.js";
 import { initLine } from "./line/program.js";
 import { initFill } from "./fill/program.js";
-import { initSprite } from "./sprite/program.js";
-import { initText } from "./text/program.js";
+import { initSymbol } from "./symbol/program.js";
 import { initLoader } from "./loader.js";
 
 export function compilePrograms(context, preamble) {
@@ -10,8 +9,7 @@ export function compilePrograms(context, preamble) {
     circle: initCircle(context),
     line: initLine(context),
     fill: initFill(context),
-    sprite: initSprite(context),
-    text: initText(context),
+    symbol: initSymbol(context),
   };
 
   function compile(info) {

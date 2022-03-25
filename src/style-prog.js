@@ -24,27 +24,10 @@ export function initStyleProg(style, spriteTexture, info, framebuffer) {
     if (haveSprite) sprite(spriteTexture);
   }
 
-  const getData = (type !== "symbol") ? getFeatures :
-    (haveSprite) ? getIcons : getText;
-
-  function getFeatures(tile) {
-    return tile.data.layers[id];
-  }
-
-  function getIcons(tile) {
-    const layer = tile.data.layers[id];
-    if (!layer) return;
-    const { type, extent, buffers: { sprite } } = layer;
-    if (sprite) return { type, extent, buffers: sprite };
-  }
-
-  function getText(tile) {
+  function getData(tile) {
     const { layers: { [id]: layer }, atlas } = tile.data;
-    if (!layer || !atlas) return;
-    const { type, extent, buffers: { text } } = layer;
-    if (!text || !sdf) return;
-    sdf(atlas);
-    return { type, extent, buffers: text };
+    if (sdf && atlas) sdf(atlas);
+    return layer;
   }
 
   return { setStyles, getData };

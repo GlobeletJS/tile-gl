@@ -1907,49 +1907,53 @@ function getPointAnchors({ type, coordinates }) {
 }
 
 function getBuffers(icon, text, anchor) {
-  const iconBuffers = getIconBuffers(icon, anchor);
-  const textBuffers = getTextBuffers(text, anchor);
+  const iconBuffers = getIconBuffers(icon, text, anchor);
+  const textBuffers = getTextBuffers(icon, text, anchor);
   return mergeBuffers(iconBuffers, textBuffers);
 }
 
-function getIconBuffers(icon, anchor) {
+function getIconBuffers(icon, text, anchor) {
   if (!icon) return;
 
   const buffers = {
-    spriteRect: icon.rect,
-    spritePos: icon.pos,
-    labelPos0: [...anchor],
+    glyphRect: icon.rect,
+    glyphPos: icon.pos,
+    labelPos: [...anchor, 0.0],
   };
 
-  Object.entries(icon.bufferVals).forEach(([key, val]) => {
-    buffers[key] = val;
-  });
+  addVals(buffers, icon.bufferVals, 1);
+  if (text) addVals(buffers, text.bufferVals, 1);
 
   return buffers;
 }
 
-function getTextBuffers(text, anchor) {
+function getTextBuffers(icon, text, anchor) {
   if (!text) return;
 
   const origin = [...anchor, text.fontScalar];
 
   const buffers = {
-    sdfRect: text.flatMap(c => c.rect),
-    charPos: text.flatMap(c => c.pos),
+    glyphRect: text.flatMap(c => c.rect),
+    glyphPos: text.flatMap(c => c.pos),
     labelPos: text.flatMap(() => origin),
   };
 
-  Object.entries(text.bufferVals).forEach(([key, val]) => {
-    buffers[key] = text.flatMap(() => val);
-  });
+  addVals(buffers, text.bufferVals, text.length);
+  if (icon) addVals(buffers, icon.bufferVals, text.length);
 
   return buffers;
 }
 
+function addVals(buffers, vals, length) {
+  Object.entries(vals).forEach(([key, val]) => {
+    buffers[key] = Array(length).fill(val);
+  });
+}
+
 function mergeBuffers(buf1, buf2) {
-  if (!buf1) return buf2;
-  if (!buf2) return buf1;
-  return Object.assign(buf1, buf2);
+  if (!buf1) return [buf2];
+  if (!buf2) return [buf1];
+  return [buf1, buf2];
 }
 
 function initShaping(style, spriteData) {
@@ -1970,14 +1974,12 @@ function initShaping(style, spriteData) {
     if (!anchors || !anchors.length) return;
 
     return anchors
-      .map(anchor => getBuffers(icon, text, anchor))
+      .flatMap(anchor => getBuffers(icon, text, anchor))
       .reduce(combineBuffers, {});
   }
 
   function getLength(buffers) {
-    const { charPos, spritePos } = buffers;
-    // If charPos exists, it is longer than spritePos
-    return charPos ? charPos.length / 4 : spritePos.length / 4;
+    return buffers.labelPos.length / 4;
   }
 }
 
