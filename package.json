@@ -44,7 +44,7 @@
   "dependencies": {
     "earcut": "^2.2.3",
     "rbush": "^3.0.1",
-    "tile-labeler": "file:../tile-labeler",
+    "tile-labeler": "^0.8.0",
     "tile-stencil": "^0.4.9"
   },
   "sideEffects": false

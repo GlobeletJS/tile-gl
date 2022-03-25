@@ -1144,28 +1144,26 @@ function updateFonts(fonts, feature) {
   return fonts;
 }
 
-function initStyleGetters(keys, { layout, paint }) {
-  const layoutFuncs = keys.layout
-    .map(k => ([camelCase$1(k), layout[k]]));
+function initStyleGetters(keys, { layout }) {
+  const styleFuncs = keys.map(k => ([layout[k], camelCase$1(k)]));
 
-  const bufferFuncs = keys.paint
-    .filter(k => paint[k].type === "property")
-    .map(k => ([camelCase$1(k), paint[k]]));
-
-  return function(zoom, feature) {
-    const layoutVals = layoutFuncs
-      .reduce((d, [k, f]) => (d[k] = f(zoom, feature), d), {});
-
-    const bufferVals = bufferFuncs
-      .reduce((d, [k, f]) => (d[k] = f(zoom, feature), d), {});
-
-    return { layoutVals, bufferVals };
+  return function(z, feature) {
+    return styleFuncs.reduce((d, [g, k]) => (d[k] = g(z, feature), d), {});
   };
 }
 
 function camelCase$1(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
+
+const styleKeys = [
+  "icon-opacity",
+  "text-color",
+  "text-opacity",
+  "text-halo-blur",
+  "text-halo-color",
+  "text-halo-width",
+];
 
 function getBox(w, h, anchor, offset) {
   const [sx, sy] = getBoxShift(anchor);
@@ -1226,15 +1224,13 @@ function initIcon(style, spriteData = {}) {
   const { image: { width, height } = {}, meta = {} } = spriteData;
   if (!width || !height) return () => undefined;
 
-  const getStyles = initStyleGetters(iconKeys, style);
+  const getStyles = initStyleGetters(iconLayoutKeys, style);
 
   return function(feature, tileCoords) {
     const sprite = getSprite(feature.spriteID);
     if (!sprite) return;
 
-    const { layoutVals, bufferVals } = getStyles(tileCoords.z, feature);
-    const icon = layoutSprite(sprite, layoutVals);
-    return Object.assign(icon, { bufferVals }); // TODO: rethink this
+    return layoutSprites(sprite, getStyles(tileCoords.z, feature));
   };
 
   function getSprite(spriteID) {
@@ -1250,21 +1246,16 @@ function initIcon(style, spriteData = {}) {
   }
 }
 
-const iconKeys = {
-  layout: [
-    "icon-anchor",
-    "icon-offset",
-    "icon-padding",
-    "icon-rotation-alignment",
-    "icon-size",
-  ],
-  paint: [
-    "icon-opacity",
-  ],
-};
+const iconLayoutKeys = [
+  "icon-anchor",
+  "icon-offset",
+  "icon-padding",
+  "icon-rotation-alignment",
+  "icon-size",
+];
 
-function layoutSprite(sprite, styleVals) {
-  const { metrics: { w, h }, spriteRect } = sprite;
+function layoutSprites(sprite, styleVals) {
+  const { metrics: { w, h }, spriteRect: rect } = sprite;
 
   const { iconAnchor, iconOffset, iconSize, iconPadding } = styleVals;
   const iconbox = getBox(w, h, iconAnchor, iconOffset);
@@ -1272,7 +1263,8 @@ function layoutSprite(sprite, styleVals) {
 
   const pos = [iconbox.x, iconbox.y, w, h].map(c => c * iconSize);
 
-  return { pos, rect: spriteRect, bbox };
+  // Structure return value to match ../text
+  return Object.assign([{ pos, rect }], { bbox, fontScalar: 0.0 });
 }
 
 const whitespace = {
@@ -1509,39 +1501,28 @@ function layout(glyphs, styleVals) {
 }
 
 function initText(style) {
-  const getStyles = initStyleGetters(textKeys, style);
+  const getStyles = initStyleGetters(textLayoutKeys, style);
 
   return function(feature, tileCoords, atlas) {
     const glyphs = getGlyphs(feature, atlas);
     if (!glyphs || !glyphs.length) return;
 
-    const { layoutVals, bufferVals } = getStyles(tileCoords.z, feature);
-    const chars = layout(glyphs, layoutVals);
-    return Object.assign(chars, { bufferVals }); // TODO: rethink this
+    return layout(glyphs, getStyles(tileCoords.z, feature));
   };
 }
 
-const textKeys = {
-  layout: [
-    "symbol-placement", // TODO: both here and in ../anchors/anchors.js
-    "text-anchor",
-    "text-justify",
-    "text-letter-spacing",
-    "text-line-height",
-    "text-max-width",
-    "text-offset",
-    "text-padding",
-    "text-rotation-alignment",
-    "text-size",
-  ],
-  paint: [
-    "text-color",
-    "text-opacity",
-    "text-halo-blur",
-    "text-halo-color",
-    "text-halo-width",
-  ],
-};
+const textLayoutKeys = [
+  "symbol-placement", // TODO: both here and in ../anchors/anchors.js
+  "text-anchor",
+  "text-justify",
+  "text-letter-spacing",
+  "text-line-height",
+  "text-max-width",
+  "text-offset",
+  "text-padding",
+  "text-rotation-alignment",
+  "text-size",
+];
 
 function getGlyphs(feature, atlas) {
   if (!atlas) return;
@@ -1573,9 +1554,9 @@ function buildCollider(placement) {
 
 function pointCollision(icon, text, anchor, tree) {
   const [x0, y0] = anchor;
-  const boxes = [];
-  if (icon) boxes.push(formatBox(x0, y0, icon.bbox));
-  if (text) boxes.push(formatBox(x0, y0, text.bbox));
+  const boxes = [icon, text]
+    .filter(label => label !== undefined)
+    .map(label => formatBox(x0, y0, label.bbox));
 
   if (boxes.some(tree.collides, tree)) return true;
   // TODO: drop if outside tile?
@@ -1598,17 +1579,16 @@ function lineCollision(icon, text, anchor, tree) {
   const sin_a = sin$1(angle);
   const rotate = ([x, y]) => [x * cos_a - y * sin_a, x * sin_a + y * cos_a];
 
-  const boxes = [];
-  if (text) text.map(c => getCharBbox(c.pos, rotate))
-    .map(bbox => formatBox(x0, y0, bbox))
-    .forEach(box => boxes.push(box));
-  if (icon) boxes.push(formatBox(x0, y0, getCharBbox(icon.pos, rotate)));
+  const boxes = [icon, text].flat()
+    .filter(glyph => glyph !== undefined)
+    .map(g => getGlyphBbox(g.pos, rotate))
+    .map(bbox => formatBox(x0, y0, bbox));
 
   if (boxes.some(tree.collides, tree)) return true;
   boxes.forEach(tree.insert, tree);
 }
 
-function getCharBbox([x, y, w, h], rotate) {
+function getGlyphBbox([x, y, w, h], rotate) {
   const corners = [
     [x, y], [x + w, y],
     [x, y + h], [x + w, y + h]
@@ -1858,10 +1838,10 @@ function getLineAnchors(geometry, extent, icon, text, layoutVals) {
 }
 
 function initAnchors(style) {
-  const getStyles = initStyleGetters(symbolKeys, style);
+  const getStyles = initStyleGetters(symbolLayoutKeys, style);
 
   return function(feature, tileCoords, icon, text, tree) {
-    const { layoutVals } = getStyles(tileCoords.z, feature);
+    const layoutVals = getStyles(tileCoords.z, feature);
     const collides = buildCollider(layoutVals.symbolPlacement);
 
     // TODO: get extent from tile?
@@ -1870,19 +1850,16 @@ function initAnchors(style) {
   };
 }
 
-const symbolKeys = {
-  layout: [
-    "symbol-placement",
-    "symbol-spacing",
-    // TODO: these are in 2 places: here and in the text getter
-    "text-rotation-alignment",
-    "text-size",
-    "icon-rotation-alignment",
-    "icon-keep-upright",
-    "text-keep-upright",
-  ],
-  paint: [],
-};
+const symbolLayoutKeys = [
+  "symbol-placement",
+  "symbol-spacing",
+  // TODO: these are in 2 places: here and in the text getter
+  "text-rotation-alignment",
+  "text-size",
+  "icon-rotation-alignment",
+  "icon-keep-upright",
+  "text-keep-upright",
+];
 
 function getAnchors(geometry, extent, icon, text, layoutVals) {
   switch (layoutVals.symbolPlacement) {
@@ -1907,53 +1884,21 @@ function getPointAnchors({ type, coordinates }) {
 }
 
 function getBuffers(icon, text, anchor) {
-  const iconBuffers = getIconBuffers(icon, text, anchor);
-  const textBuffers = getTextBuffers(icon, text, anchor);
-  return mergeBuffers(iconBuffers, textBuffers);
+  const iconBuffers = buildBuffers(icon, anchor);
+  const textBuffers = buildBuffers(text, anchor);
+  return [iconBuffers, textBuffers].filter(b => b !== undefined);
 }
 
-function getIconBuffers(icon, text, anchor) {
-  if (!icon) return;
+function buildBuffers(glyphs, anchor) {
+  if (!glyphs) return;
 
-  const buffers = {
-    glyphRect: icon.rect,
-    glyphPos: icon.pos,
-    labelPos: [...anchor, 0.0],
+  const origin = [...anchor, glyphs.fontScalar];
+
+  return {
+    glyphRect: glyphs.flatMap(g => g.rect),
+    glyphPos: glyphs.flatMap(g => g.pos),
+    labelPos: glyphs.flatMap(() => origin),
   };
-
-  addVals(buffers, icon.bufferVals, 1);
-  if (text) addVals(buffers, text.bufferVals, 1);
-
-  return buffers;
-}
-
-function getTextBuffers(icon, text, anchor) {
-  if (!text) return;
-
-  const origin = [...anchor, text.fontScalar];
-
-  const buffers = {
-    glyphRect: text.flatMap(c => c.rect),
-    glyphPos: text.flatMap(c => c.pos),
-    labelPos: text.flatMap(() => origin),
-  };
-
-  addVals(buffers, text.bufferVals, text.length);
-  if (icon) addVals(buffers, icon.bufferVals, text.length);
-
-  return buffers;
-}
-
-function addVals(buffers, vals, length) {
-  Object.entries(vals).forEach(([key, val]) => {
-    buffers[key] = Array(length).fill(val);
-  });
-}
-
-function mergeBuffers(buf1, buf2) {
-  if (!buf1) return [buf2];
-  if (!buf2) return [buf1];
-  return [buf1, buf2];
 }
 
 function initShaping(style, spriteData) {
@@ -1961,7 +1906,7 @@ function initShaping(style, spriteData) {
   const getText = initText(style);
   const getAnchors = initAnchors(style);
 
-  return { serialize, getLength };
+  return { serialize, getLength, styleKeys };
 
   function serialize(feature, tileCoords, atlas, tree) {
     // tree is an RBush from the 'rbush' module. NOTE: will be updated!
@@ -2831,7 +2776,7 @@ function getSerializeInfo(style, spriteData) {
 }
 
 function initFeatureSerializer(paint, info) {
-  const { styleKeys = [], serialize, getLength } = info;
+  const { styleKeys, serialize, getLength } = info;
 
   const dataFuncs = styleKeys
     .filter(k => paint[k].type === "property")
@@ -2844,7 +2789,7 @@ function initFeatureSerializer(paint, info) {
     const dummy = Array.from({ length: getLength(buffers) });
 
     dataFuncs.forEach(([get, key]) => {
-      const val = get(null, feature);
+      const val = get(null, feature); // Note: could be an Array
       buffers[key] = dummy.flatMap(() => val);
     });
 
