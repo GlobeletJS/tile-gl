@@ -34,11 +34,8 @@ function render(data, style) {
   yawgl.resizeCanvasToDisplaySize(canvas, pixRatio);
   const context = yawgl.initContext(canvas);
 
-  const tileContext = initGLpaint({ 
-    context,
-    framebuffer: { buffer: null, size: canvas },
-    multiTile: false,
-  });
+  const framebuffer = { buffer: null, size: canvas };
+  const tileContext = initGLpaint({ context, framebuffer });
 
   Object.values(data.layers).forEach(tileContext.loadBuffers);
   data.atlas = tileContext.loadAtlas(data.atlas);

@@ -1,11 +1,13 @@
 import { setParams } from "./params.js";
-import { initPrograms } from "./programs.js";
+import { compilePrograms } from "./compile.js";
+import { initStyleProg } from "./style-prog.js";
+import { initTilePainter } from "./paint-tile.js";
 
 export function initGLpaint(userParams) {
-  const params = setParams(userParams);
-  const { context, framebuffer } = params;
+  const { context, preamble, framebuffer } = setParams(userParams);
+  const programs = compilePrograms(context, preamble);
 
-  const { loadBuffers, loadSprite, initPainter } = initPrograms(params);
+  return { prep, loadAtlas, loadBuffers, loadSprite, initPainter };
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);
@@ -18,5 +20,32 @@ export function initGLpaint(userParams) {
     return context.initTexture({ format, width, height, data, mips: false });
   }
 
-  return { prep, loadBuffers, loadAtlas, loadSprite, initPainter };
+  function loadBuffers(layer) {
+    const { type, buffers } = layer;
+
+    const program = programs[type];
+    if (!program) throw Error("tile-gl loadBuffers: unknown layer type");
+
+    layer.buffers = program.load(buffers);
+  }
+
+  function loadSprite(image) {
+    if (!image) return false;
+    const spriteTex = context.initTexture({ image, mips: false });
+    programs.symbol.use();
+    programs.symbol.uniformSetters.sprite(spriteTex);
+    return true;
+  }
+
+  function initPainter(style) {
+    const { id, type, source, minzoom = 0, maxzoom = 24 } = style;
+
+    const program = programs[type];
+    if (!program) return () => null;
+
+    const styleProg = initStyleProg(style, program, framebuffer);
+
+    const painter = initTilePainter(context, styleProg);
+    return Object.assign(painter, { id, type, source, minzoom, maxzoom });
+  }
 }

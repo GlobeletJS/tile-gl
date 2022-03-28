@@ -10,7 +10,7 @@ vec2 tileToMap(vec2 tilePos) {
 
 vec4 mapToClip(vec2 mapPos, float z) {
   vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
-  return vec4(projected, z, 1);
+  return vec4(projected, z, 1.0);
 }
 
 float styleScale(vec2 tilePos) {
@@ -628,11 +628,22 @@ function initTilePainter(context, layer) {
   };
 }
 
-function initPrograms(params) {
-  const { context, preamble, framebuffer } = params;
+function initGLpaint(userParams) {
+  const { context, preamble, framebuffer } = setParams(userParams);
   const programs = compilePrograms(context, preamble);
 
-  return { loadBuffers, loadSprite, initPainter };
+  return { prep, loadAtlas, loadBuffers, loadSprite, initPainter };
+
+  function prep() {
+    context.bindFramebufferAndSetViewport(framebuffer);
+    return context.clear();
+  }
+
+  function loadAtlas(atlas) {
+    const format = context.gl.ALPHA;
+    const { width, height, data } = atlas;
+    return context.initTexture({ format, width, height, data, mips: false });
+  }
 
   function loadBuffers(layer) {
     const { type, buffers } = layer;
@@ -662,26 +673,6 @@ function initPrograms(params) {
     const painter = initTilePainter(context, styleProg);
     return Object.assign(painter, { id, type, source, minzoom, maxzoom });
   }
-}
-
-function initGLpaint(userParams) {
-  const params = setParams(userParams);
-  const { context, framebuffer } = params;
-
-  const { loadBuffers, loadSprite, initPainter } = initPrograms(params);
-
-  function prep() {
-    context.bindFramebufferAndSetViewport(framebuffer);
-    return context.clear();
-  }
-
-  function loadAtlas(atlas) {
-    const format = context.gl.ALPHA;
-    const { width, height, data } = atlas;
-    return context.initTexture({ format, width, height, data, mips: false });
-  }
-
-  return { prep, loadBuffers, loadAtlas, loadSprite, initPainter };
 }
 
 export { initGLpaint };
