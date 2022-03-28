@@ -1,7 +1,14 @@
-export function initBackground(context, { paint }) {
-  return function({ zoom }) {
-    const opacity = paint["background-opacity"](zoom);
-    const color = paint["background-color"](zoom);
-    context.clear(color.map(c => c * opacity));
+import vert from "./vert.glsl";
+import frag from "./frag.glsl";
+
+export function initBackground(context) {
+  const quadPos = context.initQuad();
+
+  const styleKeys = ["background-color", "background-opacity"];
+
+  return {
+    vert, frag, styleKeys,
+    getSpecialAttrs: () => ({ quadPos }),
+    countInstances: () => 1,
   };
 }

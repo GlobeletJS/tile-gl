@@ -1,3 +1,4 @@
+import { initBackground } from "./background/program.js";
 import { initCircle } from "./circle/program.js";
 import { initLine } from "./line/program.js";
 import { initFill } from "./fill/program.js";
@@ -6,6 +7,7 @@ import { initLoader } from "./loader.js";
 
 export function compilePrograms(context, preamble) {
   const progInfo = {
+    background: initBackground(context),
     circle: initCircle(context),
     line: initLine(context),
     fill: initFill(context),

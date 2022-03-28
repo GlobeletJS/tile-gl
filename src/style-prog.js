@@ -1,8 +1,13 @@
 import { camelCase } from "./camelCase.js";
 
 export function initStyleProg(style, program, framebuffer) {
-  const { id, paint } = style;
+  const { id, type, layout, paint } = style;
   const { sdf, screenScale } = program.uniformSetters;
+
+  if (type === "line") {
+    // We handle line-miter-limit in the paint phase, not layout phase
+    paint["line-miter-limit"] = layout["line-miter-limit"];
+  }
 
   const zoomFuncs = program.styleKeys
     .filter(styleKey => paint[styleKey].type !== "property")
@@ -15,16 +20,24 @@ export function initStyleProg(style, program, framebuffer) {
 
   function setStyles(zoom, pixRatio, cameraScale = 1.0) {
     program.use();
+    zoomFuncs.forEach(f => f(zoom));
+    if (!screenScale) return;
     const { width, height } = framebuffer.size;
     screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
-    zoomFuncs.forEach(f => f(zoom));
   }
 
-  function getData(tile) {
+  function getFeatures(tile) {
     const { layers: { [id]: layer }, atlas } = tile.data;
     if (sdf && atlas) sdf(atlas);
     return layer;
   }
+
+  function initBackgroundData() {
+    const buffers = program.load({});
+    return () => ({ buffers });
+  }
+
+  const getData = (type === "background") ? initBackgroundData() : getFeatures;
 
   return { setStyles, getData };
 }

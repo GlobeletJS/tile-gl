@@ -4,6 +4,6 @@ export function initTilePainter(context, layer) {
     layer.setStyles(z, pixRatio, cameraScale);
 
     const data = layer.getData(tile);
-    if (data) context.draw(data.buffers);
+    if (data && data.buffers) context.draw(data.buffers);
   };
 }
