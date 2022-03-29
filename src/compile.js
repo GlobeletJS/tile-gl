@@ -5,7 +5,9 @@ import { initFill } from "./fill/program.js";
 import { initSymbol } from "./symbol/program.js";
 import { initLoader } from "./loader.js";
 
-export function compilePrograms(context, preamble) {
+export function compilePrograms(params) {
+  const { context, preamble, extraAttributes } = params;
+
   const progInfo = {
     background: initBackground(context),
     circle: initCircle(context),
@@ -18,7 +20,7 @@ export function compilePrograms(context, preamble) {
     const { vert, frag, styleKeys } = info;
     const program = context.initProgram(preamble + vert, frag);
     const { use, constructVao, uniformSetters } = program;
-    const load = initLoader(context, info, constructVao);
+    const load = initLoader(context, info, constructVao, extraAttributes);
     return { load, use, uniformSetters, styleKeys };
   }
 

@@ -31,7 +31,8 @@ function setup(error, data, style) {
 function render(data, style) {
   const canvas = document.getElementById("tileCanvas");
   const pixRatio = window.devicePixelRatio;
-  yawgl.resizeCanvasToDisplaySize(canvas, pixRatio);
+  canvas.width = 512 * pixRatio;
+  canvas.height = 512 * pixRatio;
   const context = yawgl.initContext(canvas);
 
   const framebuffer = { buffer: null, size: canvas };
@@ -44,8 +45,10 @@ function render(data, style) {
     .map(tileStencil.getStyleFuncs)
     .map(tileContext.initPainter);
 
-  const tile = Object.assign({ data }, tileCoords);
-  painters.forEach(painter => painter({ tile, pixRatio }));
+  painters.forEach(painter => {
+    painter.setStyles(tileCoords.z, pixRatio);
+    painter.paint({ data });
+  });
 
   console.log("All done!");
 }

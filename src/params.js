@@ -4,6 +4,7 @@ export function setParams(userParams) {
   const {
     context, framebuffer,
     preamble = defaultPreamble,
+    extraAttributes,
   } = userParams;
 
   const size = framebuffer.size;
@@ -13,5 +14,5 @@ export function setParams(userParams) {
     context.clipRect(x, yflip, w, h);
   };
 
-  return { context, framebuffer, preamble };
+  return { context, framebuffer, preamble, extraAttributes };
 }

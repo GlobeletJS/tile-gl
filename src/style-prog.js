@@ -1,6 +1,8 @@
 import { camelCase } from "./camelCase.js";
 
-export function initStyleProg(style, program, framebuffer) {
+export function initStyleProg(style, program, context, framebuffer) {
+  if (!program) return;
+
   const { id, type, layout, paint } = style;
   const { sdf, screenScale } = program.uniformSetters;
 
@@ -18,12 +20,24 @@ export function initStyleProg(style, program, framebuffer) {
       return (z, f) => set(get(z, f));
     });
 
-  function setStyles(zoom, pixRatio, cameraScale = 1.0) {
+  function setStyles(zoom, pixRatio = 1.0, cameraScale = 1.0) {
     program.use();
     zoomFuncs.forEach(f => f(zoom));
     if (!screenScale) return;
     const { width, height } = framebuffer.size;
     screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
+  }
+
+  const getData = (type === "background") ? initBackgroundData() : getFeatures;
+
+  function draw(tile) {
+    const data = getData(tile);
+    if (data) context.draw(data.buffers);
+  }
+
+  function initBackgroundData() {
+    const buffers = program.load({});
+    return () => ({ buffers });
   }
 
   function getFeatures(tile) {
@@ -32,12 +46,5 @@ export function initStyleProg(style, program, framebuffer) {
     return layer;
   }
 
-  function initBackgroundData() {
-    const buffers = program.load({});
-    return () => ({ buffers });
-  }
-
-  const getData = (type === "background") ? initBackgroundData() : getFeatures;
-
-  return { setStyles, getData };
+  return { setStyles, paint: draw };
 }

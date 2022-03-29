@@ -3419,18 +3419,6 @@ function multiSelect(arr, left, right, n, compare) {
     }
 }
 
-function addTileCoords(tile, coords) {
-  const { z, x, y } = coords;
-
-  Object.values(tile.layers).forEach(layer => {
-    const { length, buffers } = layer;
-    const coordArray = Array.from({ length }).flatMap(() => [x, y, z]);
-    buffers.tileCoords = new Float32Array(coordArray);
-  });
-
-  return tile;
-}
-
 function initSerializer(userParams) {
   const { parsedStyles, spriteData, getAtlas } = setParams(userParams);
 
@@ -3439,8 +3427,7 @@ function initSerializer(userParams) {
 
   return function(source, tileCoords) {
     return getAtlas(source, tileCoords.z)
-      .then(atlas => process(source, tileCoords, atlas))
-      .then(tile => addTileCoords(tile, tileCoords));
+      .then(atlas => process(source, tileCoords, atlas));
   };
 
   function process(source, coords, atlas) {

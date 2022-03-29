@@ -22,6 +22,7 @@ function setParams(userParams) {
   const {
     context, framebuffer,
     preamble = defaultPreamble,
+    extraAttributes,
   } = userParams;
 
   const size = framebuffer.size;
@@ -31,7 +32,7 @@ function setParams(userParams) {
     context.clipRect(x, yflip, w, h);
   };
 
-  return { context, framebuffer, preamble };
+  return { context, framebuffer, preamble, extraAttributes };
 }
 
 var vert$4 = `in vec2 quadPos;
@@ -520,12 +521,11 @@ function initSymbol(context) {
   };
 }
 
-function initLoader(context, info, constructVao) {
+function initLoader(context, info, constructVao, extraAttributes) {
   const { initAttribute, initIndices } = context;
   const { attrInfo, getSpecialAttrs, countInstances } = info;
 
-  const universalAttrs = { tileCoords: { numComponents: 3 } };
-  const allAttrs = Object.assign({}, attrInfo, universalAttrs);
+  const allAttrs = Object.assign({}, attrInfo, extraAttributes);
 
   function getAttributes(buffers) {
     return Object.entries(allAttrs).reduce((d, [key, info]) => {
@@ -551,7 +551,9 @@ function initLoader(context, info, constructVao) {
   return (countInstances) ? loadInstanced : loadIndexed;
 }
 
-function compilePrograms(context, preamble) {
+function compilePrograms(params) {
+  const { context, preamble, extraAttributes } = params;
+
   const progInfo = {
     background: initBackground(context),
     circle: initCircle(context),
@@ -564,7 +566,7 @@ function compilePrograms(context, preamble) {
     const { vert, frag, styleKeys } = info;
     const program = context.initProgram(preamble + vert, frag);
     const { use, constructVao, uniformSetters } = program;
-    const load = initLoader(context, info, constructVao);
+    const load = initLoader(context, info, constructVao, extraAttributes);
     return { load, use, uniformSetters, styleKeys };
   }
 
@@ -576,7 +578,9 @@ function camelCase(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function initStyleProg(style, program, framebuffer) {
+function initStyleProg(style, program, context, framebuffer) {
+  if (!program) return;
+
   const { id, type, layout, paint } = style;
   const { sdf, screenScale } = program.uniformSetters;
 
@@ -594,12 +598,24 @@ function initStyleProg(style, program, framebuffer) {
       return (z, f) => set(get(z, f));
     });
 
-  function setStyles(zoom, pixRatio, cameraScale = 1.0) {
+  function setStyles(zoom, pixRatio = 1.0, cameraScale = 1.0) {
     program.use();
     zoomFuncs.forEach(f => f(zoom));
     if (!screenScale) return;
     const { width, height } = framebuffer.size;
     screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
+  }
+
+  const getData = (type === "background") ? initBackgroundData() : getFeatures;
+
+  function draw(tile) {
+    const data = getData(tile);
+    if (data) context.draw(data.buffers);
+  }
+
+  function initBackgroundData() {
+    const buffers = program.load({});
+    return () => ({ buffers });
   }
 
   function getFeatures(tile) {
@@ -608,29 +624,13 @@ function initStyleProg(style, program, framebuffer) {
     return layer;
   }
 
-  function initBackgroundData() {
-    const buffers = program.load({});
-    return () => ({ buffers });
-  }
-
-  const getData = (type === "background") ? initBackgroundData() : getFeatures;
-
-  return { setStyles, getData };
-}
-
-function initTilePainter(context, layer) {
-  return function({ tile, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
-    const z = (zoom !== undefined) ? zoom : tile.z;
-    layer.setStyles(z, pixRatio, cameraScale);
-
-    const data = layer.getData(tile);
-    if (data && data.buffers) context.draw(data.buffers);
-  };
+  return { setStyles, paint: draw };
 }
 
 function initGLpaint(userParams) {
-  const { context, preamble, framebuffer } = setParams(userParams);
-  const programs = compilePrograms(context, preamble);
+  const params = setParams(userParams);
+  const { context, framebuffer } = params;
+  const programs = compilePrograms(params);
 
   return { prep, loadAtlas, loadBuffers, loadSprite, initPainter };
 
@@ -639,19 +639,16 @@ function initGLpaint(userParams) {
     return context.clear();
   }
 
-  function loadAtlas(atlas) {
+  function loadAtlas(atlas) { // TODO: name like loadSprite, different behavior
     const format = context.gl.ALPHA;
     const { width, height, data } = atlas;
     return context.initTexture({ format, width, height, data, mips: false });
   }
 
   function loadBuffers(layer) {
-    const { type, buffers } = layer;
-
-    const program = programs[type];
+    const program = programs[layer.type];
     if (!program) throw Error("tile-gl loadBuffers: unknown layer type");
-
-    layer.buffers = program.load(buffers);
+    layer.buffers = program.load(layer.buffers);
   }
 
   function loadSprite(image) {
@@ -663,15 +660,7 @@ function initGLpaint(userParams) {
   }
 
   function initPainter(style) {
-    const { id, type, source, minzoom = 0, maxzoom = 24 } = style;
-
-    const program = programs[type];
-    if (!program) return () => null;
-
-    const styleProg = initStyleProg(style, program, framebuffer);
-
-    const painter = initTilePainter(context, styleProg);
-    return Object.assign(painter, { id, type, source, minzoom, maxzoom });
+    return initStyleProg(style, programs[style.type], context, framebuffer);
   }
 }
 
