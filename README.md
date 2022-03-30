@@ -160,8 +160,7 @@ related to the style for this layer. The parameters of this method are:
   dimensions. This should usually be set to [window.devicePixelRatio][].
   Default: 1.0
 - `cameraScale`: The projection scale at the camera position. Used for scaling
-  style dimensions by relative projection scales, IF the context was initialized
-  with `projScale: true`. Default: 1.0
+  style dimensions by relative projection scales. Default: 1.0
 
 The `.paint` method draws the data on the framebuffer. The argument is the tile
 to be rendered. The tile object must have a `.data` property pointing to an
