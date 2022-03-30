@@ -2,7 +2,7 @@
 
 ![tests](https://github.com/GlobeletJS/tile-gl/actions/workflows/node.js.yml/badge.svg)
 
-Data serializers and WebGL renderers for tiled vector map layers
+Data serializers and WebGL renderers for vector tile layers
 
 tile-gl exposes two methods:
 - initSerializer: Initialize a geometry serializer, to parse GeoJSON

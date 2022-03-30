@@ -574,24 +574,25 @@ function initStyleProg(style, program, context, framebuffer) {
   if (!program) return;
 
   const { id, type, layout, paint } = style;
-  const { sdf, screenScale } = program.uniformSetters;
+  const { load, use, uniformSetters, styleKeys } = program;
+  const { sdf, screenScale } = uniformSetters;
 
   if (type === "line") {
     // We handle line-miter-limit in the paint phase, not layout phase
     paint["line-miter-limit"] = layout["line-miter-limit"];
   }
 
-  const zoomFuncs = program.styleKeys
+  const zoomFuncs = styleKeys
     .filter(styleKey => paint[styleKey].type !== "property")
     .map(styleKey => {
       const get = paint[styleKey];
       const shaderVar = camelCase(styleKey);
-      const set = program.uniformSetters[shaderVar];
+      const set = uniformSetters[shaderVar];
       return (z, f) => set(get(z, f));
     });
 
   function setStyles(zoom, pixRatio = 1.0, cameraScale = 1.0) {
-    program.use();
+    use();
     zoomFuncs.forEach(f => f(zoom));
     if (!screenScale) return;
     const { width, height } = framebuffer.size;
@@ -606,7 +607,7 @@ function initStyleProg(style, program, context, framebuffer) {
   }
 
   function initBackgroundData() {
-    const buffers = program.load({});
+    const buffers = load({});
     return () => ({ buffers });
   }
 
@@ -616,7 +617,7 @@ function initStyleProg(style, program, context, framebuffer) {
     return layer;
   }
 
-  return { setStyles, paint: draw };
+  return { id, type, setStyles, getData, uniformSetters, paint: draw };
 }
 
 function initGL(userParams) {
