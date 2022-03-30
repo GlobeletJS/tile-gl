@@ -7,7 +7,7 @@ Data serializers and WebGL renderers for tiled vector map layers
 tile-gl exposes two methods:
 - initSerializer: Initialize a geometry serializer, to parse GeoJSON
   features into buffers that can be read by tile-gl renderers
-- initGLpaint: Wrap a WebGL context with methods to load the buffers to the
+- initGL: Wrap a WebGL context with methods to load the buffers to the
   GPU, and to construct renderers for [MapLibre style layers][MapLibre]
 
 See a simple [example][] of tile-gl rendering vector tile data following a
@@ -95,7 +95,7 @@ properties:
 [tile-labeler]: https://github.com/GlobeletJS/tile-labeler
 [styleType]: https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#type
 
-## initGLpaint
+## initGL
 Wraps a WebGL contexts with methods to load buffers to the GPU, and to
 construct renderers for [MapLibre style layers][MapLibre]
 
@@ -103,7 +103,7 @@ construct renderers for [MapLibre style layers][MapLibre]
 ```javascript
 import * as tileGL from "tile-gl";
 
-const context = tileGL.initGLpaint(parameters);
+const context = tileGL.initGL(parameters);
 ```
 
 where the supplied parameters object has the following properties:

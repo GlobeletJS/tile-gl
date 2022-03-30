@@ -2,7 +2,7 @@ import { setParams } from "./params.js";
 import { compilePrograms } from "./compile.js";
 import { initStyleProg } from "./style-prog.js";
 
-export function initGLpaint(userParams) {
+export function initGL(userParams) {
   const params = setParams(userParams);
   const { context, framebuffer } = params;
   const programs = compilePrograms(params);

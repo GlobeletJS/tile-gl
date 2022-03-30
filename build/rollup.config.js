@@ -14,7 +14,7 @@ export default [{
   output: {
     file: 'dist/context.bundle.js',
     format: 'esm',
-    name: 'initGLpaint',
+    name: 'initGL',
   }
 }, {
   input: 'src/serialize/serialize.js',

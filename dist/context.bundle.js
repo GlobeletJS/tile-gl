@@ -20,17 +20,9 @@ float styleScale(vec2 tilePos) {
 
 function setParams(userParams) {
   const {
-    context, framebuffer,
+    context, framebuffer, extraAttributes,
     preamble = defaultPreamble,
-    extraAttributes,
   } = userParams;
-
-  const size = framebuffer.size;
-
-  context.clipRectFlipY = function(x, y, w, h) {
-    const yflip = size.height - y - h;
-    context.clipRect(x, yflip, w, h);
-  };
 
   return { context, framebuffer, preamble, extraAttributes };
 }
@@ -627,7 +619,7 @@ function initStyleProg(style, program, context, framebuffer) {
   return { setStyles, paint: draw };
 }
 
-function initGLpaint(userParams) {
+function initGL(userParams) {
   const params = setParams(userParams);
   const { context, framebuffer } = params;
   const programs = compilePrograms(params);
@@ -664,4 +656,4 @@ function initGLpaint(userParams) {
   }
 }
 
-export { initGLpaint };
+export { initGL };

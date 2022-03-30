@@ -2,7 +2,7 @@ import * as tileStencil from "tile-stencil";
 import * as yawgl from "yawgl";
 import * as tileRetriever from "tile-retriever";
 import * as tileMixer from "tile-mixer";
-import { initSerializer, initGLpaint } from "../../";
+import { initSerializer, initGL } from "../../";
 
 const styleHref = "./streets-v8-noInteractive.json";
 const mapboxToken = "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA";
@@ -37,7 +37,7 @@ function render(data, style) {
   const context = yawgl.initContext(canvas);
 
   const framebuffer = { buffer: null, size: canvas };
-  const tileContext = initGLpaint({ context, framebuffer });
+  const tileContext = initGL({ context, framebuffer });
 
   Object.values(data.layers).forEach(tileContext.loadBuffers);
   data.atlas = tileContext.loadAtlas(data.atlas);
