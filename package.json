@@ -39,7 +39,7 @@
     "rollup": "^2.70.0",
     "tile-mixer": "^0.3.2",
     "tile-retriever": "^0.0.5",
-    "yawgl": "^0.4.0"
+    "yawgl": "^0.4.1"
   },
   "dependencies": {
     "earcut": "^2.2.3",

@@ -5,27 +5,8 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="globe.svg">
+    <link rel="stylesheet" type="text/css" href="styles.css">
 
-<style>
-.toggle {
-  position: relative;
-}
-.tilesize {
-  width: 512px;
-  height: 512px;
-}
-#png {
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-.toggle div {
-  background-color: white;
-}
-.toggle div.beneath {
-  z-index: -1;
-}
-</style>
     <script src="main.min.js"></script>
   </head>
 
@@ -33,11 +14,13 @@
     <div class="toggle" id="toggle">
       <div>
         <canvas class="tilesize" id="tileCanvas"></canvas>
-        <p>Currently displaying a tile-gl rendering. Click to toggle</p>
+        <p>Currently displaying a tile-gl rendering.<br>
+          Click to toggle</p>
       </div>
       <div id="png">
         <img class="tilesize" src="./13-1310-3166.png">
-        <p>Currently displaying a pre-rendered PNG. Click to toggle</p>
+        <p>Currently displaying a pre-rendered PNG.<br>
+          Click to toggle</p>
       </div>
     </div>
     <div class="attribution">
