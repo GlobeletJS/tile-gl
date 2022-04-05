@@ -12,7 +12,8 @@
   "type": "module",
   "files": [
     "dist",
-    "src"
+    "src",
+    "index.js"
   ],
   "scripts": {
     "lint": "eslint src",
