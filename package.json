@@ -2,9 +2,17 @@
   "name": "tile-gl",
   "version": "0.4.12",
   "description": "Data serializers and WebGL renderers for vector tile layers",
-  "module": "dist/index.js",
+  "main": "dist/tile-gl.umd.js",
+  "module": "dist/tile-gl.bundle.js",
+  "unBundled": "index.js",
+  "exports": {
+    "import": "./index.js",
+    "default": "./dist/tile-gl.bundle.js"
+  },
+  "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
     "lint": "eslint src",
@@ -36,16 +44,16 @@
     "@rollup/plugin-node-resolve": "^13.1.3",
     "eslint": "^8.11.0",
     "eslint-config-globeletjs": "^0.0.6",
-    "rollup": "^2.70.0",
-    "tile-mixer": "^0.3.2",
-    "tile-retriever": "^0.0.5",
-    "yawgl": "^0.4.1"
+    "rollup": "^2.70.1",
+    "tile-mixer": "^0.3.3",
+    "tile-retriever": "^0.0.7",
+    "yawgl": "^0.4.2"
   },
   "dependencies": {
     "earcut": "^2.2.3",
     "rbush": "^3.0.1",
-    "tile-labeler": "^0.8.0",
-    "tile-stencil": "^0.4.9"
+    "tile-labeler": "^0.8.1",
+    "tile-stencil": "^0.4.10"
   },
   "sideEffects": false
 }

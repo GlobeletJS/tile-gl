@@ -1,23 +1,27 @@
 var fs = require("fs");
 import resolve from "@rollup/plugin-node-resolve";
+import commonjs from "@rollup/plugin-commonjs";
 
 // Get a list of the directory names
 const dirNames = fs
-  .readdirSync('./', { withFileTypes: true })
+  .readdirSync("./", { withFileTypes: true })
   .filter(d => d.isDirectory())
   .map(d => d.name);
 
 // Function to make a rollup config object from a directory name
 function makeConfig(dir) {
   return {
-    input: dir + '/main.js',
+    input: dir + "/main.js",
     plugins: [
-      resolve(),
+      resolve({
+        mainFields: ["unBundled", "module", "main"],
+      }),
+      commonjs(),
     ],
     output: {
-      file: dir + '/main.min.js',
-      format: 'iife',
-      name: 'app',
+      file: dir + "/main.min.js",
+      format: "iife",
+      name: "app",
     }
   };
 }
