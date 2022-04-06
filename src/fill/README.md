@@ -15,11 +15,14 @@ Allowed feature-dependent styles include:
 - [fill-color](https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#paint-fill-fill-color)
 - [fill-opacity](https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#paint-fill-fill-opacity)
 
+[earcut]: https://github.com/mapbox/earcut
+
 ## TODO
 The following features are not implemented yet:
 - [fill-pattern](https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#paint-fill-fill-pattern)
 - [fill-outline-color](https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#paint-fill-fill-outline-color).
-  No outlines are rendered. If an outline is desired, an additional layer can be
-  added to the style document, rendering the same data as a [line layer][].
+  No outlines are rendered. To render fill outlines with the current code, an
+  additional layer can be added to the style document, rendering the same data
+  as a [line layer][].
 
 [line layer]: https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#line

@@ -4,12 +4,12 @@
 Line segments are rendered via [instanced drawing][]. The instance geometry is
 a simple rectangular quad with four corner points (divided into two triangles).
 
-The inspiration for tile-gl's line rendering strategy came from Rye Terrell's
-[fascinating article][Terrell 1]. However, that article used overlapping
-instances. The overlapping instances are problematic for partially transparent
-lines. Terrell addressed this in his [second article][Terrell 2], by splitting
-the geometry into non-overlapping instances, with specially-shaped geometries
-for the line joins.
+The inspiration for tile-gl's line rendering strategy came from
+[Rye Terrell's fascinating article][Terrell 1]. However, that article used
+overlapping instances. The overlapping instances are problematic for partially
+transparent lines. Terrell addressed this in [a followup article][Terrell 2],
+by splitting the geometry into non-overlapping instances, with specially-shaped
+geometries for the line joins.
 
 tile-gl sticks with a simple rectangular instance, and applies tapers in the
 fragment shader to avoid double-rendering the overlap between instances.
@@ -38,9 +38,9 @@ shader, and then send three sets of 2D coordinates to the fragment shader:
 [line casings]: https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#paint-line-line-gap-width
 
 ## Serialization
-The beauty of instanced rendering for lines (as pointed out by
-[Rye Terrell][Terrell 1], is that we only need to upload a single buffer
-containing the line vertices.
+The beauty of instanced rendering for lines
+([as pointed out by Rye Terrell][Terrell 1])
+is that we only need to upload a single buffer containing the line vertices.
 
 Rendering of one instance needs to consider four points: the endpoints of the
 current segment, plus the endpoints of the adjacent segments (for computing
