@@ -1,6 +1,6 @@
 {
   "name": "tile-gl",
-  "version": "0.4.12",
+  "version": "0.4.13",
   "description": "Data serializers and WebGL renderers for vector tile layers",
   "main": "dist/tile-gl.umd.js",
   "module": "dist/tile-gl.bundle.js",
