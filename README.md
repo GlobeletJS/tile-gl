@@ -113,14 +113,13 @@ where the supplied parameters object has the following properties:
   on which draw calls will be executed. If null, draw calls will render
   directly to `context.gl.canvas`
 - `.preamble`: A String containing a custom preamble for the vertex shader.
-  Must include a version statement and precision qualifier, declare the
-  screenScale uniform, and define the functions tileToMap, mapToClip, and
-  styleScale, as in src/preamble.glsl. Allows for modified behavior of the
-  transform functions, e.g. to scale and translate the tiles or adjust style
-  dimensions such as linewidths. Defaults to src/preamble.glsl
+  Must declare the screenScale uniform, and define the functions tileToMap,
+  mapToClip, and styleScale. Allows for modified behavior of the transform
+  functions, e.g. to scale and translate the tiles or adjust style dimensions
+  such as linewidths. Defaults to src/preamble.glsl
 - `.extraAttributes`: For use in the loader. For any extra attributes defined
   in `.preamble`, supply a dictionary keyed on the attribute name, with values
-  being option objects for yawgl's initAttribute method.
+  being option objects for the [yawgl][] method initAttribute.
 
 [yawgl]: https://github.com/GlobeletJS/yawgl
 
@@ -167,6 +166,26 @@ to be rendered. The tile object must have a `.data` property pointing to an
 object with the same structure as returned by [tile-mixer][], with the `.atlas`
 processed by the tile-gl context's `.loadAtlas` method, and the layer `.buffers`
 properties processed by `.loadBuffers`
+
+Other properties of the painter object can be used for custom rendering flows:
+- `.id`: The ID of the style layer used to construct the painter
+- `.type`: The type of the style layer used to construct the painter
+- `.uniformSetters`: The uniform setters of the shader program associated with
+  the painter object. These are as constructed by [yawgl][]
+- `.getData`: A method to retrieve the appropriate layer from a serialized tile.
+  Also uploads the SDF atlas texture for the tile, for layers of type "symbol".
+
+The `.getData` method can be used along with the `.draw` method of the [yawgl][]
+context, as follows:
+
+```javascript
+// Set custom uniforms
+painter.uniformSetters["customUniformName"](customUniformValue);
+// ... etc ...
+
+const data = painter.getData(tile);
+if (data) context.draw(data.buffers);
+```
 
 [tile-mixer]: https://github.com/GlobeletJS/tile-mixer
 [d3-tile]: https://github.com/d3/d3-tile
