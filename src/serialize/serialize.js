@@ -1,7 +1,6 @@
 import { setParams } from "./params.js";
 import { initLayerSerializer } from "./layer.js";
 import RBush from "rbush";
-import { addTileCoords } from "./tile-coords.js";
 
 export function initSerializer(userParams) {
   const { parsedStyles, spriteData, getAtlas } = setParams(userParams);
@@ -11,8 +10,7 @@ export function initSerializer(userParams) {
 
   return function(source, tileCoords) {
     return getAtlas(source, tileCoords.z)
-      .then(atlas => process(source, tileCoords, atlas))
-      .then(tile => addTileCoords(tile, tileCoords));
+      .then(atlas => process(source, tileCoords, atlas));
   };
 
   function process(source, coords, atlas) {

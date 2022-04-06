@@ -1,4 +1,661 @@
-import Protobuf from 'pbf-esm';
+var defaultPreamble = `#version 300 es
+
+precision highp float;
+
+uniform vec4 screenScale; // 2 / width, -2 / height, pixRatio, cameraScale
+
+vec2 tileToMap(vec2 tilePos) {
+  return tilePos * screenScale.z;
+}
+
+vec4 mapToClip(vec2 mapPos, float z) {
+  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
+  return vec4(projected, z, 1.0);
+}
+
+float styleScale(vec2 tilePos) {
+  return screenScale.z;
+}
+`;
+
+function setParams$1(userParams) {
+  const {
+    context, framebuffer, extraAttributes,
+    preamble = defaultPreamble,
+  } = userParams;
+
+  return { context, framebuffer, preamble, extraAttributes };
+}
+
+var vert$4 = `in vec2 quadPos;
+
+void main() {
+  gl_Position = vec4(quadPos, 0.0, 1.0);
+}
+`;
+
+var frag$4 = `#version 300 es
+
+precision mediump float;
+
+uniform vec4 backgroundColor;
+uniform float backgroundOpacity;
+
+out vec4 pixColor;
+
+void main() {
+  float alpha = backgroundColor.a * backgroundOpacity;
+  pixColor = vec4(backgroundColor.rgb * alpha, alpha);
+}
+`;
+
+function initBackground(context) {
+  const quadPos = context.initQuad();
+
+  const styleKeys = ["background-color", "background-opacity"];
+
+  return {
+    vert: vert$4, frag: frag$4, styleKeys,
+    getSpecialAttrs: () => ({ quadPos }),
+    countInstances: () => 1,
+  };
+}
+
+var vert$3 = `in vec2 quadPos; // Vertices of the quad instance
+in vec2 circlePos;
+in float circleRadius;
+in vec4 circleColor;
+in float circleOpacity;
+
+out vec2 delta;
+out vec4 strokeStyle;
+out float radius;
+
+void main() {
+  vec2 mapPos = tileToMap(circlePos);
+
+  // Shift to the appropriate corner of the current instance quad
+  delta = quadPos * (circleRadius + 1.0);
+  vec2 dPos = delta * styleScale(circlePos);
+
+  strokeStyle = circleColor * circleOpacity;
+  // TODO: normalize delta? Then can drop one varying
+  radius = circleRadius;
+
+  gl_Position = mapToClip(mapPos + dPos, 0.0);
+}
+`;
+
+var frag$3 = `#version 300 es
+
+precision mediump float;
+
+in vec2 delta;
+in vec4 strokeStyle;
+in float radius;
+
+out vec4 pixColor;
+
+void main() {
+  float r = length(delta);
+  float dr = fwidth(r);
+
+  float taper = 1.0 - smoothstep(radius - dr, radius + dr, r);
+  pixColor = strokeStyle * taper;
+}
+`;
+
+function initCircle(context) {
+  const attrInfo = {
+    circlePos: { numComponents: 2 },
+    circleRadius: { numComponents: 1 },
+    circleColor: { numComponents: 4 },
+    circleOpacity: { numComponents: 1 },
+  };
+  const quadPos = context.initQuad({ x0: -1.0, y0: -1.0, x1: 1.0, y1: 1.0 });
+
+  const styleKeys = ["circle-radius", "circle-color", "circle-opacity"];
+
+  return {
+    vert: vert$3, frag: frag$3, attrInfo, styleKeys,
+    getSpecialAttrs: () => ({ quadPos }),
+    countInstances: (buffers) => buffers.circlePos.length / 2,
+  };
+}
+
+var vert$2 = `in vec2 quadPos;
+in vec3 pointA, pointB, pointC, pointD;
+in vec4 lineColor;
+in float lineOpacity, lineWidth, lineGapWidth;
+
+uniform float lineMiterLimit;
+const int numDashes = 4;
+uniform float lineDasharray[numDashes];
+
+out float yCoord;
+flat out vec2 lineSize; // lineWidth, lineGapWidth
+out vec2 miterCoord1, miterCoord2;
+flat out vec4 strokeStyle;
+flat out float dashPattern[numDashes];
+out float lineSoFar;
+
+mat3 miterTransform(vec2 xHat, vec2 yHat, vec2 v, float pixWidth) {
+  // Find a coordinate basis vector aligned along the bisector
+  bool isCap = length(v) < 0.0001; // TODO: think about units
+  vec2 vHat = (isCap)
+    ? xHat // Treat v = 0 like 180 deg turn
+    : normalize(v);
+  vec2 m0 = (dot(xHat, vHat) < -0.9999)
+    ? yHat // For vHat == -xHat
+    : normalize(xHat + vHat);
+  
+  // Find a perpendicular basis vector, pointing toward xHat
+  float x_m0 = dot(xHat, m0);
+  vec2 m1 = (x_m0 < 0.9999)
+    ? normalize(xHat - vHat)
+    : yHat;
+
+  // Compute miter length
+  float sin2 = 1.0 - x_m0 * x_m0; // Could be zero!
+  float miterLength = (sin2 > 0.0001)
+    ? inversesqrt(sin2)
+    : lineMiterLimit + 1.0;
+  float bevelLength = abs(dot(yHat, m0));
+  float tx = (miterLength > lineMiterLimit)
+    ? 0.5 * pixWidth * bevelLength
+    : 0.5 * pixWidth * miterLength;
+
+  float ty = isCap ? 1.2 * pixWidth : 0.0;
+
+  return mat3(m0.x, m1.x, 0, m0.y, m1.y, 0, tx, ty, 1);
+}
+
+float sumComponents(float[numDashes] v) {
+  float sum = 0.0;
+  for (int i = 0; i < v.length(); i++) {
+    sum += v[i];
+  }
+  return sum;
+}
+
+void main() {
+  // Transform vertex positions from tile to map coordinates
+  vec2 mapA = tileToMap(pointA.xy);
+  vec2 mapB = tileToMap(pointB.xy);
+  vec2 mapC = tileToMap(pointC.xy);
+  vec2 mapD = tileToMap(pointD.xy);
+
+  vec2 xAxis = mapC - mapB;
+  vec2 xBasis = normalize(xAxis);
+  vec2 yBasis = vec2(-xBasis.y, xBasis.x);
+
+  // Get coordinate transforms for the miters
+  float pixWidth = (lineGapWidth > 0.0)
+    ? (lineGapWidth + 2.0 * lineWidth) * screenScale.z
+    : lineWidth * screenScale.z;
+  mat3 m1 = miterTransform(xBasis, yBasis, mapA - mapB, pixWidth);
+  mat3 m2 = miterTransform(-xBasis, yBasis, mapD - mapC, pixWidth);
+
+  // Find the position of the current instance vertex, in 3 coordinate systems
+  vec2 extend = lineMiterLimit * xBasis * pixWidth * (quadPos.x - 0.5);
+  // Add one pixel on either side of the line for the anti-alias taper
+  float y = (pixWidth + 2.0) * quadPos.y;
+  vec2 point = mapB + xAxis * quadPos.x + yBasis * y + extend;
+  miterCoord1 = (m1 * vec3(point - mapB, 1)).xy;
+  miterCoord2 = (m2 * vec3(point - mapC, 1)).xy;
+
+  // Remove pixRatio from varying (we taper edges using unscaled value)
+  yCoord = y / screenScale.z;
+  lineSize = vec2(lineWidth, lineGapWidth);
+
+  // TODO: should this premultiplication be done in tile-stencil?
+  //vec4 premult = vec4(color.rgb * color.a, color.a);
+  //strokeStyle = premult * opacity;
+  strokeStyle = lineColor * lineOpacity;
+
+  float dashLength = sumComponents(lineDasharray) * lineWidth;
+  if (dashLength <= 0.0) dashLength = 1.0;
+
+  float dashScale = lineWidth / dashLength;
+  dashPattern[0] = lineDasharray[0] * dashScale;
+  for (int i = 1; i < lineDasharray.length(); i++) {
+    dashPattern[i] = dashPattern[i - 1] + lineDasharray[i] * dashScale;
+  }
+
+  float xLen = length(xAxis) / screenScale.z;
+  float extendRatio = length(extend) / screenScale.z / xLen;
+  float stretch = xLen / (pointC.z - pointB.z);
+
+  float dist0 = pointB.z * stretch / dashLength;
+  float dDist = (pointC.z - pointB.z) * stretch / dashLength;
+  float eDist = dDist * extendRatio;
+  lineSoFar = dist0 - eDist + quadPos.x * (dDist + 2.0 * eDist);
+
+  float z = (min(pointB.z, pointC.z) < 0.0) ? -2.0 : 0.0;
+
+  gl_Position = mapToClip(point, z);
+}
+`;
+
+var frag$2 = `#version 300 es
+
+precision highp float;
+
+in float yCoord;
+flat in vec2 lineSize; // lineWidth, lineGapWidth
+in vec2 miterCoord1, miterCoord2;
+flat in vec4 strokeStyle;
+flat in float dashPattern[4];
+in float lineSoFar;
+
+out vec4 pixColor;
+
+float taper(float edge, float width, float x) {
+  return smoothstep(edge - width, edge + width, x);
+}
+
+float muteGap(float start, float end, float ramp, float x) {
+  return (start < end)
+    ? 1.0 - taper(start, ramp, x) * taper(-end, ramp, -x)
+    : 1.0;
+}
+
+void main() {
+  float step0 = fwidth(yCoord) * 0.707;
+  vec2 step1 = fwidth(miterCoord1) * 0.707;
+  vec2 step2 = fwidth(miterCoord2) * 0.707;
+
+  // Antialiasing tapers for line edges
+  float hGap = 0.5 * lineSize.y;
+  float inner = (hGap > 0.0) ? taper(hGap, step0, abs(yCoord)) : 1.0;
+  float hWidth = (hGap > 0.0) ? hGap + lineSize.x : 0.5 * lineSize.x;
+  float outer = taper(-hWidth, step0, -abs(yCoord));
+  float antialias = inner * outer;
+
+  // Bevels, endcaps: Use smooth taper for antialiasing
+  float taperx =
+    taper(0.0, step1.x, miterCoord1.x) * 
+    taper(0.0, step2.x, miterCoord2.x);
+
+  // Miters: Use hard step, slightly shifted to avoid overlap at center
+  float tapery = 
+    step(-0.01 * step1.y, miterCoord1.y) *
+    step(0.01 * step2.y, miterCoord2.y);
+
+  // Dashes
+  float dashX = fract(lineSoFar);
+  float stepD = fwidth(lineSoFar) * 0.707;
+  float gap1 = muteGap(dashPattern[0], dashPattern[1], stepD, dashX);
+  float gap2 = muteGap(dashPattern[2], dashPattern[3], stepD, dashX);
+  float dashMute = min(gap1, gap2);
+
+  pixColor = strokeStyle * antialias * taperx * tapery * dashMute;
+}
+`;
+
+function initLine(context) {
+  const { initQuad, createBuffer, initAttribute } = context;
+
+  const attrInfo = {
+    lineColor: { numComponents: 4 },
+    lineOpacity: { numComponents: 1 },
+    lineWidth: { numComponents: 1 },
+    lineGapWidth: { numComponents: 1 },
+  };
+  const quadPos = initQuad({ x0: 0.0, y0: -0.5, x1: 1.0, y1: 0.5 });
+  const numComponents = 3;
+  const stride = Float32Array.BYTES_PER_ELEMENT * numComponents;
+
+  function getSpecialAttrs(buffers) {
+    // Create buffer containing the vertex positions
+    const buffer = createBuffer(buffers.lines);
+
+    // Construct interleaved attributes pointing to different offsets in buffer
+    function setupPoint(shift) {
+      const offset = shift * stride;
+      return initAttribute({ buffer, numComponents, stride, offset });
+    }
+
+    return {
+      quadPos,
+      pointA: setupPoint(0),
+      pointB: setupPoint(1),
+      pointC: setupPoint(2),
+      pointD: setupPoint(3),
+    };
+  }
+
+  const styleKeys = [
+    // NOTE: line-miter-limit is a layout property in the style spec
+    // We copied the function to a paint property in ../main.js
+    "line-miter-limit",
+    // Other layout properties not implemented yet:
+    // "line-cap", "line-join",
+
+    // Paint properties:
+    "line-color", "line-opacity",
+    "line-width", "line-gap-width", "line-dasharray",
+    // "line-translate", "line-translate-anchor",
+    // "line-offset", "line-blur", "line-gradient", "line-pattern"
+  ];
+
+  return {
+    vert: vert$2, frag: frag$2, attrInfo, styleKeys, getSpecialAttrs,
+    countInstances: (buffers) => buffers.lines.length / numComponents - 3,
+  };
+}
+
+var vert$1 = `in vec2 position;
+in vec4 fillColor;
+in float fillOpacity;
+
+uniform vec2 fillTranslate;
+
+out vec4 fillStyle;
+
+void main() {
+  vec2 mapPos = tileToMap(position) + fillTranslate * screenScale.z;
+
+  fillStyle = fillColor * fillOpacity;
+
+  gl_Position = mapToClip(mapPos, 0.0);
+}
+`;
+
+var frag$1 = `#version 300 es
+
+precision mediump float;
+
+in vec4 fillStyle;
+
+out vec4 pixColor;
+
+void main() {
+    pixColor = fillStyle;
+}
+`;
+
+function initFill() {
+  const attrInfo = {
+    position: { numComponents: 2, divisor: 0 },
+    fillColor: { numComponents: 4, divisor: 0 },
+    fillOpacity: { numComponents: 1, divisor: 0 },
+  };
+
+  const styleKeys = ["fill-color", "fill-opacity", "fill-translate"];
+
+  return {
+    vert: vert$1, frag: frag$1, attrInfo, styleKeys,
+    getSpecialAttrs: () => ({}),
+  };
+}
+
+var vert = `in vec2 quadPos;   // Vertices of the quad instance
+in vec4 labelPos;  // x, y, angle, font size scalar (0 for icons)
+in vec4 glyphPos;  // dx, dy (relative to labelPos), w, h
+in vec4 glyphRect; // x, y, w, h
+
+in float iconOpacity;
+
+in vec4 textColor;
+in float textOpacity;
+in float textHaloBlur;
+in vec4 textHaloColor;
+in float textHaloWidth;
+
+out vec2 texCoord;
+
+out float opacity;
+
+out vec4 fillColor;
+out vec4 haloColor;
+out vec2 haloSize; // width, blur
+out float taperWidth;
+
+void main() {
+  // For icons only
+  opacity = iconOpacity;
+
+  // For text only
+  taperWidth = labelPos.w * screenScale.z; // == 0.0 for icon glyphs
+  haloSize = vec2(textHaloWidth, textHaloBlur) * screenScale.z;
+
+  float fillAlpha = textColor.a * textOpacity;
+  fillColor = vec4(textColor.rgb * fillAlpha, fillAlpha);
+  float haloAlpha = textHaloColor.a * textOpacity;
+  haloColor = vec4(textHaloColor.rgb * haloAlpha, haloAlpha);
+
+  // Texture coordinates
+  texCoord = glyphRect.xy + glyphRect.zw * quadPos;
+
+  // Compute glyph position. First transform the label origin
+  vec2 mapPos = tileToMap(labelPos.xy);
+
+  // Shift to the appropriate corner of the current instance quad
+  vec2 dPos = (glyphPos.xy + glyphPos.zw * quadPos) * styleScale(labelPos.xy);
+
+  float cos_a = cos(labelPos.z);
+  float sin_a = sin(labelPos.z);
+  float dx = dPos.x * cos_a - dPos.y * sin_a;
+  float dy = dPos.x * sin_a + dPos.y * cos_a;
+
+  gl_Position = mapToClip(mapPos + vec2(dx, dy), 0.0);
+}
+`;
+
+var frag = `#version 300 es
+
+precision highp float;
+
+uniform sampler2D sprite, sdf;
+
+in vec2 texCoord;
+
+in float opacity;
+
+in vec4 fillColor;
+in vec4 haloColor;
+in vec2 haloSize; // width, blur
+in float taperWidth; // 0 for icons
+
+out vec4 pixColor;
+
+void main() {
+  // Get color from sprite if this is an icon glyph
+  vec4 spritePix = texture(sprite, texCoord);
+  // Input sprite does NOT have pre-multiplied alpha
+  vec4 iconColor = vec4(spritePix.rgb * spritePix.a, spritePix.a) * opacity;
+
+  // Compute fill and halo color from sdf if this is a text glyph
+  float sdfVal = texture(sdf, texCoord).a;
+  float screenDist = taperWidth * (191.0 - 255.0 * sdfVal) / 32.0;
+
+  float fillAlpha = smoothstep(-0.707, 0.707, -screenDist);
+  float hEdge = haloSize.x - haloSize.y / 2.0;
+  float hTaper = haloSize.x + haloSize.y / 2.0;
+  float haloAlpha = (haloSize.x > 0.0 || haloSize.y > 0.0)
+    ? (1.0 - fillAlpha) * smoothstep(-hTaper, -hEdge, -screenDist)
+    : 0.0;
+  vec4 textColor = fillColor * fillAlpha + haloColor * haloAlpha;
+
+  // Choose icon or text color based on taperWidth value
+  pixColor = (taperWidth == 0.0) ? iconColor : textColor;
+}
+`;
+
+function initSymbol(context) {
+  const attrInfo = {
+    labelPos: { numComponents: 4 },
+    glyphPos: { numComponents: 4 },
+    glyphRect: { numComponents: 4 },
+    iconOpacity: { numComponents: 1 },
+    textColor: { numComponents: 4 },
+    textOpacity: { numComponents: 1 },
+    textHaloBlur: { numComponents: 1 },
+    textHaloColor: { numComponents: 4 },
+    textHaloWidth: { numComponents: 1 },
+  };
+  const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
+
+  const styleKeys = [
+    "icon-opacity",
+    "text-color",
+    "text-opacity",
+    "text-halo-blur",
+    "text-halo-color",
+    "text-halo-width",
+  ];
+
+  return {
+    vert, frag, attrInfo, styleKeys,
+    getSpecialAttrs: () => ({ quadPos }),
+    countInstances: (buffers) => buffers.labelPos.length / 4,
+  };
+}
+
+function initLoader(context, info, constructVao, extraAttributes) {
+  const { initAttribute, initIndices } = context;
+  const { attrInfo, getSpecialAttrs, countInstances } = info;
+
+  const allAttrs = Object.assign({}, attrInfo, extraAttributes);
+
+  function getAttributes(buffers) {
+    return Object.entries(allAttrs).reduce((d, [key, info]) => {
+      const data = buffers[key];
+      if (data) d[key] = initAttribute(Object.assign({ data }, info));
+      return d;
+    }, getSpecialAttrs(buffers));
+  }
+
+  function loadInstanced(buffers) {
+    const attributes = getAttributes(buffers);
+    const vao = constructVao({ attributes });
+    return { vao, instanceCount: countInstances(buffers) };
+  }
+
+  function loadIndexed(buffers) {
+    const attributes = getAttributes(buffers);
+    const indices = initIndices({ data: buffers.indices });
+    const vao = constructVao({ attributes, indices });
+    return { vao, indices, count: buffers.indices.length };
+  }
+
+  return (countInstances) ? loadInstanced : loadIndexed;
+}
+
+function compilePrograms(params) {
+  const { context, preamble, extraAttributes } = params;
+
+  const progInfo = {
+    background: initBackground(context),
+    circle: initCircle(context),
+    line: initLine(context),
+    fill: initFill(),
+    symbol: initSymbol(context),
+  };
+
+  function compile(info) {
+    const { vert, frag, styleKeys } = info;
+    const program = context.initProgram(preamble + vert, frag);
+    const { use, constructVao, uniformSetters } = program;
+    const load = initLoader(context, info, constructVao, extraAttributes);
+    return { load, use, uniformSetters, styleKeys };
+  }
+
+  return Object.entries(progInfo)
+    .reduce((d, [k, info]) => (d[k] = compile(info), d), {});
+}
+
+function camelCase$2(hyphenated) {
+  return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
+}
+
+function initStyleProg(style, program, context, framebuffer) {
+  if (!program) return;
+
+  const { id, type, layout, paint } = style;
+  const { load, use, uniformSetters, styleKeys } = program;
+  const { sdf, screenScale } = uniformSetters;
+
+  if (type === "line") {
+    // We handle line-miter-limit in the paint phase, not layout phase
+    paint["line-miter-limit"] = layout["line-miter-limit"];
+  }
+
+  const zoomFuncs = styleKeys
+    .filter(styleKey => paint[styleKey].type !== "property")
+    .map(styleKey => {
+      const get = paint[styleKey];
+      const shaderVar = camelCase$2(styleKey);
+      const set = uniformSetters[shaderVar];
+      return (z, f) => set(get(z, f));
+    });
+
+  function setStyles(zoom, pixRatio = 1.0, cameraScale = 1.0) {
+    use();
+    zoomFuncs.forEach(f => f(zoom));
+    if (!screenScale) return;
+    const { width, height } = framebuffer.size;
+    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
+  }
+
+  const getData = (type === "background") ? initBackgroundData() : getFeatures;
+
+  function draw(tile) {
+    const data = getData(tile);
+    if (data) context.draw(data.buffers);
+  }
+
+  function initBackgroundData() {
+    const buffers = load({});
+    return () => ({ buffers });
+  }
+
+  function getFeatures(tile) {
+    const { layers: { [id]: layer }, atlas } = tile.data;
+    if (sdf && atlas) sdf(atlas);
+    return layer;
+  }
+
+  return { id, type, setStyles, getData, uniformSetters, paint: draw };
+}
+
+function initGL(userParams) {
+  const params = setParams$1(userParams);
+  const { context, framebuffer } = params;
+  const programs = compilePrograms(params);
+
+  return { prep, loadAtlas, loadBuffers, loadSprite, initPainter };
+
+  function prep() {
+    context.bindFramebufferAndSetViewport(framebuffer);
+    return context.clear();
+  }
+
+  function loadAtlas(atlas) { // TODO: name like loadSprite, different behavior
+    const format = context.gl.ALPHA;
+    const { width, height, data } = atlas;
+    return context.initTexture({ format, width, height, data, mips: false });
+  }
+
+  function loadBuffers(layer) {
+    const program = programs[layer.type];
+    if (!program) throw Error("tile-gl loadBuffers: unknown layer type");
+    layer.buffers = program.load(layer.buffers);
+  }
+
+  function loadSprite(image) {
+    if (!image) return false;
+    const spriteTex = context.initTexture({ image, mips: false });
+    programs.symbol.use();
+    programs.symbol.uniformSetters.sprite(spriteTex);
+    return true;
+  }
+
+  function initPainter(style) {
+    return initStyleProg(style, programs[style.type], context, framebuffer);
+  }
+}
 
 function define(constructor, factory, prototype) {
   constructor.prototype = factory.prototype = prototype;
@@ -684,6 +1341,713 @@ function getStyleFuncs(inputLayer) {
   return layer;
 }
 
+var ieee754 = {};
+
+/*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
+
+ieee754.read = function (buffer, offset, isLE, mLen, nBytes) {
+  var e, m;
+  var eLen = (nBytes * 8) - mLen - 1;
+  var eMax = (1 << eLen) - 1;
+  var eBias = eMax >> 1;
+  var nBits = -7;
+  var i = isLE ? (nBytes - 1) : 0;
+  var d = isLE ? -1 : 1;
+  var s = buffer[offset + i];
+
+  i += d;
+
+  e = s & ((1 << (-nBits)) - 1);
+  s >>= (-nBits);
+  nBits += eLen;
+  for (; nBits > 0; e = (e * 256) + buffer[offset + i], i += d, nBits -= 8) {}
+
+  m = e & ((1 << (-nBits)) - 1);
+  e >>= (-nBits);
+  nBits += mLen;
+  for (; nBits > 0; m = (m * 256) + buffer[offset + i], i += d, nBits -= 8) {}
+
+  if (e === 0) {
+    e = 1 - eBias;
+  } else if (e === eMax) {
+    return m ? NaN : ((s ? -1 : 1) * Infinity)
+  } else {
+    m = m + Math.pow(2, mLen);
+    e = e - eBias;
+  }
+  return (s ? -1 : 1) * m * Math.pow(2, e - mLen)
+};
+
+ieee754.write = function (buffer, value, offset, isLE, mLen, nBytes) {
+  var e, m, c;
+  var eLen = (nBytes * 8) - mLen - 1;
+  var eMax = (1 << eLen) - 1;
+  var eBias = eMax >> 1;
+  var rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0);
+  var i = isLE ? 0 : (nBytes - 1);
+  var d = isLE ? 1 : -1;
+  var s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0;
+
+  value = Math.abs(value);
+
+  if (isNaN(value) || value === Infinity) {
+    m = isNaN(value) ? 1 : 0;
+    e = eMax;
+  } else {
+    e = Math.floor(Math.log(value) / Math.LN2);
+    if (value * (c = Math.pow(2, -e)) < 1) {
+      e--;
+      c *= 2;
+    }
+    if (e + eBias >= 1) {
+      value += rt / c;
+    } else {
+      value += rt * Math.pow(2, 1 - eBias);
+    }
+    if (value * c >= 2) {
+      e++;
+      c /= 2;
+    }
+
+    if (e + eBias >= eMax) {
+      m = 0;
+      e = eMax;
+    } else if (e + eBias >= 1) {
+      m = ((value * c) - 1) * Math.pow(2, mLen);
+      e = e + eBias;
+    } else {
+      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen);
+      e = 0;
+    }
+  }
+
+  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8) {}
+
+  e = (e << mLen) | m;
+  eLen += mLen;
+  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8) {}
+
+  buffer[offset + i - d] |= s * 128;
+};
+
+function readVarintRemainder(l, s, p) {
+    var buf = p.buf,
+        h, b;
+
+    b = buf[p.pos++]; h  = (b & 0x70) >> 4;  if (b < 0x80) return toNum(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 3;  if (b < 0x80) return toNum(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 10; if (b < 0x80) return toNum(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 17; if (b < 0x80) return toNum(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 24; if (b < 0x80) return toNum(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x01) << 31; if (b < 0x80) return toNum(l, h, s);
+
+    throw new Error('Expected varint not more than 10 bytes');
+}
+
+function toNum(low, high, isSigned) {
+    if (isSigned) {
+        return high * 0x100000000 + (low >>> 0);
+    }
+
+    return ((high >>> 0) * 0x100000000) + (low >>> 0);
+}
+
+function writeBigVarint(val, pbf) {
+    var low, high;
+
+    if (val >= 0) {
+        low  = (val % 0x100000000) | 0;
+        high = (val / 0x100000000) | 0;
+    } else {
+        low  = ~(-val % 0x100000000);
+        high = ~(-val / 0x100000000);
+
+        if (low ^ 0xffffffff) {
+            low = (low + 1) | 0;
+        } else {
+            low = 0;
+            high = (high + 1) | 0;
+        }
+    }
+
+    if (val >= 0x10000000000000000 || val < -0x10000000000000000) {
+        throw new Error('Given varint doesn\'t fit into 10 bytes');
+    }
+
+    pbf.realloc(10);
+
+    writeBigVarintLow(low, high, pbf);
+    writeBigVarintHigh(high, pbf);
+}
+
+function writeBigVarintLow(low, high, pbf) {
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos]   = low & 0x7f;
+}
+
+function writeBigVarintHigh(high, pbf) {
+    var lsb = (high & 0x07) << 4;
+
+    pbf.buf[pbf.pos++] |= lsb         | ((high >>>= 3) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f;
+}
+
+// Buffer code below from https://github.com/feross/buffer, MIT-licensed
+
+function readUtf8(buf, pos, end) {
+    var str = '';
+    var i = pos;
+
+    while (i < end) {
+        var b0 = buf[i];
+        var c = null; // codepoint
+        var bytesPerSequence =
+            b0 > 0xEF ? 4 :
+            b0 > 0xDF ? 3 :
+            b0 > 0xBF ? 2 : 1;
+
+        if (i + bytesPerSequence > end) break;
+
+        var b1, b2, b3;
+
+        if (bytesPerSequence === 1) {
+            if (b0 < 0x80) c = b0;
+        } else if (bytesPerSequence === 2) {
+            b1 = buf[i + 1];
+            if ((b1 & 0xC0) === 0x80) {
+                c = (b0 & 0x1F) << 0x6 | (b1 & 0x3F);
+                if (c <= 0x7F) c = null;
+            }
+        } else if (bytesPerSequence === 3) {
+            b1 = buf[i + 1];
+            b2 = buf[i + 2];
+            if ((b1 & 0xC0) === 0x80 && (b2 & 0xC0) === 0x80) {
+                c = (b0 & 0xF) << 0xC | (b1 & 0x3F) << 0x6 | (b2 & 0x3F);
+                if (c <= 0x7FF || (c >= 0xD800 && c <= 0xDFFF)) c = null;
+            }
+        } else if (bytesPerSequence === 4) {
+            b1 = buf[i + 1];
+            b2 = buf[i + 2];
+            b3 = buf[i + 3];
+            if ((b1 & 0xC0) === 0x80 && (b2 & 0xC0) === 0x80 && (b3 & 0xC0) === 0x80) {
+                c = (b0 & 0xF) << 0x12 | (b1 & 0x3F) << 0xC | (b2 & 0x3F) << 0x6 | (b3 & 0x3F);
+                if (c <= 0xFFFF || c >= 0x110000) c = null;
+            }
+        }
+
+        if (c === null) {
+            c = 0xFFFD;
+            bytesPerSequence = 1;
+
+        } else if (c > 0xFFFF) {
+            c -= 0x10000;
+            str += String.fromCharCode(c >>> 10 & 0x3FF | 0xD800);
+            c = 0xDC00 | c & 0x3FF;
+        }
+
+        str += String.fromCharCode(c);
+        i += bytesPerSequence;
+    }
+
+    return str;
+}
+
+function writeUtf8(buf, str, pos) {
+    for (var i = 0, c, lead; i < str.length; i++) {
+        c = str.charCodeAt(i); // code point
+
+        if (c > 0xD7FF && c < 0xE000) {
+            if (lead) {
+                if (c < 0xDC00) {
+                    buf[pos++] = 0xEF;
+                    buf[pos++] = 0xBF;
+                    buf[pos++] = 0xBD;
+                    lead = c;
+                    continue;
+                } else {
+                    c = lead - 0xD800 << 10 | c - 0xDC00 | 0x10000;
+                    lead = null;
+                }
+            } else {
+                if (c > 0xDBFF || (i + 1 === str.length)) {
+                    buf[pos++] = 0xEF;
+                    buf[pos++] = 0xBF;
+                    buf[pos++] = 0xBD;
+                } else {
+                    lead = c;
+                }
+                continue;
+            }
+        } else if (lead) {
+            buf[pos++] = 0xEF;
+            buf[pos++] = 0xBF;
+            buf[pos++] = 0xBD;
+            lead = null;
+        }
+
+        if (c < 0x80) {
+            buf[pos++] = c;
+        } else {
+            if (c < 0x800) {
+                buf[pos++] = c >> 0x6 | 0xC0;
+            } else {
+                if (c < 0x10000) {
+                    buf[pos++] = c >> 0xC | 0xE0;
+                } else {
+                    buf[pos++] = c >> 0x12 | 0xF0;
+                    buf[pos++] = c >> 0xC & 0x3F | 0x80;
+                }
+                buf[pos++] = c >> 0x6 & 0x3F | 0x80;
+            }
+            buf[pos++] = c & 0x3F | 0x80;
+        }
+    }
+    return pos;
+}
+
+// Buffer code below from https://github.com/feross/buffer, MIT-licensed
+
+function readUInt32(buf, pos) {
+    return ((buf[pos]) |
+        (buf[pos + 1] << 8) |
+        (buf[pos + 2] << 16)) +
+        (buf[pos + 3] * 0x1000000);
+}
+
+function writeInt32(buf, val, pos) {
+    buf[pos] = val;
+    buf[pos + 1] = (val >>> 8);
+    buf[pos + 2] = (val >>> 16);
+    buf[pos + 3] = (val >>> 24);
+}
+
+function readInt32(buf, pos) {
+    return ((buf[pos]) |
+        (buf[pos + 1] << 8) |
+        (buf[pos + 2] << 16)) +
+        (buf[pos + 3] << 24);
+}
+
+function Pbf(buf) {
+    this.buf = ArrayBuffer.isView(buf) ? buf : new Uint8Array(buf || 0);
+    this.pos = 0;
+    this.type = 0;
+    this.length = this.buf.length;
+}
+
+Pbf.Varint  = 0; // varint: int32, int64, uint32, uint64, sint32, sint64, bool, enum
+Pbf.Fixed64 = 1; // 64-bit: double, fixed64, sfixed64
+Pbf.Bytes   = 2; // length-delimited: string, bytes, embedded messages, packed repeated fields
+Pbf.Fixed32 = 5; // 32-bit: float, fixed32, sfixed32
+
+var SHIFT_LEFT_32 = (1 << 16) * (1 << 16),
+    SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
+
+// Threshold chosen based on both benchmarking and knowledge about browser string
+// data structures (which currently switch structure types at 12 bytes or more)
+var TEXT_DECODER_MIN_LENGTH = 12;
+var utf8TextDecoder = new TextDecoder('utf-8');
+
+Pbf.prototype = {
+
+    destroy: function() {
+        this.buf = null;
+    },
+
+    // === READING =================================================================
+
+    readFields: function(readField, result, end) {
+        end = end || this.length;
+
+        while (this.pos < end) {
+            var val = this.readVarint(),
+                tag = val >> 3,
+                startPos = this.pos;
+
+            this.type = val & 0x7;
+            readField(tag, result, this);
+
+            if (this.pos === startPos) this.skip(val);
+        }
+        return result;
+    },
+
+    readMessage: function(readField, result) {
+        return this.readFields(readField, result, this.readVarint() + this.pos);
+    },
+
+    readFixed32: function() {
+        var val = readUInt32(this.buf, this.pos);
+        this.pos += 4;
+        return val;
+    },
+
+    readSFixed32: function() {
+        var val = readInt32(this.buf, this.pos);
+        this.pos += 4;
+        return val;
+    },
+
+    // 64-bit int handling is based on github.com/dpw/node-buffer-more-ints (MIT-licensed)
+
+    readFixed64: function() {
+        var val = readUInt32(this.buf, this.pos) + readUInt32(this.buf, this.pos + 4) * SHIFT_LEFT_32;
+        this.pos += 8;
+        return val;
+    },
+
+    readSFixed64: function() {
+        var val = readUInt32(this.buf, this.pos) + readInt32(this.buf, this.pos + 4) * SHIFT_LEFT_32;
+        this.pos += 8;
+        return val;
+    },
+
+    readFloat: function() {
+        var val = ieee754.read(this.buf, this.pos, true, 23, 4);
+        this.pos += 4;
+        return val;
+    },
+
+    readDouble: function() {
+        var val = ieee754.read(this.buf, this.pos, true, 52, 8);
+        this.pos += 8;
+        return val;
+    },
+
+    readVarint: function(isSigned) {
+        var buf = this.buf,
+            val, b;
+
+        b = buf[this.pos++]; val  =  b & 0x7f;        if (b < 0x80) return val;
+        b = buf[this.pos++]; val |= (b & 0x7f) << 7;  if (b < 0x80) return val;
+        b = buf[this.pos++]; val |= (b & 0x7f) << 14; if (b < 0x80) return val;
+        b = buf[this.pos++]; val |= (b & 0x7f) << 21; if (b < 0x80) return val;
+        b = buf[this.pos];   val |= (b & 0x0f) << 28;
+
+        return readVarintRemainder(val, isSigned, this);
+    },
+
+    readVarint64: function() { // for compatibility with v2.0.1
+        return this.readVarint(true);
+    },
+
+    readSVarint: function() {
+        var num = this.readVarint();
+        return num % 2 === 1 ? (num + 1) / -2 : num / 2; // zigzag encoding
+    },
+
+    readBoolean: function() {
+        return Boolean(this.readVarint());
+    },
+
+    readString: function() {
+        var end = this.readVarint() + this.pos;
+        var pos = this.pos;
+        this.pos = end;
+
+        if (end - pos >= TEXT_DECODER_MIN_LENGTH && utf8TextDecoder) {
+            // longer strings are fast with the built-in browser TextDecoder API
+            return utf8TextDecoder.decode(this.buf.subarray(pos, end));
+        }
+        // short strings are fast with our custom implementation
+        return readUtf8(this.buf, pos, end);
+    },
+
+    readBytes: function() {
+        var end = this.readVarint() + this.pos,
+            buffer = this.buf.subarray(this.pos, end);
+        this.pos = end;
+        return buffer;
+    },
+
+    // verbose for performance reasons; doesn't affect gzipped size
+
+    readPackedVarint: function(arr = [], isSigned) {
+        if (this.type !== Pbf.Bytes) return arr.push(this.readVarint(isSigned));
+        var end = readPackedEnd(this);
+        while (this.pos < end) arr.push(this.readVarint(isSigned));
+        return arr;
+    },
+    readPackedSVarint: function(arr = []) {
+        if (this.type !== Pbf.Bytes) return arr.push(this.readSVarint());
+        var end = readPackedEnd(this);
+        while (this.pos < end) arr.push(this.readSVarint());
+        return arr;
+    },
+    readPackedBoolean: function(arr = []) {
+        if (this.type !== Pbf.Bytes) return arr.push(this.readBoolean());
+        var end = readPackedEnd(this);
+        while (this.pos < end) arr.push(this.readBoolean());
+        return arr;
+    },
+    readPackedFloat: function(arr = []) {
+        if (this.type !== Pbf.Bytes) return arr.push(this.readFloat());
+        var end = readPackedEnd(this);
+        while (this.pos < end) arr.push(this.readFloat());
+        return arr;
+    },
+    readPackedDouble: function(arr = []) {
+        if (this.type !== Pbf.Bytes) return arr.push(this.readDouble());
+        var end = readPackedEnd(this);
+        while (this.pos < end) arr.push(this.readDouble());
+        return arr;
+    },
+    readPackedFixed32: function(arr = []) {
+        if (this.type !== Pbf.Bytes) return arr.push(this.readFixed32());
+        var end = readPackedEnd(this);
+        while (this.pos < end) arr.push(this.readFixed32());
+        return arr;
+    },
+    readPackedSFixed32: function(arr = []) {
+        if (this.type !== Pbf.Bytes) return arr.push(this.readSFixed32());
+        var end = readPackedEnd(this);
+        while (this.pos < end) arr.push(this.readSFixed32());
+        return arr;
+    },
+    readPackedFixed64: function(arr = []) {
+        if (this.type !== Pbf.Bytes) return arr.push(this.readFixed64());
+        var end = readPackedEnd(this);
+        while (this.pos < end) arr.push(this.readFixed64());
+        return arr;
+    },
+    readPackedSFixed64: function(arr = []) {
+        if (this.type !== Pbf.Bytes) return arr.push(this.readSFixed64());
+        var end = readPackedEnd(this);
+        while (this.pos < end) arr.push(this.readSFixed64());
+        return arr;
+    },
+
+    skip: function(val) {
+        var type = val & 0x7;
+        if (type === Pbf.Varint) while (this.buf[this.pos++] > 0x7f) {}
+        else if (type === Pbf.Bytes) this.pos = this.readVarint() + this.pos;
+        else if (type === Pbf.Fixed32) this.pos += 4;
+        else if (type === Pbf.Fixed64) this.pos += 8;
+        else throw new Error('Unimplemented type: ' + type);
+    },
+
+    // === WRITING =================================================================
+
+    writeTag: function(tag, type) {
+        this.writeVarint((tag << 3) | type);
+    },
+
+    realloc: function(min) {
+        var length = this.length || 16;
+
+        while (length < this.pos + min) length *= 2;
+
+        if (length !== this.length) {
+            var buf = new Uint8Array(length);
+            buf.set(this.buf);
+            this.buf = buf;
+            this.length = length;
+        }
+    },
+
+    finish: function() {
+        this.length = this.pos;
+        this.pos = 0;
+        return this.buf.subarray(0, this.length);
+    },
+
+    writeFixed32: function(val) {
+        this.realloc(4);
+        writeInt32(this.buf, val, this.pos);
+        this.pos += 4;
+    },
+
+    writeSFixed32: function(val) {
+        this.realloc(4);
+        writeInt32(this.buf, val, this.pos);
+        this.pos += 4;
+    },
+
+    writeFixed64: function(val) {
+        this.realloc(8);
+        writeInt32(this.buf, val & -1, this.pos);
+        writeInt32(this.buf, Math.floor(val * SHIFT_RIGHT_32), this.pos + 4);
+        this.pos += 8;
+    },
+
+    writeSFixed64: function(val) {
+        this.realloc(8);
+        writeInt32(this.buf, val & -1, this.pos);
+        writeInt32(this.buf, Math.floor(val * SHIFT_RIGHT_32), this.pos + 4);
+        this.pos += 8;
+    },
+
+    writeVarint: function(val) {
+        val = +val || 0;
+
+        if (val > 0xfffffff || val < 0) {
+            writeBigVarint(val, this);
+            return;
+        }
+
+        this.realloc(4);
+
+        this.buf[this.pos++] =           val & 0x7f  | (val > 0x7f ? 0x80 : 0); if (val <= 0x7f) return;
+        this.buf[this.pos++] = ((val >>>= 7) & 0x7f) | (val > 0x7f ? 0x80 : 0); if (val <= 0x7f) return;
+        this.buf[this.pos++] = ((val >>>= 7) & 0x7f) | (val > 0x7f ? 0x80 : 0); if (val <= 0x7f) return;
+        this.buf[this.pos++] =   (val >>> 7) & 0x7f;
+    },
+
+    writeSVarint: function(val) {
+        this.writeVarint(val < 0 ? -val * 2 - 1 : val * 2);
+    },
+
+    writeBoolean: function(val) {
+        this.writeVarint(Boolean(val));
+    },
+
+    writeString: function(str) {
+        str = String(str);
+        this.realloc(str.length * 4);
+
+        this.pos++; // reserve 1 byte for short string length
+
+        var startPos = this.pos;
+        // write the string directly to the buffer and see how much was written
+        this.pos = writeUtf8(this.buf, str, this.pos);
+        var len = this.pos - startPos;
+
+        if (len >= 0x80) makeRoomForExtraLength(startPos, len, this);
+
+        // finally, write the message length in the reserved place and restore the position
+        this.pos = startPos - 1;
+        this.writeVarint(len);
+        this.pos += len;
+    },
+
+    writeFloat: function(val) {
+        this.realloc(4);
+        ieee754.write(this.buf, val, this.pos, true, 23, 4);
+        this.pos += 4;
+    },
+
+    writeDouble: function(val) {
+        this.realloc(8);
+        ieee754.write(this.buf, val, this.pos, true, 52, 8);
+        this.pos += 8;
+    },
+
+    writeBytes: function(buffer) {
+        var len = buffer.length;
+        this.writeVarint(len);
+        this.realloc(len);
+        for (var i = 0; i < len; i++) this.buf[this.pos++] = buffer[i];
+    },
+
+    writeRawMessage: function(fn, obj) {
+        this.pos++; // reserve 1 byte for short message length
+
+        // write the message directly to the buffer and see how much was written
+        var startPos = this.pos;
+        fn(obj, this);
+        var len = this.pos - startPos;
+
+        if (len >= 0x80) makeRoomForExtraLength(startPos, len, this);
+
+        // finally, write the message length in the reserved place and restore the position
+        this.pos = startPos - 1;
+        this.writeVarint(len);
+        this.pos += len;
+    },
+
+    writeMessage: function(tag, fn, obj) {
+        this.writeTag(tag, Pbf.Bytes);
+        this.writeRawMessage(fn, obj);
+    },
+
+    writePackedVarint:   function(tag, arr) { if (arr.length) this.writeMessage(tag, writePackedVarint, arr);   },
+    writePackedSVarint:  function(tag, arr) { if (arr.length) this.writeMessage(tag, writePackedSVarint, arr);  },
+    writePackedBoolean:  function(tag, arr) { if (arr.length) this.writeMessage(tag, writePackedBoolean, arr);  },
+    writePackedFloat:    function(tag, arr) { if (arr.length) this.writeMessage(tag, writePackedFloat, arr);    },
+    writePackedDouble:   function(tag, arr) { if (arr.length) this.writeMessage(tag, writePackedDouble, arr);   },
+    writePackedFixed32:  function(tag, arr) { if (arr.length) this.writeMessage(tag, writePackedFixed32, arr);  },
+    writePackedSFixed32: function(tag, arr) { if (arr.length) this.writeMessage(tag, writePackedSFixed32, arr); },
+    writePackedFixed64:  function(tag, arr) { if (arr.length) this.writeMessage(tag, writePackedFixed64, arr);  },
+    writePackedSFixed64: function(tag, arr) { if (arr.length) this.writeMessage(tag, writePackedSFixed64, arr); },
+
+    writeBytesField: function(tag, buffer) {
+        this.writeTag(tag, Pbf.Bytes);
+        this.writeBytes(buffer);
+    },
+    writeFixed32Field: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed32);
+        this.writeFixed32(val);
+    },
+    writeSFixed32Field: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed32);
+        this.writeSFixed32(val);
+    },
+    writeFixed64Field: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed64);
+        this.writeFixed64(val);
+    },
+    writeSFixed64Field: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed64);
+        this.writeSFixed64(val);
+    },
+    writeVarintField: function(tag, val) {
+        this.writeTag(tag, Pbf.Varint);
+        this.writeVarint(val);
+    },
+    writeSVarintField: function(tag, val) {
+        this.writeTag(tag, Pbf.Varint);
+        this.writeSVarint(val);
+    },
+    writeStringField: function(tag, str) {
+        this.writeTag(tag, Pbf.Bytes);
+        this.writeString(str);
+    },
+    writeFloatField: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed32);
+        this.writeFloat(val);
+    },
+    writeDoubleField: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed64);
+        this.writeDouble(val);
+    },
+    writeBooleanField: function(tag, val) {
+        this.writeVarintField(tag, Boolean(val));
+    }
+};
+
+function readPackedEnd(pbf) {
+    return pbf.type === Pbf.Bytes ?
+        pbf.readVarint() + pbf.pos : pbf.pos + 1;
+}
+
+function makeRoomForExtraLength(startPos, len, pbf) {
+    var extraLen =
+        len <= 0x3fff ? 1 :
+        len <= 0x1fffff ? 2 :
+        len <= 0xfffffff ? 3 : Math.floor(Math.log(len) / (Math.LN2 * 7));
+
+    // if 1 byte isn't enough for encoding message length, shift the data to the right
+    pbf.realloc(extraLen);
+    for (var i = pbf.pos - 1; i >= startPos; i--) pbf.buf[i + extraLen] = pbf.buf[i];
+}
+
+function writePackedVarint(arr, pbf)   { arr.forEach(pbf.writeVarint, pbf);   }
+function writePackedSVarint(arr, pbf)  { arr.forEach(pbf.writeSVarint, pbf);  }
+function writePackedFloat(arr, pbf)    { arr.forEach(pbf.writeFloat, pbf);    }
+function writePackedDouble(arr, pbf)   { arr.forEach(pbf.writeDouble, pbf);   }
+function writePackedBoolean(arr, pbf)  { arr.forEach(pbf.writeBoolean, pbf);  }
+function writePackedFixed32(arr, pbf)  { arr.forEach(pbf.writeFixed32, pbf);  }
+function writePackedSFixed32(arr, pbf) { arr.forEach(pbf.writeSFixed32, pbf); }
+function writePackedFixed64(arr, pbf)  { arr.forEach(pbf.writeFixed64, pbf);  }
+function writePackedSFixed64(arr, pbf) { arr.forEach(pbf.writeSFixed64, pbf); }
+
 class AlphaImage {
   // See maplibre-gl-js/src/util/image.js
   constructor(size, data) {
@@ -775,7 +2139,7 @@ const ONE_EM = 24;
 function parseGlyphPbf(data) {
   // See maplibre-gl-js/src/style/parse_glyph_pbf.js
   // Input is an ArrayBuffer, which will be read as a Uint8Array
-  return new Protobuf(data).readFields(readFontstacks, []);
+  return new Pbf(data).readFields(readFontstacks, []);
 }
 
 function readFontstacks(tag, glyphs, pbf) {
@@ -1144,28 +2508,26 @@ function updateFonts(fonts, feature) {
   return fonts;
 }
 
-function initStyleGetters(keys, { layout, paint }) {
-  const layoutFuncs = keys.layout
-    .map(k => ([camelCase$1(k), layout[k]]));
+function initStyleGetters(keys, { layout }) {
+  const styleFuncs = keys.map(k => ([layout[k], camelCase$1(k)]));
 
-  const bufferFuncs = keys.paint
-    .filter(k => paint[k].type === "property")
-    .map(k => ([camelCase$1(k), paint[k]]));
-
-  return function(zoom, feature) {
-    const layoutVals = layoutFuncs
-      .reduce((d, [k, f]) => (d[k] = f(zoom, feature), d), {});
-
-    const bufferVals = bufferFuncs
-      .reduce((d, [k, f]) => (d[k] = f(zoom, feature), d), {});
-
-    return { layoutVals, bufferVals };
+  return function(z, feature) {
+    return styleFuncs.reduce((d, [g, k]) => (d[k] = g(z, feature), d), {});
   };
 }
 
 function camelCase$1(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
+
+const styleKeys = [
+  "icon-opacity",
+  "text-color",
+  "text-opacity",
+  "text-halo-blur",
+  "text-halo-color",
+  "text-halo-width",
+];
 
 function getBox(w, h, anchor, offset) {
   const [sx, sy] = getBoxShift(anchor);
@@ -1226,15 +2588,13 @@ function initIcon(style, spriteData = {}) {
   const { image: { width, height } = {}, meta = {} } = spriteData;
   if (!width || !height) return () => undefined;
 
-  const getStyles = initStyleGetters(iconKeys, style);
+  const getStyles = initStyleGetters(iconLayoutKeys, style);
 
   return function(feature, tileCoords) {
     const sprite = getSprite(feature.spriteID);
     if (!sprite) return;
 
-    const { layoutVals, bufferVals } = getStyles(tileCoords.z, feature);
-    const icon = layoutSprite(sprite, layoutVals);
-    return Object.assign(icon, { bufferVals }); // TODO: rethink this
+    return layoutSprites(sprite, getStyles(tileCoords.z, feature));
   };
 
   function getSprite(spriteID) {
@@ -1250,21 +2610,16 @@ function initIcon(style, spriteData = {}) {
   }
 }
 
-const iconKeys = {
-  layout: [
-    "icon-anchor",
-    "icon-offset",
-    "icon-padding",
-    "icon-rotation-alignment",
-    "icon-size",
-  ],
-  paint: [
-    "icon-opacity",
-  ],
-};
+const iconLayoutKeys = [
+  "icon-anchor",
+  "icon-offset",
+  "icon-padding",
+  "icon-rotation-alignment",
+  "icon-size",
+];
 
-function layoutSprite(sprite, styleVals) {
-  const { metrics: { w, h }, spriteRect } = sprite;
+function layoutSprites(sprite, styleVals) {
+  const { metrics: { w, h }, spriteRect: rect } = sprite;
 
   const { iconAnchor, iconOffset, iconSize, iconPadding } = styleVals;
   const iconbox = getBox(w, h, iconAnchor, iconOffset);
@@ -1272,7 +2627,8 @@ function layoutSprite(sprite, styleVals) {
 
   const pos = [iconbox.x, iconbox.y, w, h].map(c => c * iconSize);
 
-  return { pos, rect: spriteRect, bbox };
+  // Structure return value to match ../text
+  return Object.assign([{ pos, rect }], { bbox, fontScalar: 0.0 });
 }
 
 const whitespace = {
@@ -1509,39 +2865,28 @@ function layout(glyphs, styleVals) {
 }
 
 function initText(style) {
-  const getStyles = initStyleGetters(textKeys, style);
+  const getStyles = initStyleGetters(textLayoutKeys, style);
 
   return function(feature, tileCoords, atlas) {
     const glyphs = getGlyphs(feature, atlas);
     if (!glyphs || !glyphs.length) return;
 
-    const { layoutVals, bufferVals } = getStyles(tileCoords.z, feature);
-    const chars = layout(glyphs, layoutVals);
-    return Object.assign(chars, { bufferVals }); // TODO: rethink this
+    return layout(glyphs, getStyles(tileCoords.z, feature));
   };
 }
 
-const textKeys = {
-  layout: [
-    "symbol-placement", // TODO: both here and in ../anchors/anchors.js
-    "text-anchor",
-    "text-justify",
-    "text-letter-spacing",
-    "text-line-height",
-    "text-max-width",
-    "text-offset",
-    "text-padding",
-    "text-rotation-alignment",
-    "text-size",
-  ],
-  paint: [
-    "text-color",
-    "text-opacity",
-    "text-halo-blur",
-    "text-halo-color",
-    "text-halo-width",
-  ],
-};
+const textLayoutKeys = [
+  "symbol-placement", // TODO: both here and in ../anchors/anchors.js
+  "text-anchor",
+  "text-justify",
+  "text-letter-spacing",
+  "text-line-height",
+  "text-max-width",
+  "text-offset",
+  "text-padding",
+  "text-rotation-alignment",
+  "text-size",
+];
 
 function getGlyphs(feature, atlas) {
   if (!atlas) return;
@@ -1573,9 +2918,9 @@ function buildCollider(placement) {
 
 function pointCollision(icon, text, anchor, tree) {
   const [x0, y0] = anchor;
-  const boxes = [];
-  if (icon) boxes.push(formatBox(x0, y0, icon.bbox));
-  if (text) boxes.push(formatBox(x0, y0, text.bbox));
+  const boxes = [icon, text]
+    .filter(label => label !== undefined)
+    .map(label => formatBox(x0, y0, label.bbox));
 
   if (boxes.some(tree.collides, tree)) return true;
   // TODO: drop if outside tile?
@@ -1598,17 +2943,16 @@ function lineCollision(icon, text, anchor, tree) {
   const sin_a = sin$1(angle);
   const rotate = ([x, y]) => [x * cos_a - y * sin_a, x * sin_a + y * cos_a];
 
-  const boxes = [];
-  if (text) text.map(c => getCharBbox(c.pos, rotate))
-    .map(bbox => formatBox(x0, y0, bbox))
-    .forEach(box => boxes.push(box));
-  if (icon) boxes.push(formatBox(x0, y0, getCharBbox(icon.pos, rotate)));
+  const boxes = [icon, text].flat()
+    .filter(glyph => glyph !== undefined)
+    .map(g => getGlyphBbox(g.pos, rotate))
+    .map(bbox => formatBox(x0, y0, bbox));
 
   if (boxes.some(tree.collides, tree)) return true;
   boxes.forEach(tree.insert, tree);
 }
 
-function getCharBbox([x, y, w, h], rotate) {
+function getGlyphBbox([x, y, w, h], rotate) {
   const corners = [
     [x, y], [x + w, y],
     [x, y + h], [x + w, y + h]
@@ -1858,10 +3202,10 @@ function getLineAnchors(geometry, extent, icon, text, layoutVals) {
 }
 
 function initAnchors(style) {
-  const getStyles = initStyleGetters(symbolKeys, style);
+  const getStyles = initStyleGetters(symbolLayoutKeys, style);
 
   return function(feature, tileCoords, icon, text, tree) {
-    const { layoutVals } = getStyles(tileCoords.z, feature);
+    const layoutVals = getStyles(tileCoords.z, feature);
     const collides = buildCollider(layoutVals.symbolPlacement);
 
     // TODO: get extent from tile?
@@ -1870,19 +3214,16 @@ function initAnchors(style) {
   };
 }
 
-const symbolKeys = {
-  layout: [
-    "symbol-placement",
-    "symbol-spacing",
-    // TODO: these are in 2 places: here and in the text getter
-    "text-rotation-alignment",
-    "text-size",
-    "icon-rotation-alignment",
-    "icon-keep-upright",
-    "text-keep-upright",
-  ],
-  paint: [],
-};
+const symbolLayoutKeys = [
+  "symbol-placement",
+  "symbol-spacing",
+  // TODO: these are in 2 places: here and in the text getter
+  "text-rotation-alignment",
+  "text-size",
+  "icon-rotation-alignment",
+  "icon-keep-upright",
+  "text-keep-upright",
+];
 
 function getAnchors(geometry, extent, icon, text, layoutVals) {
   switch (layoutVals.symbolPlacement) {
@@ -1907,49 +3248,21 @@ function getPointAnchors({ type, coordinates }) {
 }
 
 function getBuffers(icon, text, anchor) {
-  const iconBuffers = getIconBuffers(icon, anchor);
-  const textBuffers = getTextBuffers(text, anchor);
-  return mergeBuffers(iconBuffers, textBuffers);
+  const iconBuffers = buildBuffers(icon, anchor);
+  const textBuffers = buildBuffers(text, anchor);
+  return [iconBuffers, textBuffers].filter(b => b !== undefined);
 }
 
-function getIconBuffers(icon, anchor) {
-  if (!icon) return;
+function buildBuffers(glyphs, anchor) {
+  if (!glyphs) return;
 
-  const buffers = {
-    spriteRect: icon.rect,
-    spritePos: icon.pos,
-    labelPos0: [...anchor],
+  const origin = [...anchor, glyphs.fontScalar];
+
+  return {
+    glyphRect: glyphs.flatMap(g => g.rect),
+    glyphPos: glyphs.flatMap(g => g.pos),
+    labelPos: glyphs.flatMap(() => origin),
   };
-
-  Object.entries(icon.bufferVals).forEach(([key, val]) => {
-    buffers[key] = val;
-  });
-
-  return buffers;
-}
-
-function getTextBuffers(text, anchor) {
-  if (!text) return;
-
-  const origin = [...anchor, text.fontScalar];
-
-  const buffers = {
-    sdfRect: text.flatMap(c => c.rect),
-    charPos: text.flatMap(c => c.pos),
-    labelPos: text.flatMap(() => origin),
-  };
-
-  Object.entries(text.bufferVals).forEach(([key, val]) => {
-    buffers[key] = text.flatMap(() => val);
-  });
-
-  return buffers;
-}
-
-function mergeBuffers(buf1, buf2) {
-  if (!buf1) return buf2;
-  if (!buf2) return buf1;
-  return Object.assign(buf1, buf2);
 }
 
 function initShaping(style, spriteData) {
@@ -1957,7 +3270,7 @@ function initShaping(style, spriteData) {
   const getText = initText(style);
   const getAnchors = initAnchors(style);
 
-  return { serialize, getLength };
+  return { serialize, getLength, styleKeys };
 
   function serialize(feature, tileCoords, atlas, tree) {
     // tree is an RBush from the 'rbush' module. NOTE: will be updated!
@@ -1970,14 +3283,12 @@ function initShaping(style, spriteData) {
     if (!anchors || !anchors.length) return;
 
     return anchors
-      .map(anchor => getBuffers(icon, text, anchor))
+      .flatMap(anchor => getBuffers(icon, text, anchor))
       .reduce(combineBuffers, {});
   }
 
   function getLength(buffers) {
-    const { charPos, spritePos } = buffers;
-    // If charPos exists, it is longer than spritePos
-    return charPos ? charPos.length / 4 : spritePos.length / 4;
+    return buffers.labelPos.length / 4;
   }
 }
 
@@ -2829,7 +4140,7 @@ function getSerializeInfo(style, spriteData) {
 }
 
 function initFeatureSerializer(paint, info) {
-  const { styleKeys = [], serialize, getLength } = info;
+  const { styleKeys, serialize, getLength } = info;
 
   const dataFuncs = styleKeys
     .filter(k => paint[k].type === "property")
@@ -2842,7 +4153,7 @@ function initFeatureSerializer(paint, info) {
     const dummy = Array.from({ length: getLength(buffers) });
 
     dataFuncs.forEach(([get, key]) => {
-      const val = get(null, feature);
+      const val = get(null, feature); // Note: could be an Array
       buffers[key] = dummy.flatMap(() => val);
     });
 
@@ -3472,18 +4783,6 @@ function multiSelect(arr, left, right, n, compare) {
     }
 }
 
-function addTileCoords(tile, coords) {
-  const { z, x, y } = coords;
-
-  Object.values(tile.layers).forEach(layer => {
-    const { length, buffers } = layer;
-    const coordArray = Array.from({ length }).flatMap(() => [x, y, z]);
-    buffers.tileCoords = new Float32Array(coordArray);
-  });
-
-  return tile;
-}
-
 function initSerializer(userParams) {
   const { parsedStyles, spriteData, getAtlas } = setParams(userParams);
 
@@ -3492,8 +4791,7 @@ function initSerializer(userParams) {
 
   return function(source, tileCoords) {
     return getAtlas(source, tileCoords.z)
-      .then(atlas => process(source, tileCoords, atlas))
-      .then(tile => addTileCoords(tile, tileCoords));
+      .then(atlas => process(source, tileCoords, atlas));
   };
 
   function process(source, coords, atlas) {
@@ -3515,4 +4813,4 @@ function initSerializer(userParams) {
   }
 }
 
-export { initSerializer };
+export { initGL, initSerializer };

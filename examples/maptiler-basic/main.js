@@ -2,7 +2,7 @@ import * as tileStencil from "tile-stencil";
 import * as yawgl from "yawgl";
 import * as tileRetriever from "tile-retriever";
 import * as tileMixer from "tile-mixer";
-import { initSerializer, initGLpaint } from "../../";
+import { initSerializer, initGL } from "../../";
 
 const styleHref = "./klokantech-basic-style.json";
 const tileCoords = { z: 13, x: 1310, y: 3166 };
@@ -35,21 +35,20 @@ function render(data, style) {
   canvas.height = 512 * pixRatio;
   const context = yawgl.initContext(canvas);
 
-  const tileContext = initGLpaint({ 
-    context,
-    framebuffer: { buffer: null, size: canvas },
-    multiTile: false,
-  });
+  const framebuffer = { buffer: null, size: canvas };
+  const tileContext = initGL({ context, framebuffer });
 
   Object.values(data.layers).forEach(tileContext.loadBuffers);
   data.atlas = tileContext.loadAtlas(data.atlas);
 
   const painters = style.layers
     .map(tileStencil.getStyleFuncs)
-    .map(layer => tileContext.initPainter(layer));
+    .map(tileContext.initPainter);
 
-  const tile = Object.assign({ data }, tileCoords);
-  painters.forEach(painter => painter({ tile, pixRatio }));
+  painters.forEach(painter => {
+    painter.setStyles(tileCoords.z, pixRatio);
+    painter.paint({ data });
+  });
 
   console.log("All done!");
 }

@@ -1,8 +1,8 @@
-export function initLoader(context, progInfo, constructVao) {
+export function initLoader(context, info, constructVao, extraAttributes) {
   const { initAttribute, initIndices } = context;
-  const { attrInfo, getSpecialAttrs, countInstances } = progInfo;
-  const universalAttrs = { tileCoords: { numComponents: 3 } };
-  const allAttrs = Object.assign({}, attrInfo, universalAttrs);
+  const { attrInfo, getSpecialAttrs, countInstances } = info;
+
+  const allAttrs = Object.assign({}, attrInfo, extraAttributes);
 
   function getAttributes(buffers) {
     return Object.entries(allAttrs).reduce((d, [key, info]) => {

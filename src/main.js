@@ -1,51 +1,40 @@
 import { setParams } from "./params.js";
-import { initPrograms } from "./programs.js";
-import { initBackground } from "./background/program.js";
+import { compilePrograms } from "./compile.js";
+import { initStyleProg } from "./style-prog.js";
 
-export function initGLpaint(userParams) {
-  const { context, framebuffer, preamble, multiTile } = setParams(userParams);
+export function initGL(userParams) {
+  const params = setParams(userParams);
+  const { context, framebuffer } = params;
+  const programs = compilePrograms(params);
 
-  const programs = initPrograms(context, framebuffer, preamble, multiTile);
-  programs["background"] = initBackground(context);
+  return { prep, loadAtlas, loadBuffers, loadSprite, initPainter };
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);
     return context.clear();
   }
 
-  function loadBuffers(layer) {
-    const { type, buffers } = layer;
-
-    const program = programs[type];
-    if (!program) throw "loadBuffers: unknown layer type";
-
-    layer.buffers = program.load(buffers);
-  }
-
-  function loadAtlas(atlas) {
+  function loadAtlas(atlas) { // TODO: name like loadSprite, different behavior
     const format = context.gl.ALPHA;
     const { width, height, data } = atlas;
     return context.initTexture({ format, width, height, data, mips: false });
   }
 
+  function loadBuffers(layer) {
+    const program = programs[layer.type];
+    if (!program) throw Error("tile-gl loadBuffers: unknown layer type");
+    layer.buffers = program.load(layer.buffers);
+  }
+
   function loadSprite(image) {
-    if (image) return context.initTexture({ image, mips: false });
+    if (!image) return false;
+    const spriteTex = context.initTexture({ image, mips: false });
+    programs.symbol.use();
+    programs.symbol.uniformSetters.sprite(spriteTex);
+    return true;
   }
 
-  function initPainter(style, sprite) {
-    const { id, type, source, minzoom = 0, maxzoom = 24 } = style;
-
-    const program = programs[type];
-    if (!program) return () => null;
-
-    const { layout, paint } = style;
-    if (type === "line") {
-      // We handle line-miter-limit in the paint phase, not layout phase
-      paint["line-miter-limit"] = layout["line-miter-limit"];
-    }
-    const painter = program.initPainter(style, sprite);
-    return Object.assign(painter, { id, type, source, minzoom, maxzoom });
+  function initPainter(style) {
+    return initStyleProg(style, programs[style.type], context, framebuffer);
   }
-
-  return { prep, loadBuffers, loadAtlas, loadSprite, initPainter };
 }

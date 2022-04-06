@@ -1,8 +1,7 @@
-var singlePreamble = `#version 300 es
+var defaultPreamble = `#version 300 es
 
 precision highp float;
 
-uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
 uniform vec4 screenScale; // 2 / width, -2 / height, pixRatio, cameraScale
 
 vec2 tileToMap(vec2 tilePos) {
@@ -11,85 +10,58 @@ vec2 tileToMap(vec2 tilePos) {
 
 vec4 mapToClip(vec2 mapPos, float z) {
   vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
-  return vec4(projected, z, 1);
-}
-`;
-
-var multiPreamble = `#version 300 es
-
-precision highp float;
-
-in vec3 tileCoords;
-
-uniform vec4 mapCoords;   // x, y, z, extent of tileset[0]
-uniform vec3 mapShift;    // translate and scale of tileset[0]
-uniform vec4 screenScale; // 2 / width, -2 / height, pixRatio, cameraScale
-
-vec2 tileToMap(vec2 tilePos) {
-  // Find distance of this tile from top left tile, in tile units
-  float zoomFac = exp2(mapCoords.z - tileCoords.z);
-  vec2 dTile = zoomFac * tileCoords.xy - mapCoords.xy;
-  // tileCoords.x and mapCoords.x are both wrapped to the range [0..exp2(z)]
-  // If the right edge of the tile is left of the map, we need to unwrap dTile
-  dTile.x += (dTile.x + zoomFac <= 0.0) ? exp2(mapCoords.z) : 0.0;
-
-  // Convert to a translation in pixels
-  vec2 tileTranslate = dTile * mapShift.z + mapShift.xy;
-
-  // Find scaling between tile coordinates and screen pixels
-  float tileScale = zoomFac * mapShift.z / mapCoords.w;
-
-  return tilePos * tileScale + tileTranslate;
-}
-
-vec4 mapToClip(vec2 mapPos, float z) {
-  vec2 projected = mapPos * screenScale.xy + vec2(-1.0, 1.0);
-  return vec4(projected, z, 1);
-}
-`;
-
-var simpleScale = `float styleScale(vec2 tilePos) {
-  return screenScale.z;
-}
-`;
-
-var mercatorScale = `const float TWOPI = 6.28318530718;
-
-float mercatorScale(float yWeb) {
-  // Convert Web Mercator Y to standard Mercator Y
-  float yMerc = TWOPI * (0.5 - yWeb);
-  return 0.5 * (exp(yMerc) + exp(-yMerc)); // == cosh(y)
+  return vec4(projected, z, 1.0);
 }
 
 float styleScale(vec2 tilePos) {
-  float y = (tileCoords.y + tilePos.y / mapCoords.w) / exp2(tileCoords.z);
-  return screenScale.z * mercatorScale(y) / screenScale.w;
+  return screenScale.z;
 }
 `;
 
 function setParams(userParams) {
   const {
-    context, framebuffer,
-    projScale = false,
-    multiTile = true,
+    context, framebuffer, extraAttributes,
+    preamble = defaultPreamble,
   } = userParams;
 
-  const preamble = (multiTile) ? multiPreamble : singlePreamble;
-  const scaleCode = (projScale) ? mercatorScale : simpleScale;
-  const size = framebuffer.size;
+  return { context, framebuffer, preamble, extraAttributes };
+}
 
-  context.clipRectFlipY = function(x, y, w, h) {
-    const yflip = size.height - y - h;
-    context.clipRect(x, yflip, w, h);
-  };
+var vert$4 = `in vec2 quadPos;
+
+void main() {
+  gl_Position = vec4(quadPos, 0.0, 1.0);
+}
+`;
+
+var frag$4 = `#version 300 es
+
+precision mediump float;
+
+uniform vec4 backgroundColor;
+uniform float backgroundOpacity;
+
+out vec4 pixColor;
+
+void main() {
+  float alpha = backgroundColor.a * backgroundOpacity;
+  pixColor = vec4(backgroundColor.rgb * alpha, alpha);
+}
+`;
+
+function initBackground(context) {
+  const quadPos = context.initQuad();
+
+  const styleKeys = ["background-color", "background-opacity"];
 
   return {
-    context, framebuffer, multiTile,
-    preamble: preamble + scaleCode,
+    vert: vert$4, frag: frag$4, styleKeys,
+    getSpecialAttrs: () => ({ quadPos }),
+    countInstances: () => 1,
   };
 }
 
-var vert$4 = `in vec2 quadPos; // Vertices of the quad instance
+var vert$3 = `in vec2 quadPos; // Vertices of the quad instance
 in vec2 circlePos;
 in float circleRadius;
 in vec4 circleColor;
@@ -114,7 +86,7 @@ void main() {
 }
 `;
 
-var frag$4 = `#version 300 es
+var frag$3 = `#version 300 es
 
 precision mediump float;
 
@@ -145,13 +117,13 @@ function initCircle(context) {
   const styleKeys = ["circle-radius", "circle-color", "circle-opacity"];
 
   return {
-    vert: vert$4, frag: frag$4, attrInfo, styleKeys,
+    vert: vert$3, frag: frag$3, attrInfo, styleKeys,
     getSpecialAttrs: () => ({ quadPos }),
     countInstances: (buffers) => buffers.circlePos.length / 2,
   };
 }
 
-var vert$3 = `in vec2 quadPos;
+var vert$2 = `in vec2 quadPos;
 in vec3 pointA, pointB, pointC, pointD;
 in vec4 lineColor;
 in float lineOpacity, lineWidth, lineGapWidth;
@@ -265,7 +237,7 @@ void main() {
 }
 `;
 
-var frag$3 = `#version 300 es
+var frag$2 = `#version 300 es
 
 precision highp float;
 
@@ -368,12 +340,12 @@ function initLine(context) {
   ];
 
   return {
-    vert: vert$3, frag: frag$3, attrInfo, styleKeys, getSpecialAttrs,
+    vert: vert$2, frag: frag$2, attrInfo, styleKeys, getSpecialAttrs,
     countInstances: (buffers) => buffers.lines.length / numComponents - 3,
   };
 }
 
-var vert$2 = `in vec2 position;
+var vert$1 = `in vec2 position;
 in vec4 fillColor;
 in float fillOpacity;
 
@@ -390,7 +362,7 @@ void main() {
 }
 `;
 
-var frag$2 = `#version 300 es
+var frag$1 = `#version 300 es
 
 precision mediump float;
 
@@ -413,94 +385,39 @@ function initFill() {
   const styleKeys = ["fill-color", "fill-opacity", "fill-translate"];
 
   return {
-    vert: vert$2, frag: frag$2, attrInfo, styleKeys,
+    vert: vert$1, frag: frag$1, attrInfo, styleKeys,
     getSpecialAttrs: () => ({}),
   };
 }
 
-var vert$1 = `in vec2 quadPos;    // Vertices of the quad instance
-in vec3 labelPos0;   // x, y, angle
-in vec4 spritePos;  // dx, dy (relative to labelPos0), w, h
-in vec4 spriteRect; // x, y, w, h
+var vert = `in vec2 quadPos;   // Vertices of the quad instance
+in vec4 labelPos;  // x, y, angle, font size scalar (0 for icons)
+in vec4 glyphPos;  // dx, dy (relative to labelPos), w, h
+in vec4 glyphRect; // x, y, w, h
+
 in float iconOpacity;
 
-out float opacity;
-out vec2 texCoord;
-
-void main() {
-  texCoord = spriteRect.xy + spriteRect.zw * quadPos;
-  opacity = iconOpacity;
-
-  vec2 mapPos = tileToMap(labelPos0.xy);
-
-  // Shift to the appropriate corner of the current instance quad
-  vec2 dPos = (spritePos.xy + spritePos.zw * quadPos) * styleScale(labelPos0.xy);
-
-  float cos_a = cos(labelPos0.z);
-  float sin_a = sin(labelPos0.z);
-  float dx = dPos.x * cos_a - dPos.y * sin_a;
-  float dy = dPos.x * sin_a + dPos.y * cos_a;
-
-  gl_Position = mapToClip(mapPos + vec2(dx, dy), 0.0);
-}
-`;
-
-var frag$1 = `#version 300 es
-
-precision highp float;
-
-uniform sampler2D sprite;
-
-in float opacity;
-in vec2 texCoord;
-
-out vec4 pixColor;
-
-void main() {
-  vec4 texColor = texture(sprite, texCoord);
-  // Input sprite does NOT have pre-multiplied alpha
-  pixColor = vec4(texColor.rgb * texColor.a, texColor.a) * opacity;
-}
-`;
-
-function initSprite(context) {
-  const attrInfo = {
-    labelPos0: { numComponents: 3 },
-    spritePos: { numComponents: 4 },
-    spriteRect: { numComponents: 4 },
-    iconOpacity: { numComponents: 1 },
-  };
-  const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
-
-  const styleKeys = ["icon-opacity"];
-
-  return {
-    vert: vert$1, frag: frag$1, attrInfo, styleKeys,
-    getSpecialAttrs: () => ({ quadPos }),
-    countInstances: (buffers) => buffers.labelPos0.length / 3,
-  };
-}
-
-var vert = `in vec2 quadPos;  // Vertices of the quad instance
-in vec4 labelPos; // x, y, angle, font size scalar
-in vec4 charPos;  // dx, dy (relative to labelPos), w, h
-in vec4 sdfRect;  // x, y, w, h
 in vec4 textColor;
 in float textOpacity;
 in float textHaloBlur;
 in vec4 textHaloColor;
 in float textHaloWidth;
 
+out vec2 texCoord;
+
+out float opacity;
+
 out vec4 fillColor;
 out vec4 haloColor;
 out vec2 haloSize; // width, blur
-out vec2 texCoord;
 out float taperWidth;
 
 void main() {
-  texCoord = sdfRect.xy + sdfRect.zw * quadPos;
+  // For icons only
+  opacity = iconOpacity;
 
-  taperWidth = labelPos.w * screenScale.z;
+  // For text only
+  taperWidth = labelPos.w * screenScale.z; // == 0.0 for icon glyphs
   haloSize = vec2(textHaloWidth, textHaloBlur) * screenScale.z;
 
   float fillAlpha = textColor.a * textOpacity;
@@ -508,10 +425,14 @@ void main() {
   float haloAlpha = textHaloColor.a * textOpacity;
   haloColor = vec4(textHaloColor.rgb * haloAlpha, haloAlpha);
 
+  // Texture coordinates
+  texCoord = glyphRect.xy + glyphRect.zw * quadPos;
+
+  // Compute glyph position. First transform the label origin
   vec2 mapPos = tileToMap(labelPos.xy);
 
   // Shift to the appropriate corner of the current instance quad
-  vec2 dPos = (charPos.xy + charPos.zw * quadPos) * styleScale(labelPos.xy);
+  vec2 dPos = (glyphPos.xy + glyphPos.zw * quadPos) * styleScale(labelPos.xy);
 
   float cos_a = cos(labelPos.z);
   float sin_a = sin(labelPos.z);
@@ -526,17 +447,26 @@ var frag = `#version 300 es
 
 precision highp float;
 
-uniform sampler2D sdf;
+uniform sampler2D sprite, sdf;
+
+in vec2 texCoord;
+
+in float opacity;
 
 in vec4 fillColor;
 in vec4 haloColor;
 in vec2 haloSize; // width, blur
-in vec2 texCoord;
-in float taperWidth;
+in float taperWidth; // 0 for icons
 
 out vec4 pixColor;
 
 void main() {
+  // Get color from sprite if this is an icon glyph
+  vec4 spritePix = texture(sprite, texCoord);
+  // Input sprite does NOT have pre-multiplied alpha
+  vec4 iconColor = vec4(spritePix.rgb * spritePix.a, spritePix.a) * opacity;
+
+  // Compute fill and halo color from sdf if this is a text glyph
   float sdfVal = texture(sdf, texCoord).a;
   float screenDist = taperWidth * (191.0 - 255.0 * sdfVal) / 32.0;
 
@@ -546,16 +476,19 @@ void main() {
   float haloAlpha = (haloSize.x > 0.0 || haloSize.y > 0.0)
     ? (1.0 - fillAlpha) * smoothstep(-hTaper, -hEdge, -screenDist)
     : 0.0;
+  vec4 textColor = fillColor * fillAlpha + haloColor * haloAlpha;
 
-  pixColor = fillColor * fillAlpha + haloColor * haloAlpha;
+  // Choose icon or text color based on taperWidth value
+  pixColor = (taperWidth == 0.0) ? iconColor : textColor;
 }
 `;
 
-function initText(context) {
+function initSymbol(context) {
   const attrInfo = {
     labelPos: { numComponents: 4 },
-    charPos: { numComponents: 4 },
-    sdfRect: { numComponents: 4 },
+    glyphPos: { numComponents: 4 },
+    glyphRect: { numComponents: 4 },
+    iconOpacity: { numComponents: 1 },
     textColor: { numComponents: 4 },
     textOpacity: { numComponents: 1 },
     textHaloBlur: { numComponents: 1 },
@@ -565,6 +498,7 @@ function initText(context) {
   const quadPos = context.initQuad({ x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 });
 
   const styleKeys = [
+    "icon-opacity",
     "text-color",
     "text-opacity",
     "text-halo-blur",
@@ -579,21 +513,11 @@ function initText(context) {
   };
 }
 
-function getProgInfo(context) {
-  return {
-    "circle": initCircle(context),
-    "line": initLine(context),
-    "fill": initFill(),
-    "sprite": initSprite(context),
-    "text": initText(context),
-  };
-}
-
-function initLoader(context, progInfo, constructVao) {
+function initLoader(context, info, constructVao, extraAttributes) {
   const { initAttribute, initIndices } = context;
-  const { attrInfo, getSpecialAttrs, countInstances } = progInfo;
-  const universalAttrs = { tileCoords: { numComponents: 3 } };
-  const allAttrs = Object.assign({}, attrInfo, universalAttrs);
+  const { attrInfo, getSpecialAttrs, countInstances } = info;
+
+  const allAttrs = Object.assign({}, attrInfo, extraAttributes);
 
   function getAttributes(buffers) {
     return Object.entries(allAttrs).reduce((d, [key, info]) => {
@@ -619,245 +543,118 @@ function initLoader(context, progInfo, constructVao) {
   return (countInstances) ? loadInstanced : loadIndexed;
 }
 
+function compilePrograms(params) {
+  const { context, preamble, extraAttributes } = params;
+
+  const progInfo = {
+    background: initBackground(context),
+    circle: initCircle(context),
+    line: initLine(context),
+    fill: initFill(),
+    symbol: initSymbol(context),
+  };
+
+  function compile(info) {
+    const { vert, frag, styleKeys } = info;
+    const program = context.initProgram(preamble + vert, frag);
+    const { use, constructVao, uniformSetters } = program;
+    const load = initLoader(context, info, constructVao, extraAttributes);
+    return { load, use, uniformSetters, styleKeys };
+  }
+
+  return Object.entries(progInfo)
+    .reduce((d, [k, info]) => (d[k] = compile(info), d), {});
+}
+
 function camelCase(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function initStyleProg(style, styleKeys, program, spriteTexture) {
-  const { id, type, paint } = style;
-  const { sdf, sprite } = program.uniformSetters;
-  const haveSprite = sprite && (spriteTexture instanceof WebGLTexture);
+function initStyleProg(style, program, context, framebuffer) {
+  if (!program) return;
+
+  const { id, type, layout, paint } = style;
+  const { load, use, uniformSetters, styleKeys } = program;
+  const { sdf, screenScale } = uniformSetters;
+
+  if (type === "line") {
+    // We handle line-miter-limit in the paint phase, not layout phase
+    paint["line-miter-limit"] = layout["line-miter-limit"];
+  }
 
   const zoomFuncs = styleKeys
     .filter(styleKey => paint[styleKey].type !== "property")
     .map(styleKey => {
       const get = paint[styleKey];
       const shaderVar = camelCase(styleKey);
-      const set = program.uniformSetters[shaderVar];
+      const set = uniformSetters[shaderVar];
       return (z, f) => set(get(z, f));
     });
 
-  function setStyles(zoom) {
-    program.use();
+  function setStyles(zoom, pixRatio = 1.0, cameraScale = 1.0) {
+    use();
     zoomFuncs.forEach(f => f(zoom));
-    if (haveSprite) sprite(spriteTexture);
+    if (!screenScale) return;
+    const { width, height } = framebuffer.size;
+    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
   }
 
-  const getData = (type !== "symbol") ? getFeatures :
-    (haveSprite) ? getIcons : getText;
+  const getData = (type === "background") ? initBackgroundData() : getFeatures;
+
+  function draw(tile) {
+    const data = getData(tile);
+    if (data) context.draw(data.buffers);
+  }
+
+  function initBackgroundData() {
+    const buffers = load({});
+    return () => ({ buffers });
+  }
 
   function getFeatures(tile) {
-    return tile.data.layers[id];
-  }
-
-  function getIcons(tile) {
-    const layer = tile.data.layers[id];
-    if (!layer) return;
-    const { type, extent, buffers: { sprite } } = layer;
-    if (sprite) return { type, extent, buffers: sprite };
-  }
-
-  function getText(tile) {
     const { layers: { [id]: layer }, atlas } = tile.data;
-    if (!layer || !atlas) return;
-    const { type, extent, buffers: { text } } = layer;
-    if (!text || !sdf) return;
-    sdf(atlas);
-    return { type, extent, buffers: text };
+    if (sdf && atlas) sdf(atlas);
+    return layer;
   }
 
-  return { setStyles, getData };
+  return { id, type, setStyles, getData, uniformSetters, paint: draw };
 }
 
-function antiMeridianSplit(tileset) {
-  // At low zooms, some tiles may be repeated on opposite ends of the map
-  // We split them into subsets, one tileset for each copy of the map
+function initGL(userParams) {
+  const params = setParams(userParams);
+  const { context, framebuffer } = params;
+  const programs = compilePrograms(params);
 
-  const { 0: { x, z }, translate, scale } = tileset;
-  const numTiles = 1 << z;
-
-  function inRange(tile, shift) {
-    const delta = tile.x - x - shift;
-    return (0 <= delta && delta < numTiles);
-  }
-
-  return [0, 1, 2]
-    .map(repeat => repeat * numTiles)
-    .map(shift => tileset.filter(tile => inRange(tile, shift)))
-    .map(tiles => Object.assign(tiles, { translate, scale }))
-    .filter(subset => subset.length);
-}
-
-function initTilesetPainter(context, framebuffer, program, layer) {
-  const { screenScale, mapCoords, mapShift } = program.uniformSetters;
-
-  return function({ tileset, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
-    if (!tileset || !tileset.length) return;
-    layer.setStyles(zoom);
-
-    // Set screenScale and mapCoords
-    const { width, height } = framebuffer.size;
-    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
-
-    const { x, y, z } = tileset[0];
-    const numTiles = 1 << z;
-    const xw = x - Math.floor(x / numTiles) * numTiles;
-    const extent = 512; // TODO: don't assume this!!
-    mapCoords([xw, y, z, extent]);
-
-    // Draw tiles. Split into subsets if they are repeated across antimeridian
-    antiMeridianSplit(tileset).forEach(subset => drawSubset(subset, pixRatio));
-  };
-
-  function drawSubset(tileset, pixRatio = 1) {
-    const { 0: { x, y }, translate, scale: rawScale } = tileset;
-    const scale = rawScale * pixRatio;
-
-    const [dx, dy] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    mapShift([dx, dy, scale]);
-
-    tileset.forEach(tile => drawTileBox(tile, translate, scale));
-  }
-
-  function drawTileBox(box, translate, scale) {
-    const { x, y, tile } = box;
-    const data = layer.getData(tile);
-    if (!data) return;
-
-    const [x0, y0] = [x, y].map((c, i) => (c + translate[i]) * scale);
-    context.clipRectFlipY(x0, y0, scale, scale);
-
-    context.draw(data.buffers);
-  }
-}
-
-function initTilePainter(context, framebuffer, program, layer) {
-  const { screenScale } = program.uniformSetters;
-
-  return function({ tile, zoom, pixRatio = 1.0, cameraScale = 1.0 }) {
-    const z = (zoom !== undefined) ? zoom : tile.z;
-    layer.setStyles(z);
-
-    // Note: layer.getData executes uniform1i for text layers.
-    // So we must call useProgram first (done in layer.setStyles)
-    const data = layer.getData(tile);
-    if (!data) return;
-
-    const { width, height } = framebuffer.size;
-    screenScale([2 / width, -2 / height, pixRatio, cameraScale]);
-
-    context.draw(data.buffers);
-  };
-}
-
-function initPrograms(context, framebuffer, preamble, multiTile) {
-  const info = getProgInfo(context);
-  const initRenderer = (multiTile) ? initTilesetPainter : initTilePainter;
-
-  return {
-    "circle": setupProgram(info.circle),
-    "line": setupProgram(info.line),
-    "fill": setupProgram(info.fill),
-    "symbol": setupSymbol(),
-  };
-
-  function setupProgram(progInfo) {
-    const { vert, frag, styleKeys } = progInfo;
-
-    const program = context.initProgram(preamble + vert, frag);
-    const load = initLoader(context, progInfo, program.constructVao);
-
-    function initPainter(style, sprite) {
-      const styleProg = initStyleProg(style, styleKeys, program, sprite);
-      return initRenderer(context, framebuffer, program, styleProg);
-    }
-
-    return { load, initPainter };
-  }
-
-  function setupSymbol() {
-    const spriteProg = setupProgram(info.sprite);
-    const textProg = setupProgram(info.text);
-
-    function load(buffers) {
-      const loaded = {};
-      if (buffers.spritePos) loaded.sprite = spriteProg.load(buffers);
-      if (buffers.charPos) loaded.text = textProg.load(buffers);
-      return loaded;
-    }
-
-    function initPainter(style, sprite) {
-      const iconPaint = spriteProg.initPainter(style, sprite);
-      const textPaint = textProg.initPainter(style);
-
-      return function(params) {
-        iconPaint(params);
-        textPaint(params);
-      };
-    }
-
-    return { load, initPainter };
-  }
-}
-
-function initBackground(context) {
-  function initPainter({ paint }) {
-    return function({ zoom }) {
-      const opacity = paint["background-opacity"](zoom);
-      const color = paint["background-color"](zoom);
-      context.clear(color.map(c => c * opacity));
-    };
-  }
-
-  return { initPainter };
-}
-
-function initGLpaint(userParams) {
-  const { context, framebuffer, preamble, multiTile } = setParams(userParams);
-
-  const programs = initPrograms(context, framebuffer, preamble, multiTile);
-  programs["background"] = initBackground(context);
+  return { prep, loadAtlas, loadBuffers, loadSprite, initPainter };
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);
     return context.clear();
   }
 
-  function loadBuffers(layer) {
-    const { type, buffers } = layer;
-
-    const program = programs[type];
-    if (!program) throw "loadBuffers: unknown layer type";
-
-    layer.buffers = program.load(buffers);
-  }
-
-  function loadAtlas(atlas) {
+  function loadAtlas(atlas) { // TODO: name like loadSprite, different behavior
     const format = context.gl.ALPHA;
     const { width, height, data } = atlas;
     return context.initTexture({ format, width, height, data, mips: false });
   }
 
+  function loadBuffers(layer) {
+    const program = programs[layer.type];
+    if (!program) throw Error("tile-gl loadBuffers: unknown layer type");
+    layer.buffers = program.load(layer.buffers);
+  }
+
   function loadSprite(image) {
-    if (image) return context.initTexture({ image, mips: false });
+    if (!image) return false;
+    const spriteTex = context.initTexture({ image, mips: false });
+    programs.symbol.use();
+    programs.symbol.uniformSetters.sprite(spriteTex);
+    return true;
   }
 
-  function initPainter(style, sprite) {
-    const { id, type, source, minzoom = 0, maxzoom = 24 } = style;
-
-    const program = programs[type];
-    if (!program) return () => null;
-
-    const { layout, paint } = style;
-    if (type === "line") {
-      // We handle line-miter-limit in the paint phase, not layout phase
-      paint["line-miter-limit"] = layout["line-miter-limit"];
-    }
-    const painter = program.initPainter(style, sprite);
-    return Object.assign(painter, { id, type, source, minzoom, maxzoom });
+  function initPainter(style) {
+    return initStyleProg(style, programs[style.type], context, framebuffer);
   }
-
-  return { prep, loadBuffers, loadAtlas, loadSprite, initPainter };
 }
 
-export { initGLpaint };
+export { initGL };

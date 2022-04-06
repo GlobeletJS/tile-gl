@@ -20,7 +20,7 @@ export function getSerializeInfo(style, spriteData) {
 }
 
 export function initFeatureSerializer(paint, info) {
-  const { styleKeys = [], serialize, getLength } = info;
+  const { styleKeys, serialize, getLength } = info;
 
   const dataFuncs = styleKeys
     .filter(k => paint[k].type === "property")
@@ -33,7 +33,7 @@ export function initFeatureSerializer(paint, info) {
     const dummy = Array.from({ length: getLength(buffers) });
 
     dataFuncs.forEach(([get, key]) => {
-      const val = get(null, feature);
+      const val = get(null, feature); // Note: could be an Array
       buffers[key] = dummy.flatMap(() => val);
     });
 

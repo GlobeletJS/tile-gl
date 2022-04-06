@@ -2,12 +2,11 @@ import * as tileStencil from "tile-stencil";
 import * as yawgl from "yawgl";
 import * as tileRetriever from "tile-retriever";
 import * as tileMixer from "tile-mixer";
-import { initSerializer, initGLpaint } from "../../";
+import { initSerializer, initGL } from "../../";
 
 const styleHref = "./streets-v8-noInteractive.json";
 const mapboxToken = "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA";
 const tileCoords = { z: 15, x: 7703, y: 13544 };
-// const tileCoords = { z: 13, x: 1310, y: 3166 };
 
 export function main() {
   tileStencil.loadStyle(styleHref, mapboxToken).then(getTile);
@@ -37,22 +36,21 @@ function render(data, style) {
   canvas.height = 512 * pixRatio;
   const context = yawgl.initContext(canvas);
 
-  const tileContext = initGLpaint({ 
-    context,
-    framebuffer: { buffer: null, size: canvas },
-    multiTile: false,
-  });
+  const framebuffer = { buffer: null, size: canvas };
+  const tileContext = initGL({ context, framebuffer });
 
   Object.values(data.layers).forEach(tileContext.loadBuffers);
   data.atlas = tileContext.loadAtlas(data.atlas);
-  const sprite = tileContext.loadSprite(style.spriteData.image);
+  tileContext.loadSprite(style.spriteData.image);
 
   const painters = style.layers
     .map(tileStencil.getStyleFuncs)
-    .map(layer => tileContext.initPainter(layer, sprite));
+    .map(tileContext.initPainter);
 
-  const tile = Object.assign({ data }, tileCoords);
-  painters.forEach(painter => painter({ tile, pixRatio }));
+  painters.forEach(painter => {
+    painter.setStyles(tileCoords.z, pixRatio);
+    painter.paint({ data });
+  });
 
   console.log("All done!");
 }
