@@ -54,7 +54,7 @@
     "earcut": "^2.2.3",
     "rbush": "^3.0.1",
     "tile-labeler": "^0.8.1",
-    "tile-stencil": "^0.4.10"
+    "tile-stencil": "^0.4.12"
   },
   "sideEffects": false
 }
