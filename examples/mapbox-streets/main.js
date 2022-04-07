@@ -47,6 +47,7 @@ function render(data, style) {
     .map(tileStencil.getStyleFuncs)
     .map(tileContext.initPainter);
 
+  tileContext.prep();
   painters.forEach(painter => {
     painter.setStyles(tileCoords.z, pixRatio);
     painter.paint({ data });
