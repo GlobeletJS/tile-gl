@@ -1,26 +1,19 @@
 import { setParams } from "./params.js";
 import { compilePrograms } from "./compile.js";
 import { initStyleProg } from "./style-prog.js";
+import { initSprite } from "./sprite.js";
 
 export function initGL(userParams) {
   const params = setParams(userParams);
   const { context, framebuffer } = params;
   const programs = compilePrograms(params);
+  const sprite = initSprite(context, programs);
 
-  let spriteTexture;
-  const spriteSetters = Object.values(programs)
-    .map(({ use, uniformSetters }) => ({ use, set: uniformSetters.sprite }))
-    .filter(setter => setter.set !== undefined);
-
-  function loadSprite(image) {
-    if (image) spriteTexture = context.initTexture({ image, mips: false });
-  }
-
-  return { prep, loadAtlas, loadBuffers, loadSprite, initPainter };
+  return { prep, loadAtlas, loadBuffers, loadSprite: sprite.load, initPainter };
 
   function prep() {
     context.bindFramebufferAndSetViewport(framebuffer);
-    spriteSetters.forEach(({ use, set }) => (use(), set(spriteTexture)));
+    sprite.set();
     return context.clear();
   }
 

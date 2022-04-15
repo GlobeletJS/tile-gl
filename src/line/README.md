@@ -86,3 +86,4 @@ is common enough to warrant adding that much complexity to the code:
 - [line-pattern](https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#paint-line-line-pattern)
 
 [line-dasharray]: https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#paint-line-line-dasharray
+[line-miter-limit]: https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#layout-line-line-miter-limit

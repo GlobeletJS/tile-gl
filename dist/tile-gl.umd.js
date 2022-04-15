@@ -626,25 +626,38 @@ void main() {
     return { id, type, setStyles, getData, uniformSetters, paint: draw };
   }
 
-  function initGL(userParams) {
-    const params = setParams$1(userParams);
-    const { context, framebuffer } = params;
-    const programs = compilePrograms(params);
+  function initSprite(context, programs) {
+    // Construct a default sprite: one blue pixel
+    const bluePixel = new Uint8Array([0, 0, 255, 255]);
+    let spriteTexture = context.initTexture({ data: bluePixel, mips: false });
 
-    let spriteTexture;
+    // Collect sprite setter uniforms from the programs
     const spriteSetters = Object.values(programs)
       .map(({ use, uniformSetters }) => ({ use, set: uniformSetters.sprite }))
       .filter(setter => setter.set !== undefined);
 
-    function loadSprite(image) {
+    function load(image) {
       if (image) spriteTexture = context.initTexture({ image, mips: false });
     }
 
-    return { prep, loadAtlas, loadBuffers, loadSprite, initPainter };
+    function set() {
+      spriteSetters.forEach(({ use, set }) => (use(), set(spriteTexture)));
+    }
+
+    return { load, set };
+  }
+
+  function initGL(userParams) {
+    const params = setParams$1(userParams);
+    const { context, framebuffer } = params;
+    const programs = compilePrograms(params);
+    const sprite = initSprite(context, programs);
+
+    return { prep, loadAtlas, loadBuffers, loadSprite: sprite.load, initPainter };
 
     function prep() {
       context.bindFramebufferAndSetViewport(framebuffer);
-      spriteSetters.forEach(({ use, set }) => (use(), set(spriteTexture)));
+      sprite.set();
       return context.clear();
     }
 
