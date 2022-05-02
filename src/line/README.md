@@ -31,11 +31,14 @@ shader, and then send three sets of 2D coordinates to the fragment shader:
    the end of the segment and the start of the next segment. These are used
    in the same way as the previous miter coordinates.
 
+See the [interactive notebook][] for a visualization of these coordinates.
+
 [instanced drawing]: https://webgl2fundamentals.org/webgl/lessons/webgl-instanced-drawing.html
 [Terrell 1]: https://wwwtyro.net/2019/11/18/instanced-lines.html
 [Terrell 2]: https://wwwtyro.net/2021/10/01/instanced-lines-part-2.html
 [anti-aliasing]: https://blog.mapbox.com/drawing-antialiased-lines-with-opengl-8766f34192dc
 [line casings]: https://maplibre.org/maplibre-gl-js-docs/style-spec/layers/#paint-line-line-gap-width
+[interactive notebook]: https://observablehq.com/@jjhembd/instanced-lines-for-vector-maps
 
 ## Serialization
 The beauty of instanced rendering for lines

@@ -16,3 +16,4 @@ vec4 mapToClip(vec2 mapPos, float z) {
 float styleScale(vec2 tilePos) {
   return screenScale.z;
 }
+

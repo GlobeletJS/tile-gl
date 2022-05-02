@@ -1,3 +1,4 @@
+import miter from "./miter.glsl";
 import vert from "./vert.glsl";
 import frag from "./frag.glsl";
 
@@ -48,7 +49,8 @@ export function initLine(context) {
   ];
 
   return {
-    vert, frag, attrInfo, styleKeys, getSpecialAttrs,
+    vert: miter + vert,
+    frag, attrInfo, styleKeys, getSpecialAttrs,
     countInstances: (buffers) => buffers.lines.length / numComponents - 3,
   };
 }
